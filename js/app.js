@@ -1,5 +1,5 @@
 /**
- * Application principale - Suivi AG & Votes Conseil Syndical
+ * Application principale - Suivi AG & Votes Conseil Syndical (Module Anti-Fraude & Émargement)
  */
 
 let appData = loadData();
@@ -27,7 +27,7 @@ function persistData(broadcast = true) {
 }
 
 function reloadConvocationData() {
-  if (confirm("Réinitialiser avec toutes les résolutions de votre convocation du 25 novembre 2026 ?")) {
+  if (confirm("Réinitialiser avec toutes les résolutions et copropriétaires de la convocation ?")) {
     appData = JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
     persistData();
   }
@@ -50,11 +50,40 @@ function switchTab(tabId) {
 
 // UI Updates
 function updateUI() {
-  document.getElementById('headerSubtitle').innerText = `${appData.config.coproName} - AG du ${formatDate(appData.config.agDate)}`;
-  document.getElementById('printAgTitle').innerText = `${appData.config.coproName} - Assemblée Générale Annuelle`;
-  document.getElementById('printAgMeta').innerText = `Mercredi 25 novembre 2026 à 18h00 - Sassenage - Relevé de décisions & Votes du CS`;
+  const totalTant = Number(appData.config.totalTantiemes) || 97478;
 
-  // Stats calculation
+  document.getElementById('headerSubtitle').innerText = `${appData.config.coproName} - AG du ${formatDate(appData.config.agDate)}`;
+  document.getElementById('printAgTitle').innerText = `${appData.config.coproName} - Relevé Miroir des Votes du Conseil Syndical`;
+  document.getElementById('printAgMeta').innerText = `AG du 25/11/2026 - Total syndicat : ${totalTant} tantièmes - Contrôle strict des délibérations`;
+
+  // Compteurs d'émargement en temps réel
+  const copros = appData.coproprietaires || [];
+  let presentsPhysiques = 0;
+  let representesPouvoir = 0;
+  let votesCorresp = 0;
+  let partisEnCours = 0;
+  let tantiemesEnSalle = 0;
+
+  copros.forEach(c => {
+    const t = Number(c.tantiemes) || 0;
+    if (c.statut === 'PRESENT') {
+      presentsPhysiques++;
+      tantiemesEnSalle += t;
+    } else if (c.statut === 'POUVOIR') {
+      representesPouvoir++;
+      tantiemesEnSalle += t;
+    } else if (c.statut === 'VPC') {
+      votesCorresp++;
+      tantiemesEnSalle += t;
+    } else if (c.statut === 'PARTI') {
+      partisEnCours++;
+    }
+  });
+
+  const totalExprimesEnSalle = tantiemesEnSalle;
+  appData.config.presentTantiemes = totalExprimesEnSalle;
+
+  // Stats des votes
   const voteResolutions = appData.resolutions.filter(r => r.majorite !== 'article sans vote');
   const total = voteResolutions.length;
   const adopted = voteResolutions.filter(r => r.status === 'ADOPTEE').length;
@@ -68,34 +97,38 @@ function updateUI() {
   document.getElementById('statRejected').innerText = rejected;
   document.getElementById('statPercent').innerText = total > 0 ? Math.round((voted / total) * 100) + '% voté' : '0%';
 
-  // CS Weight
+  // Voix du CS
   const csPerso = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0), 0);
   const csMandats = appData.members.reduce((acc, m) => acc + (Number(m.mandatTantiemes) || 0), 0);
   const csTotal = csPerso + csMandats;
-  const totalTant = Number(appData.config.totalTantiemes) || 10000;
   const csPct = totalTant > 0 ? ((csTotal / totalTant) * 100).toFixed(1) : '0';
 
   document.getElementById('statCsWeight').innerText = `${csTotal} / ${totalTant}`;
   document.getElementById('statCsPercent').innerText = `${csPct}% des tantièmes totaux`;
 
-  // Badges
+  // Compteurs Émargement
+  document.getElementById('statTantiemesEnSalle').innerText = `${totalExprimesEnSalle} / ${totalTant}`;
+  document.getElementById('statEnSallePct').innerText = `${((totalExprimesEnSalle / totalTant) * 100).toFixed(1)}% des voix représentées`;
+  document.getElementById('statPresentsCount').innerText = `${presentsPhysiques} présents, ${representesPouvoir} pouvoirs, ${partisEnCours} parti(s)`;
+
+  // Badges d'onglets
   document.getElementById('badgeVotesCount').innerText = `${voted}/${total}`;
-  document.getElementById('badgePresenceCount').innerText = appData.coproprietaires ? appData.coproprietaires.length : 0;
+  document.getElementById('badgePresenceCount').innerText = `${presentsPhysiques + representesPouvoir + votesCorresp}/${copros.length}`;
   document.getElementById('badgeMembersCount').innerText = appData.members.length;
 
-  renderResolutions();
-  renderCoproprietaires(totalTant);
+  renderResolutions(totalExprimesEnSalle, totalTant);
+  renderCoproprietaires(totalExprimesEnSalle, totalTant);
   renderMembers(csPerso, csMandats, csTotal, totalTant);
 
   // Settings
   document.getElementById('cfgCoproname').value = appData.config.coproName || '';
   document.getElementById('cfgAgDate').value = appData.config.agDate || '';
-  document.getElementById('cfgTotalTantiemes').value = appData.config.totalTantiemes || 10000;
-  document.getElementById('cfgPresentTantiemes').value = appData.config.presentTantiemes || '';
+  document.getElementById('cfgTotalTantiemes').value = appData.config.totalTantiemes || 97478;
+  document.getElementById('cfgPresentTantiemes').value = appData.config.presentTantiemes || totalExprimesEnSalle;
 }
 
-// Render Resolutions
-function renderResolutions() {
+// Render Resolutions avec module de calcul de majorité miroir
+function renderResolutions(totalEnSalle, totalCopro) {
   const listEl = document.getElementById('resolutionsList');
   const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
   const statusFilter = document.getElementById('filterStatus')?.value || 'ALL';
@@ -129,6 +162,43 @@ function renderResolutions() {
       'REPORTEE': '⏳ Reportée / Retirée'
     }[r.status] || r.status;
 
+    // Calculs de dépouillement en direct
+    const pour = Number(r.tantiemesPour) || 0;
+    const contre = Number(r.tantiemesContre) || 0;
+    const abs = Number(r.tantiemesAbs) || 0;
+    const hasNumbers = (pour > 0 || contre > 0 || abs > 0);
+
+    // Calcul légal de majorité selon l'article
+    let legalNotice = '';
+    let legalClass = '';
+    if (hasNumbers && !isSansVote) {
+      if (r.majorite === 'Article 24') {
+        // Art. 24 : Majorité simple des voix exprimées (Pour > Contre, abstentions ne comptent pas)
+        if (pour > contre) {
+          legalNotice = `⚖️ Légalement ADOPTÉE (Art. 24) : ${pour} POUR > ${contre} CONTRE (Abstentions ${abs} exclues)`;
+          legalClass = 'thresh-adoptee';
+        } else {
+          legalNotice = `⚖️ Légalement REJETÉE (Art. 24) : ${contre} CONTRE >= ${pour} POUR`;
+          legalClass = 'thresh-rejetee';
+        }
+      } else if (r.majorite.includes('Article 25')) {
+        // Art. 25 : Majorité absolue de TOUS les copropriétaires (> 50% de totalCopro)
+        const seuil25 = Math.floor(totalCopro / 2) + 1;
+        const seuilPasserelle = Math.ceil(totalCopro / 3);
+
+        if (pour >= seuil25) {
+          legalNotice = `⚖️ Légalement ADOPTÉE à l'Article 25 : ${pour} voix >= ${seuil25} (Majorité absolue atteinte)`;
+          legalClass = 'thresh-adoptee';
+        } else if (pour >= seuilPasserelle) {
+          legalNotice = `⚠️ PASSERELLE ART. 25-1 DISPONIBLE : ${pour} voix >= ${seuilPasserelle} (1/3 atteint). Le syndic DOIT organiser un second vote immédiat à l'Art. 24 !`;
+          legalClass = 'thresh-passerelle';
+        } else {
+          legalNotice = `⚖️ Légalement REJETÉE à l'Art. 25 et 25-1 : ${pour} voix < ${seuilPasserelle} (Moins d'un tiers des voix totales)`;
+          legalClass = 'thresh-rejetee';
+        }
+      }
+    }
+
     return `
       <div class="resolution-card status-${r.status}" id="res-card-${r.id}">
         <div class="resolution-header">
@@ -139,9 +209,15 @@ function renderResolutions() {
               <span class="tag ${isSansVote ? 'tag-maj-sansvote' : 'tag-maj'}">${escapeHtml(r.majorite)}</span>
               ${!isSansVote ? `<span class="tag ${csBadgeClass}">Consigne CS : ${r.csConsigne}</span>` : ''}
               <span class="tag tag-status-${r.status}">${statusLabel}</span>
+              ${r.opponentsList && r.opponentsList.length > 0 ? `<span class="badge-anti-fraude">🚨 ${r.opponentsList.length} opposant(s) consigné(s)</span>` : ''}
             </div>
           </div>
           <div class="no-print" style="display:flex; gap:0.4rem;">
+            ${!isSansVote ? `
+              <button class="btn btn-purple btn-sm" onclick="openScrutinModal('${r.id}')" title="Contrôle des opposants et abstentions">
+                🎯 Dépouillement Miroir
+              </button>
+            ` : ''}
             <button class="btn btn-secondary btn-sm" onclick="editResolution('${r.id}')" title="Modifier">✏️</button>
             <button class="btn btn-secondary btn-sm" onclick="deleteResolution('${r.id}')" title="Supprimer" style="color:var(--danger)">🗑️</button>
           </div>
@@ -157,14 +233,38 @@ function renderResolutions() {
 
         ${r.notesSeance ? `
           <div style="font-size:0.83rem; color:var(--gray-700); margin:0.4rem 0; font-style:italic;">
-            <strong>📝 Séance :</strong> ${escapeHtml(r.notesSeance)}
+            <strong>📝 Note de séance :</strong> ${escapeHtml(r.notesSeance)}
+          </div>
+        ` : ''}
+
+        ${hasNumbers ? `
+          <div class="depouillement-box">
+            <div class="depouillement-header">
+              <span>📊 Contrôle des voix (Feuille de vote CS)</span>
+              <span style="font-size:0.75rem; color:var(--gray-500);">En salle au moment du vote : ${totalEnSalle} tantièmes</span>
+            </div>
+            <div class="depouillement-meters">
+              <div class="meter-card">
+                <div class="meter-label">👍 POUR</div>
+                <div class="meter-val c-pour">${pour}</div>
+              </div>
+              <div class="meter-card">
+                <div class="meter-label">👎 CONTRE</div>
+                <div class="meter-val c-contre">${contre}</div>
+              </div>
+              <div class="meter-card">
+                <div class="meter-label">⚠️ ABSTENTION</div>
+                <div class="meter-val c-abs">${abs}</div>
+              </div>
+            </div>
+            ${legalNotice ? `<div class="legal-threshold-notice ${legalClass}">${legalNotice}</div>` : ''}
           </div>
         ` : ''}
 
         ${!isSansVote ? `
           <div class="resolution-vote-zone">
             <div class="vote-quick-actions no-print">
-              <span style="font-size:0.82rem; font-weight:600; color:var(--gray-500); margin-right:0.3rem;">Vote réel :</span>
+              <span style="font-size:0.82rem; font-weight:700; color:var(--gray-700); margin-right:0.3rem;">Décision finale :</span>
               <button class="vote-btn-choice ${r.status === 'ADOPTEE' ? 'selected-adoptee' : ''}" onclick="setQuickVote('${r.id}', 'ADOPTEE')">
                 ✅ Adoptée
               </button>
@@ -181,9 +281,8 @@ function renderResolutions() {
               ` : ''}
             </div>
 
-            <div style="font-size:0.82rem; color:var(--gray-500); display:flex; gap:0.8rem;">
-              ${r.tantiemesPour ? `<span>👍 Pour : <strong>${escapeHtml(r.tantiemesPour)}</strong></span>` : ''}
-              ${r.tantiemesContre ? `<span>👎 Contre : <strong>${escapeHtml(r.tantiemesContre)}</strong></span>` : ''}
+            <div style="font-size:0.8rem; color:var(--gray-600);">
+              ${r.syndicClaimStatus ? `<span>Syndic prétend : <strong>${r.syndicClaimStatus}</strong></span>` : ''}
             </div>
           </div>
         ` : ''}
@@ -192,31 +291,12 @@ function renderResolutions() {
   }).join('');
 }
 
-// Render Copropriétaires (Présences & Pouvoirs)
-function renderCoproprietaires(totalTant) {
+// Render Copropriétaires (Accueil / Émargement & Départs en séance)
+function renderCoproprietaires(totalEnSalle, totalTant) {
   const tbody = document.getElementById('coproTableBody');
   if (!tbody) return;
 
   const list = appData.coproprietaires || [];
-  if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">
-      Aucun copropriétaire renseigné pour le moment.<br>
-      <button class="btn btn-sm btn-primary" style="margin-top:0.6rem;" onclick="openImportCoproModal()">📥 Importer la liste des copropriétaires & tantièmes</button>
-    </td></tr>`;
-    document.getElementById('footPresentTantiemes').innerText = "0";
-    return;
-  }
-
-  // Calculate overall presence
-  let totalPresents = 0;
-  let countPresents = 0;
-  list.forEach(c => {
-    if (c.statut === 'PRESENT' || c.statut === 'POUVOIR' || c.statut === 'VPC') {
-      totalPresents += Number(c.tantiemes) || 0;
-      countPresents++;
-    }
-  });
-
   const search = (document.getElementById('searchCoproInput')?.value || '').toLowerCase();
   const filterStatut = document.getElementById('filterCoproStatut')?.value || 'ALL';
 
@@ -232,17 +312,23 @@ function renderCoproprietaires(totalTant) {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire ne correspond à vos filtres.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire trouvé.</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
-      const badgeMap = {
-        'PRESENT': '<span class="badge-present">Présent</span>',
-        'POUVOIR': `<span class="badge-pouvoir">Pouvoir : ${escapeHtml(c.mandataire || '?')}</span>`,
-        'VPC': '<span class="badge-vpc">Vote Corresp.</span>',
-        'ABSENT': '<span class="badge-absent">Absent</span>'
-      };
-
       const isTop20 = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
+
+      let statutBadge = '';
+      if (c.statut === 'PRESENT') {
+        statutBadge = `<span class="badge-present">✅ Présent (${c.heureArrivee || '18h00'})</span>`;
+      } else if (c.statut === 'POUVOIR') {
+        statutBadge = `<span class="badge-pouvoir">✉️ Pouvoir : ${escapeHtml(c.mandataire || 'Inconnu')}</span>`;
+      } else if (c.statut === 'VPC') {
+        statutBadge = `<span class="badge-vpc">📬 Vote Corresp.</span>`;
+      } else if (c.statut === 'PARTI') {
+        statutBadge = `<span class="badge-parti">🚪 Parti (${c.heureDepart || 'En cours'})</span>`;
+      } else {
+        statutBadge = `<span class="badge-absent">❌ Absent</span>`;
+      }
 
       return `
         <tr>
@@ -252,11 +338,20 @@ function renderCoproprietaires(totalTant) {
           </td>
           <td>${escapeHtml(c.lots || '-')}</td>
           <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
-          <td>${badgeMap[c.statut] || c.statut}</td>
+          <td>${statutBadge}</td>
           <td>${escapeHtml(c.notes || '-')}</td>
-          <td class="no-print" style="text-align:right;">
-            <button class="btn btn-secondary btn-sm" onclick="editCopro('${c.id}')">✏️</button>
-            <button class="btn btn-secondary btn-sm" onclick="deleteCopro('${c.id}')" style="color:var(--danger)">🗑️</button>
+          <td class="no-print">
+            <div class="pointage-btn-group">
+              <button class="btn btn-sm btn-success" onclick="setCoproStatut('${c.id}', 'PRESENT')" title="Pointer comme Présent en personne">
+                Présent
+              </button>
+              <button class="btn btn-sm btn-warning" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
+                Parti
+              </button>
+              <button class="btn btn-sm btn-secondary" onclick="editCopro('${c.id}')" title="Modifier le statut / pouvoir">
+                ✏️
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -264,10 +359,37 @@ function renderCoproprietaires(totalTant) {
   }
 
   const effectiveTotal = totalTant || 97478;
-  document.getElementById('footPresentTantiemes').innerText = `${totalPresents} / ${effectiveTotal} tantièmes (${((totalPresents / effectiveTotal) * 100).toFixed(1)}%) — ${countPresents} présents ou représentés`;
-  
-  if (!appData.config.presentTantiemes || appData.config.presentTantiemes === 0) {
-    appData.config.presentTantiemes = totalPresents;
+  document.getElementById('footPresentTantiemes').innerText = `${totalEnSalle} / ${effectiveTotal} tantièmes en salle (${((totalEnSalle / effectiveTotal) * 100).toFixed(1)}%)`;
+}
+
+// Pointage express à l'accueil
+function setCoproStatut(id, newStatut) {
+  const c = appData.coproprietaires.find(x => x.id === id);
+  if (c) {
+    c.statut = newStatut;
+    if (newStatut === 'PRESENT') {
+      const now = new Date();
+      c.heureArrivee = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+      delete c.heureDepart;
+    }
+    persistData();
+    showToast(`${c.nom} pointé comme ${newStatut}`, "success");
+  }
+}
+
+function promptDepartCopro(id) {
+  const c = appData.coproprietaires.find(x => x.id === id);
+  if (!c) return;
+
+  const now = new Date();
+  const defaultHour = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  const heure = prompt(`Heure de départ de ${c.nom} (obligatoire sur feuille de présence) :`, defaultHour);
+  if (heure !== null) {
+    c.statut = 'PARTI';
+    c.heureDepart = heure;
+    c.notes = (c.notes ? c.notes + ' | ' : '') + `Parti à ${heure}`;
+    persistData();
+    showToast(`Départ de ${c.nom} enregistré à ${heure}. Ses tantièmes sont retirés des votes suivants.`, "warning");
   }
 }
 
@@ -316,10 +438,183 @@ function setQuickVote(id, newStatus) {
   if (res) {
     res.status = newStatus;
     persistData();
+    if (isLiveActive) {
+      broadcastLiveUpdate({ type: 'QUICK_VOTE', id: id, status: newStatus });
+    }
   }
 }
 
-// Modal management
+// ==========================================
+// MODULE DÉPOUILLEMENT MIROIR & SCRUTIN
+// ==========================================
+let currentScrutinResId = null;
+
+function openScrutinModal(resId) {
+  currentScrutinResId = resId;
+  const res = appData.resolutions.find(r => r.id === resId);
+  if (!res) return;
+
+  document.getElementById('scrutinModalTitle').innerText = `Dépouillement Miroir - Résolution n° ${res.number}`;
+  document.getElementById('scrutinResTitle').innerText = res.title;
+  document.getElementById('scrutinResMaj').innerText = `Majorité légale requise : ${res.majorite}`;
+
+  // Tantièmes présents en salle actuellement
+  const totalEnSalle = appData.config.presentTantiemes || 0;
+  document.getElementById('scrutinTotalSalle').innerText = totalEnSalle;
+
+  document.getElementById('scrutinPourInput').value = res.tantiemesPour || '';
+  document.getElementById('scrutinContreInput').value = res.tantiemesContre || '';
+  document.getElementById('scrutinAbsInput').value = res.tantiemesAbs || '';
+  document.getElementById('scrutinSyndicClaim').value = res.syndicClaimStatus || '';
+  document.getElementById('scrutinOpponentsList').value = res.opponentsText || '';
+
+  // Calcul instantané des opposants cochés
+  renderScrutinChecklist();
+  computeScrutinTotals();
+  openModal('scrutinModal');
+}
+
+function renderScrutinChecklist() {
+  const container = document.getElementById('scrutinCoproChecklist');
+  if (!container) return;
+
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  const activeOpponents = res.opponentsIds || [];
+  const activeAbs = res.absenteeIds || [];
+
+  // Filtrer uniquement les copropriétaires présents ou représentés en salle
+  const presents = (appData.coproprietaires || []).filter(c => c.statut === 'PRESENT' || c.statut === 'POUVOIR' || c.statut === 'VPC');
+
+  if (presents.length === 0) {
+    container.innerHTML = `<div style="font-size:0.82rem; color:var(--gray-500); padding:0.5rem;">
+      Astuce : Pointez d'abord les présents dans l'onglet « Copropriétaires & Pouvoirs », ou saisissez directement les chiffres ci-dessous.
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:0.4rem;">
+      Appel des opposants (Cochez les copropriétaires qui lèvent la main) :
+    </div>
+    <div style="max-height:160px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:0.5rem; background:#fff;">
+      ${presents.map(c => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.25rem 0; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeOpponents.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange()">
+            <span>${escapeHtml(c.nom)} (<strong>${c.tantiemes}</strong> tant.)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:var(--warning); cursor:pointer;">
+            <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeAbs.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange()">
+            Abstention
+          </label>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function onScrutinCheckboxChange() {
+  let contreTotal = 0;
+  let absTotal = 0;
+  const contreNoms = [];
+  const contreIds = [];
+  const absIds = [];
+
+  document.querySelectorAll('.chk-contre:checked').forEach(cb => {
+    const tant = Number(cb.getAttribute('data-tant')) || 0;
+    const id = cb.getAttribute('data-id');
+    contreTotal += tant;
+    contreIds.push(id);
+    const copro = appData.coproprietaires.find(c => c.id === id);
+    if (copro) contreNoms.push(`${copro.nom} (${tant})`);
+  });
+
+  document.querySelectorAll('.chk-abs:checked').forEach(cb => {
+    const tant = Number(cb.getAttribute('data-tant')) || 0;
+    const id = cb.getAttribute('data-id');
+    absTotal += tant;
+    absIds.push(id);
+  });
+
+  document.getElementById('scrutinContreInput').value = contreTotal;
+  document.getElementById('scrutinAbsInput').value = absTotal;
+  document.getElementById('scrutinOpponentsList').value = contreNoms.join(', ');
+
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  if (res) {
+    res.opponentsIds = contreIds;
+    res.absenteeIds = absIds;
+    res.opponentsList = contreNoms;
+  }
+
+  computeScrutinTotals();
+}
+
+function computeScrutinTotals() {
+  const totalSalle = Number(document.getElementById('scrutinTotalSalle').innerText) || appData.config.presentTantiemes || 0;
+  const contre = Number(document.getElementById('scrutinContreInput').value) || 0;
+  const abs = Number(document.getElementById('scrutinAbsInput').value) || 0;
+
+  // En droit, Voix Pour = Total Présents - Contre - Abstention
+  const pourCalcule = Math.max(0, totalSalle - contre - abs);
+  document.getElementById('scrutinPourInput').value = pourCalcule;
+
+  // Calcul du résultat légal
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const resultBox = document.getElementById('scrutinLegalVerdict');
+
+  if (!res || res.majorite === 'article sans vote') {
+    resultBox.innerHTML = `<em>Résolution sans vote.</em>`;
+    return;
+  }
+
+  if (res.majorite === 'Article 24') {
+    if (pourCalcule > contre) {
+      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 24</span> (${pourCalcule} Pour contre ${contre} Contre). Les ${abs} abstentions sont légales et non comptabilisées.`;
+    } else {
+      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE à l'Article 24</span> (${contre} Contre >= ${pourCalcule} Pour).`;
+    }
+  } else if (res.majorite.includes('Article 25')) {
+    const seuil25 = Math.floor(totalCopro / 2) + 1;
+    const seuil13 = Math.ceil(totalCopro / 3);
+
+    if (pourCalcule >= seuil25) {
+      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 25</span> (${pourCalcule} Pour >= ${seuil25} requis).`;
+    } else if (pourCalcule >= seuil13) {
+      resultBox.innerHTML = `<span style="color:#b45309; font-weight:700;">⚠️ PASSERELLE ART. 25-1 DISPONIBLE</span> (${pourCalcule} Pour >= ${seuil13} soit 1/3 des voix). Le syndic n'a PAS le droit de rejeter définitivement : un 2nd vote à l'Art. 24 est obligatoire en séance !`;
+    } else {
+      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE Définitivement</span> (${pourCalcule} Pour < ${seuil13} requis pour la passerelle).`;
+    }
+  }
+}
+
+function saveScrutin(e) {
+  e.preventDefault();
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  if (!res) return;
+
+  res.tantiemesPour = Number(document.getElementById('scrutinPourInput').value) || 0;
+  res.tantiemesContre = Number(document.getElementById('scrutinContreInput').value) || 0;
+  res.tantiemesAbs = Number(document.getElementById('scrutinAbsInput').value) || 0;
+  res.syndicClaimStatus = document.getElementById('scrutinSyndicClaim').value;
+  res.opponentsText = document.getElementById('scrutinOpponentsList').value.trim();
+
+  // Détermination automatique du statut
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  if (res.majorite === 'Article 24') {
+    res.status = (res.tantiemesPour > res.tantiemesContre) ? 'ADOPTEE' : 'REJETEE';
+  } else if (res.majorite.includes('Article 25')) {
+    const seuil25 = Math.floor(totalCopro / 2) + 1;
+    res.status = (res.tantiemesPour >= seuil25) ? 'ADOPTEE' : 'REJETEE';
+  }
+
+  closeModal('scrutinModal');
+  persistData();
+  showToast(`Résultat miroir enregistré pour la résolution ${res.number} !`, "success");
+}
+
+// Modal helpers
 function openModal(id) { document.getElementById(id)?.classList.add('active'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
 
@@ -513,60 +808,11 @@ function deleteCopro(id) {
   }
 }
 
-function openImportCoproModal() {
-  document.getElementById('coproImportRaw').value = '';
-  openModal('coproImportModal');
-}
-
-function processCoproImport() {
-  const text = document.getElementById('coproImportRaw').value.trim();
-  if (!text) {
-    alert("Veuillez coller la liste des copropriétaires.");
-    return;
-  }
-
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  let countAdded = 0;
-  if (!appData.coproprietaires) appData.coproprietaires = [];
-
-  lines.forEach(line => {
-    // Detect formats: "Nom;Lot;Tantiemes" or "Nom \t Lot \t Tantiemes" or "Nom, 120 tantièmes"
-    let parts = line.split(/[;\t]/);
-    let nom = parts[0]?.trim() || line;
-    let lots = parts[1]?.trim() || "";
-    let tantiemes = Number(parts[2]?.trim()) || 0;
-
-    // Regex check for tantiemes in text if not tab-separated
-    if (parts.length === 1) {
-      const matchTant = line.match(/(\d+)\s*(tanti[eè]mes|milli[eè]mes|[\/]\d+)/i);
-      if (matchTant) {
-        tantiemes = Number(matchTant[1]);
-        nom = line.replace(matchTant[0], '').trim();
-      }
-    }
-
-    appData.coproprietaires.push({
-      id: 'copro_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      nom: nom,
-      lots: lots,
-      tantiemes: tantiemes,
-      statut: 'PRESENT',
-      mandataire: '',
-      notes: ''
-    });
-    countAdded++;
-  });
-
-  closeModal('coproImportModal');
-  persistData();
-  alert(`${countAdded} copropriétaire(s) importé(s) avec succès !`);
-}
-
 // Config Save
 function saveConfig() {
   appData.config.coproName = document.getElementById('cfgCoproname').value.trim();
   appData.config.agDate = document.getElementById('cfgAgDate').value;
-  appData.config.totalTantiemes = Number(document.getElementById('cfgTotalTantiemes').value) || 10000;
+  appData.config.totalTantiemes = Number(document.getElementById('cfgTotalTantiemes').value) || 97478;
   appData.config.presentTantiemes = Number(document.getElementById('cfgPresentTantiemes').value) || 0;
   persistData();
 }
@@ -575,7 +821,7 @@ function resetFilters() {
   document.getElementById('searchInput').value = '';
   document.getElementById('filterStatus').value = 'ALL';
   document.getElementById('filterCsConsigne').value = 'ALL';
-  renderResolutions();
+  renderResolutions(appData.config.presentTantiemes, appData.config.totalTantiemes);
 }
 
 // Export / Import
@@ -631,7 +877,6 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-// Initialization
 document.addEventListener('DOMContentLoaded', () => {
   updateUI();
 });

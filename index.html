@@ -63,11 +63,11 @@
   <nav class="tabs-nav no-print">
     <div class="tabs-container">
       <button class="tab-btn active" onclick="switchTab('votes')">
-        📋 Ordre du jour & Votes
+        📋 Ordre du jour & Votes Miroir
         <span class="badge-count" id="badgeVotesCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('presence')">
-        🏢 Copropriétaires & Pouvoirs
+        🚪 Émargement & Départs
         <span class="badge-count" id="badgePresenceCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('members')">
@@ -91,10 +91,11 @@
         <div>
           <div class="ag-info-text">
             <strong>RÉSIDENCE LE FLORÉAL (13-19 Rue du Moucherotte, 38360 Sassenage)</strong>
+            <span class="badge-anti-fraude" style="margin-left:0.6rem;">🛡️ Contrôle Miroir Anti-Fraude Actif</span>
           </div>
           <div class="ag-info-meta">
             <span>📅 <strong>Mercredi 25 novembre 2026 à 18h00</strong></span>
-            <span>📍 Salle Jacques Prévert, Rue du Moucherotte</span>
+            <span>📍 Salle Jacques Prévert</span>
             <span>🏢 Syndic : Citya Agence Henry</span>
           </div>
         </div>
@@ -116,6 +117,11 @@
           <div class="stat-label">Rejetées</div>
           <div class="stat-value" id="statRejected">0</div>
           <div class="stat-subtext">Non retenues</div>
+        </div>
+        <div class="stat-card c-purple">
+          <div class="stat-label">Présents en séance</div>
+          <div class="stat-value" id="statTantiemesEnSalle">0</div>
+          <div class="stat-subtext" id="statEnSallePct">Feuille de présence</div>
         </div>
         <div class="stat-card c-info">
           <div class="stat-label">Force de vote CS</div>
@@ -155,23 +161,30 @@
 
     </section>
 
-    <!-- SECTION 2: COPROPRIÉTAIRES & POUVOIRS (FEUILLE DE PRÉSENCE) -->
+    <!-- SECTION 2: ÉMARGEMENT & DÉPARTS EN SÉANCE -->
     <section id="section-presence" style="display:none;">
+
+      <div class="anti-fraude-alert">
+        <strong>🛡️ Contrôle d'Accueil & Départs en séance (Art. 14 et 17 du décret de 1967) :</strong><br>
+        • À l'arrivée d'un copropriétaire : cliquez sur <strong>« Présent »</strong> (l'heure d'arrivée est automatiquement horodatée).<br>
+        • Si un copropriétaire part avant la fin : cliquez sur <strong>« Parti »</strong>. La loi exige de mentionner son heure de départ sur la feuille de présence, et <strong>ses tantièmes sont immédiatement exclus des votes suivants</strong> pour empêcher le syndic de truquer le quorum !
+      </div>
 
       <div class="filter-bar no-print">
         <div class="filter-group">
-          <input type="text" id="searchCoproInput" class="search-input" placeholder="🔍 Rechercher un copropriétaire..." oninput="renderCoproprietaires(appData.config.totalTantiemes)">
-          <select id="filterCoproStatut" class="select-input" onchange="renderCoproprietaires(appData.config.totalTantiemes)">
+          <input type="text" id="searchCoproInput" class="search-input" placeholder="🔍 Rechercher un copropriétaire..." oninput="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
+          <select id="filterCoproStatut" class="select-input" onchange="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
             <option value="ALL">Tous les statuts</option>
             <option value="POUVOIR">✉️ Pouvoirs / Représentés</option>
-            <option value="PRESENT">✅ Présents</option>
-            <option value="ABSENT">❌ Absents</option>
+            <option value="PRESENT">✅ Présents en salle</option>
+            <option value="PARTI">🚪 Partis en cours d'AG</option>
+            <option value="ABSENT">❌ Absents non représentés</option>
             <option value="TOP20">🔥 Top 20%</option>
           </select>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--primary);" id="statPresentsCount">0 présents</span>
           <button class="btn btn-primary" onclick="openNewCoproModal()">+ Ajouter</button>
-          <button class="btn btn-secondary" onclick="openImportCoproModal()">📥 Importer</button>
         </div>
       </div>
 
@@ -565,6 +578,80 @@ M. LEROY Jacques	Lot 8	85"></textarea>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('memberModal')">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL SCRUTIN / DÉPOUILLEMENT MIROIR ANTI-FRAUDE -->
+  <div class="modal-overlay" id="scrutinModal">
+    <div class="modal-box" style="max-width:700px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="scrutinModalTitle">🎯 Dépouillement Miroir & Contrôle Anti-Fraude</h3>
+        <button class="modal-close" onclick="closeModal('scrutinModal')">&times;</button>
+      </div>
+      <form id="scrutinForm" onsubmit="saveScrutin(event)">
+        <div class="modal-body">
+          <div style="background:#eff6ff; border-left:4px solid var(--primary-light); padding:0.75rem 1rem; border-radius:0 6px 6px 0;">
+            <div style="font-weight:700; color:var(--primary-dark);" id="scrutinResTitle">Résolution</div>
+            <div style="font-size:0.83rem; color:var(--gray-600);" id="scrutinResMaj">Majorité légale requise</div>
+            <div style="font-size:0.83rem; font-weight:700; color:#1d4ed8; margin-top:0.25rem;">
+              Voix actuellement en salle : <span id="scrutinTotalSalle">0</span> tantièmes
+            </div>
+          </div>
+
+          <!-- Checklist d'appel des opposants -->
+          <div id="scrutinCoproChecklist">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Chiffres du scrutin -->
+          <div class="form-row">
+            <div class="form-group">
+              <label style="color:var(--danger);">👎 Voix CONTRE (Total tantièmes opposants)</label>
+              <input type="number" id="scrutinContreInput" class="form-control" placeholder="0" oninput="computeScrutinTotals()">
+            </div>
+            <div class="form-group">
+              <label style="color:var(--warning);">⚠️ Voix ABSTENTION (Total tantièmes)</label>
+              <input type="number" id="scrutinAbsInput" class="form-control" placeholder="0" oninput="computeScrutinTotals()">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="color:var(--success);">👍 Voix POUR (Calculé légalement : En salle - Contre - Abstention)</label>
+            <input type="number" id="scrutinPourInput" class="form-control" style="font-size:1.1rem; font-weight:700; color:var(--success); background:#f0fdf4;" readonly>
+          </div>
+
+          <!-- Verdict juridique en direct -->
+          <div style="background:#fff; border:2px solid #cbd5e1; border-radius:8px; padding:0.85rem;">
+            <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; font-weight:700; margin-bottom:0.2rem;">
+              ⚖️ Verdict Juridique Impartial (Selon la loi du 10 juillet 1965) :
+            </div>
+            <div id="scrutinLegalVerdict" style="font-size:0.92rem; line-height:1.4;">
+              <!-- Calculé automatiquement -->
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Annonce prétendue par le Syndic</label>
+              <select id="scrutinSyndicClaim" class="form-control">
+                <option value="">Sélectionner ce qu'annonce le syndic...</option>
+                <option value="ADOPTEE">Le syndic annonce : ADOPTÉE ✅</option>
+                <option value="REJETEE">Le syndic annonce : REJETÉE ❌</option>
+                <option value="REPORTEE">Le syndic annonce : REPORTÉE ⏳</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Noms des opposants consignés au PV (Preuve contestation)</label>
+              <input type="text" id="scrutinOpponentsList" class="form-control" placeholder="Ex: M. Dupont (145), Mme Leroy (220)...">
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('scrutinModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer la décision</button>
         </div>
       </form>
     </div>
