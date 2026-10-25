@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suivi AG & Votes - RÉSIDENCE LE FLORÉAL</title>
+  <!-- Bibliothèques gratuites pour la synchronisation en direct et les QR Codes -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #2563eb;
+      --primary-dark: #172554;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --info: #0284c7;
+      --info-bg: #e0f2fe;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e1;
+      --gray-500: #64748b;
+      --gray-700: #334155;
+      --gray-800: #1e293b;
+      --gray-900: #0f172a;
+      --border-radius: 10px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+      --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background-color: #f1f5f9;
+      color: var(--gray-800);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: white;
+      padding: 1rem 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-title h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .header-title p {
+      font-size: 0.85rem;
+      color: #bfdbfe;
+      margin-top: 0.2rem;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.84rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background-color: var(--primary-light); color: white; }
+    .btn-primary:hover { background-color: #1d4ed8; }
+
+    .btn-live {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+    .btn-live:hover { background: #059669; }
+
+    .btn-white { background-color: white; color: var(--primary); }
+    .btn-white:hover { background-color: #f8fafc; }
+
+    .btn-outline { background: transparent; border: 1px solid rgba(255, 255, 255, 0.7); color: white; }
+    .btn-outline:hover { background: rgba(255, 255, 255, 0.15); border-color: white; }
+
+    .btn-secondary { background-color: var(--gray-200); color: var(--gray-700); }
+    .btn-secondary:hover { background-color: var(--gray-300); }
+
+    .btn-success { background-color: var(--success); color: white; }
+    .btn-danger { background-color: var(--danger); color: white; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+
+    /* Live status banner */
+    .live-status-bar {
+      background-color: #065f46;
+      color: #d1fae5;
+      padding: 0.4rem 1.5rem;
+      font-size: 0.8rem;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .live-status-bar.active { display: flex; }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #34d399;
+      border-radius: 50%;
+      margin-right: 6px;
+      box-shadow: 0 0 6px #34d399;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      background-color: white;
+      border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .tabs-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 1.5rem;
+      padding: 0 1.5rem;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 0.85rem 0.2rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--gray-500);
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary-light);
+    }
+
+    .badge-count {
+      background-color: var(--gray-200);
+      color: var(--gray-700);
+      border-radius: 9999px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .tab-btn.active .badge-count {
+      background-color: #dbeafe;
+      color: var(--primary);
+    }
+
+    /* Main Content */
+    main {
+      max-width: 1200px;
+      margin: 1.25rem auto;
+      padding: 0 1rem;
+      flex: 1;
+      width: 100%;
+    }
+
+    /* AG Info Banner */
+    .ag-info-banner {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      padding: 0.9rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+      border-left: 5px solid var(--primary);
+    }
+
+    .ag-info-text strong {
+      color: var(--primary-dark);
+      font-size: 1.05rem;
+    }
+
+    .ag-info-meta {
+      font-size: 0.82rem;
+      color: var(--gray-600);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 0.2rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 1.1rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      border-left: 4px solid var(--primary-light);
+    }
+
+    .stat-card.c-success { border-left-color: var(--success); }
+    .stat-card.c-danger { border-left-color: var(--danger); }
+    .stat-card.c-info { border-left-color: var(--info); }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-top: 0.2rem;
+    }
+
+    .stat-subtext {
+      font-size: 0.75rem;
+      color: var(--gray-500);
+      margin-top: 0.25rem;
+    }
+
+    /* Filters */
+    .filter-bar {
+      background: white;
+      padding: 0.8rem 1rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-input, .select-input {
+      padding: 0.45rem 0.8rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background-color: white;
+      color: var(--gray-700);
+    }
+
+    .search-input { min-width: 220px; }
+
+    /* Resolutions */
+    .resolutions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .resolution-card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      padding: 1.15rem;
+      border: 1px solid var(--gray-200);
+      transition: all 0.15s;
+    }
+
+    .resolution-card:hover {
+      box-shadow: var(--shadow-lg);
+    }
+
+    .resolution-card.status-ADOPTEE { border-left: 5px solid var(--success); }
+    .resolution-card.status-REJETEE { border-left: 5px solid var(--danger); }
+    .resolution-card.status-REPORTEE { border-left: 5px solid var(--warning); }
+    .resolution-card.status-EN_ATTENTE { border-left: 5px solid var(--gray-300); }
+
+    .resolution-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .resolution-num {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .resolution-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-top: 0.1rem;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+
+    .tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .tag-maj { background-color: #f3e8ff; color: #7e22ce; }
+    .tag-maj-sansvote { background-color: var(--gray-100); color: var(--gray-500); }
+    .tag-cs-pour { background-color: var(--success-bg); color: var(--success); }
+    .tag-cs-contre { background-color: var(--danger-bg); color: var(--danger); }
+    .tag-cs-abstention { background-color: var(--warning-bg); color: var(--warning); }
+    .tag-cs-libre { background-color: var(--gray-100); color: var(--gray-700); }
+
+    .tag-status-EN_ATTENTE { background-color: var(--gray-100); color: var(--gray-700); }
+    .tag-status-ADOPTEE { background-color: var(--success-bg); color: var(--success); font-weight: 700; }
+    .tag-status-REJETEE { background-color: var(--danger-bg); color: var(--danger); font-weight: 700; }
+    .tag-status-REPORTEE { background-color: var(--warning-bg); color: var(--warning); font-weight: 700; }
+
+    .resolution-desc {
+      font-size: 0.88rem;
+      color: var(--gray-700);
+      margin: 0.6rem 0;
+      white-space: pre-line;
+      line-height: 1.45;
+    }
+
+    .cs-argument-box {
+      background-color: #eff6ff;
+      border-left: 3px solid var(--primary-light);
+      padding: 0.6rem 0.8rem;
+      border-radius: 0 6px 6px 0;
+      margin: 0.6rem 0;
+      font-size: 0.84rem;
+    }
+
+    .resolution-vote-zone {
+      margin-top: 0.8rem;
+      padding-top: 0.8rem;
+      border-top: 1px dashed var(--gray-200);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .vote-quick-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .vote-btn-choice {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid var(--gray-300);
+      background: white;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: all 0.15s;
+    }
+
+    .vote-btn-choice:hover { background-color: var(--gray-100); }
+    .vote-btn-choice.selected-adoptee { background-color: var(--success); color: white; border-color: var(--success); }
+    .vote-btn-choice.selected-rejetee { background-color: var(--danger); color: white; border-color: var(--danger); }
+    .vote-btn-choice.selected-reportee { background-color: var(--warning); color: white; border-color: var(--warning); }
+
+    /* Modals */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(2px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+
+    .modal-box {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      transform: translateY(20px);
+      transition: transform 0.2s ease-out;
+    }
+
+    .modal-overlay.active .modal-box { transform: translateY(0); }
+
+    .modal-header {
+      padding: 1.1rem 1.4rem;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title { font-size: 1.15rem; font-weight: 700; color: var(--gray-900); }
+    .modal-close { background: transparent; border: none; font-size: 1.5rem; color: var(--gray-500); cursor: pointer; }
+
+    .modal-body { padding: 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--gray-700); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+
+    .form-control {
+      padding: 0.55rem 0.8rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+
+    .form-control:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+    textarea.form-control { resize: vertical; min-height: 75px; }
+
+    .modal-footer {
+      padding: 1rem 1.4rem;
+      border-top: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.6rem;
+      background-color: var(--gray-50);
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* Members table */
+    .members-table-container { background: white; border-radius: var(--border-radius); box-shadow: var(--shadow); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { background-color: var(--gray-50); color: var(--gray-700); font-weight: 600; padding: 0.75rem 1rem; border-bottom: 2px solid var(--gray-200); text-align: left; }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+    tr:hover { background-color: #f8fafc; }
+    .tantieme-pill { font-weight: 700; color: var(--primary); background-color: #eff6ff; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.82rem; }
+
+    .legal-alert {
+      background-color: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      color: #92400e;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+    }
+
+    .config-card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      padding: 1.4rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .config-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.8rem; color: var(--gray-900); }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 2.5rem 1rem; background: white; border-radius: var(--border-radius); color: var(--gray-500); }
+
+    /* Print styles */
+    @media print {
+      body { background: white; color: black; font-size: 11pt; }
+      header, .tabs-nav, .filter-bar, .modal-overlay, .btn, .no-print, .live-status-bar { display: none !important; }
+      .resolution-card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; margin-bottom: 1rem; }
+      .print-header { display: block !important; margin-bottom: 1.5rem; border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
+    }
+    .print-header { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Print Header -->
+  <div class="print-header">
+    <h2 id="printAgTitle">RÉSIDENCE LE FLORÉAL - Assemblée Générale Annuelle</h2>
+    <p id="printAgMeta">Mercredi 25 novembre 2026 à 18h00 - Sassenage - Relevé de décisions & Votes du CS</p>
+  </div>
+
+  <!-- Live sync status bar -->
+  <div class="live-status-bar" id="liveStatusBar">
+    <div>
+      <span class="pulse-dot"></span>
+      <span id="liveStatusText">Session collaborative en direct active</span>
+    </div>
+    <div style="display:flex; gap:0.6rem; align-items:center;">
+      <span style="font-size:0.75rem;" id="livePeerCount">Connecté(s) : 1</span>
+      <button class="btn btn-sm btn-white" onclick="openLiveSyncModal()">Afficher le QR Code</button>
+      <button class="btn btn-sm btn-secondary" onclick="stopLiveSync()">Quitter le direct</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div class="header-title">
+        <h1>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+          Suivi AG & Votes CS
+        </h1>
+        <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL - AG du 25/11/2026</p>
+      </div>
+      <div class="header-actions no-print">
+        <button class="btn btn-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones/tablettes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          Direct Multi-écrans (Gratuit)
+        </button>
+
+        <button class="btn btn-white" onclick="openNewResolutionModal()">
+          + Résolution
+        </button>
+        <button class="btn btn-outline" onclick="window.print()">
+          🖨️ Imprimer / PDF
+        </button>
+        <button class="btn btn-outline" onclick="exportDataJson()">
+          💾 Exporter
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="tabs-nav no-print">
+    <div class="tabs-container">
+      <button class="tab-btn active" onclick="switchTab('votes')">
+        📋 Ordre du jour & Votes
+        <span class="badge-count" id="badgeVotesCount">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('members')">
+        👥 Membres CS & Pouvoirs
+        <span class="badge-count" id="badgeMembersCount">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('settings')">
+        ⚙️ Paramètres & Sauvegarde
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Body Content -->
+  <main>
+
+    <!-- SECTION 1: VOTES -->
+    <section id="section-votes">
+
+      <!-- AG Info Banner -->
+      <div class="ag-info-banner">
+        <div>
+          <div class="ag-info-text">
+            <strong>RÉSIDENCE LE FLORÉAL (13-19 Rue du Moucherotte, 38360 Sassenage)</strong>
+          </div>
+          <div class="ag-info-meta">
+            <span>📅 <strong>Mercredi 25 novembre 2026 à 18h00</strong></span>
+            <span>📍 Salle Jacques Prévert, Rue du Moucherotte</span>
+            <span>🏢 Syndic : Citya Agence Henry</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Progression des votes</div>
+          <div class="stat-value"><span id="statVoted">0</span> / <span id="statTotal">0</span></div>
+          <div class="stat-subtext" id="statPercent">0% voté</div>
+        </div>
+        <div class="stat-card c-success">
+          <div class="stat-label">Adoptées</div>
+          <div class="stat-value" id="statAdopted">0</div>
+          <div class="stat-subtext">Validées en séance</div>
+        </div>
+        <div class="stat-card c-danger">
+          <div class="stat-label">Rejetées</div>
+          <div class="stat-value" id="statRejected">0</div>
+          <div class="stat-subtext">Non retenues</div>
+        </div>
+        <div class="stat-card c-info">
+          <div class="stat-label">Force de vote CS</div>
+          <div class="stat-value" id="statCsWeight">0</div>
+          <div class="stat-subtext" id="statCsPercent">Tantièmes représentés</div>
+        </div>
+      </div>
+
+      <!-- Filters & Search -->
+      <div class="filter-bar no-print">
+        <div class="filter-group">
+          <input type="text" id="searchInput" class="search-input" placeholder="🔍 Rechercher une résolution..." oninput="renderResolutions()">
+          <select id="filterStatus" class="select-input" onchange="renderResolutions()">
+            <option value="ALL">Tous les statuts</option>
+            <option value="EN_ATTENTE">À voter (En attente)</option>
+            <option value="ADOPTEE">Adoptées ✅</option>
+            <option value="REJETEE">Rejetées ❌</option>
+            <option value="REPORTEE">Reportées / Retirées ⏳</option>
+          </select>
+          <select id="filterCsConsigne" class="select-input" onchange="renderResolutions()">
+            <option value="ALL">Toutes les consignes CS</option>
+            <option value="POUR">Consigne CS : POUR</option>
+            <option value="CONTRE">Consigne CS : CONTRE</option>
+            <option value="ABSTENTION">Consigne CS : ABSTENTION</option>
+            <option value="LIBRE">Consigne CS : LIBRE</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-secondary btn-sm" onclick="resetFilters()">Réinitialiser filtres</button>
+        </div>
+      </div>
+
+      <!-- Resolutions List -->
+      <div class="resolutions-list" id="resolutionsList">
+        <!-- Rendered dynamically -->
+      </div>
+
+    </section>
+
+    <!-- SECTION 2: MEMBERS & MANDATES -->
+    <section id="section-members" style="display:none;">
+
+      <div class="legal-alert">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <div>
+          <strong>Règle légale des pouvoirs (Loi du 10 juillet 1965 - Art. 22) :</strong><br>
+          Un mandataire ne peut détenir plus de <strong>3 délégations de vote</strong>, sauf si le total de ses voix et de ses mandants n'excède pas <strong>10% des voix</strong> du syndicat. L'application calcule automatiquement votre cumul de tantièmes !
+        </div>
+      </div>
+
+      <div class="filter-bar no-print">
+        <div style="font-weight: 700; color: var(--gray-800);">
+          Membres du Conseil Syndical (RÉSIDENCE LE FLORÉAL)
+        </div>
+        <button class="btn btn-primary" onclick="openNewMemberModal()">
+          + Ajouter un membre CS
+        </button>
+      </div>
+
+      <div class="members-table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Membre CS</th>
+              <th>Lot(s)</th>
+              <th>Tantièmes Perso</th>
+              <th>Pouvoirs / Mandats reçus</th>
+              <th>Tantièmes Pouvoirs</th>
+              <th>Total Voix Détenues</th>
+              <th class="no-print" style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="membersTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+          <tfoot>
+            <tr style="background:#f8fafc; font-weight:700;">
+              <td colspan="2">TOTAL DÉTENU PAR LE CS</td>
+              <td id="footPersoTantiemes">0</td>
+              <td>-</td>
+              <td id="footMandatTantiemes">0</td>
+              <td id="footTotalCsTantiemes" class="tantieme-pill" style="display:inline-block; margin:0.5rem 1rem;">0 / 10 000</td>
+              <td class="no-print"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- SECTION 3: SETTINGS -->
+    <section id="section-settings" style="display:none;">
+      <div class="config-card">
+        <h3>🏢 Informations de la Copropriété & de l'AG</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nom de la Résidence / Copropriété</label>
+            <input type="text" id="cfgCoproname" class="form-control" onchange="saveConfig()">
+          </div>
+          <div class="form-group">
+            <label>Date de l'AG</label>
+            <input type="date" id="cfgAgDate" class="form-control" onchange="saveConfig()">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:0.8rem;">
+          <div class="form-group">
+            <label>Total des tantièmes de la copropriété</label>
+            <input type="number" id="cfgTotalTantiemes" class="form-control" onchange="saveConfig()">
+          </div>
+          <div class="form-group">
+            <label>Tantièmes Présents & Représentés (Feuille de présence)</label>
+            <input type="number" id="cfgPresentTantiemes" class="form-control" placeholder="Pour calcul de la majorité Art. 24" onchange="saveConfig()">
+          </div>
+        </div>
+      </div>
+
+      <div class="config-card">
+        <h3>💾 Sauvegardes & Données</h3>
+        <p style="font-size:0.85rem; color:var(--gray-500); margin-bottom:1rem;">
+          Toutes vos modifications sont automatiquement conservées en continu dans ce navigateur. Vous pouvez exporter votre fichier pour le partager avec vos collègues du CS :
+        </p>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="exportDataJson()">Télécharger la sauvegarde (JSON)</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importFileInput').click()">Restaurer un fichier JSON</button>
+          <button class="btn btn-secondary" onclick="reloadConvocationData()">Recharger les résolutions de la convocation</button>
+        </div>
+        <input type="file" id="importFileInput" style="display:none" accept=".json" onchange="importDataJson(event)">
+      </div>
+
+      <div class="config-card">
+        <h3>⚖️ Rappel légal des majorités (Loi du 10 juillet 1965)</h3>
+        <div style="font-size:0.85rem; color:var(--gray-700); line-height:1.6;">
+          <p><strong>• Article 24 (Majorité simple) :</strong> Majorité des voix exprimées des copropriétaires présents ou représentés. Les abstentions ne sont pas prises en compte.</p>
+          <p style="margin-top:0.3rem;"><strong>• Article 25 (Majorité absolue) :</strong> Majorité des voix de <em>l'ensemble</em> des copropriétaires de l'immeuble (qu'ils soient présents ou absents).</p>
+          <p style="margin-top:0.3rem;"><strong>• Article 25-1 (Passerelle de vote) :</strong> Si une résolution soumise à l'Art. 25 recueille au moins 1/3 des voix de tous les copropriétaires, l'assemblée peut procéder immédiatement à un second vote à la majorité simple de l'Art. 24.</p>
+          <p style="margin-top:0.3rem;"><strong>• Article 26 (Double majorité) :</strong> Deux tiers (2/3) des voix de l'ensemble des copropriétaires.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL LIVE MULTI-DEVICES -->
+  <div class="modal-overlay" id="liveSyncModal">
+    <div class="modal-box" style="max-width:550px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📡 Session collaborative en direct</h3>
+        <button class="modal-close" onclick="closeModal('liveSyncModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.88rem; color:var(--gray-700);">
+          <strong>100% gratuit :</strong> Connectez les ordinateurs, téléphones et tablettes des membres de votre CS. Lorsqu'un vote est saisi sur un écran, tous les autres sont mis à jour instantanément !
+        </p>
+
+        <div id="liveSetupZone">
+          <div style="background:#f1f5f9; padding:1rem; border-radius:8px; margin-bottom:1rem;">
+            <h4 style="font-size:0.92rem; color:var(--primary); margin-bottom:0.4rem;">Option 1 : Vous êtes l'ordinateur principal (Hôte)</h4>
+            <p style="font-size:0.82rem; color:var(--gray-600); margin-bottom:0.6rem;">Démarrez la session pour permettre aux autres membres de scanner votre écran avec leur smartphone.</p>
+            <button class="btn btn-primary" onclick="startHostingLive()">Démarrer la session en direct</button>
+          </div>
+
+          <div style="background:#f1f5f9; padding:1rem; border-radius:8px;">
+            <h4 style="font-size:0.92rem; color:var(--primary); margin-bottom:0.4rem;">Option 2 : Rejoindre une session existante</h4>
+            <p style="font-size:0.82rem; color:var(--gray-600); margin-bottom:0.6rem;">Entrez le code de session affiché sur l'ordinateur principal :</p>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" id="joinRoomCode" class="form-control" placeholder="Ex: ag-cs-xxxx">
+              <button class="btn btn-secondary" onclick="joinLiveSession()">Rejoindre</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="liveActiveZone" style="display:none; text-align:center;">
+          <div style="font-weight:700; color:var(--success); margin-bottom:0.5rem;">
+            🟢 Session en direct active !
+          </div>
+
+          <div id="fileProtocolWarning" style="display:none; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:0.75rem; border-radius:8px; margin-bottom:0.9rem; text-align:left; font-size:0.83rem; line-height:1.45;">
+            <strong>⚠️ Vous êtes en fichier local (<code>file:///</code>) :</strong><br>
+            Un smartphone ne peut pas lire le disque dur de votre ordinateur via ce QR code.<br>
+            <strong>Pour que le QR code fonctionne sur les téléphones :</strong><br>
+            1. <strong>Même Wi-Fi ou partage 4G :</strong> Double-cliquez sur <strong><code>LANCER_SERVEUR.bat</code></strong> dans votre dossier, puis recliquez sur Direct.<br>
+            2. <strong>Ou en ligne partout :</strong> Déposez la page sur Netlify/GitHub Pages.
+          </div>
+
+          <div style="font-size:0.85rem; color:var(--gray-600); margin-bottom:1rem;">
+            Scannez ce QR Code avec l'appareil photo de vos smartphones ou tablettes :
+          </div>
+          <div id="qrcodeContainer" style="display:flex; justify-content:center; margin-bottom:1rem;"></div>
+          <div style="background:#f8fafc; padding:0.6rem; border-radius:6px; font-size:0.85rem; border:1px solid #e2e8f0; margin-bottom:0.5rem;">
+            Code de session : <strong id="liveSessionCodeDisplay">-</strong>
+          </div>
+          <div id="liveUrlDisplay" style="font-size:0.75rem; color:var(--gray-500); word-break:break-all;"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('liveSyncModal')">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RESOLUTION (ADD / EDIT) -->
+  <div class="modal-overlay" id="resolutionModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="resModalTitle">Modifier la résolution</h3>
+        <button class="modal-close" onclick="closeModal('resolutionModal')">&times;</button>
+      </div>
+      <form id="resolutionForm" onsubmit="saveResolution(event)">
+        <input type="hidden" id="resFormId">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group" style="flex:0 0 100px;">
+              <label>N° Résolution *</label>
+              <input type="text" id="resFormNum" class="form-control" placeholder="Ex: 01" required>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>Type de Majorité</label>
+              <select id="resFormMaj" class="form-control">
+                <option value="Article 24">Article 24 (Majorité simple)</option>
+                <option value="Article 25 ou à défaut article 25-1">Article 25 ou à défaut article 25-1</option>
+                <option value="Article 25">Article 25 (Majorité absolue)</option>
+                <option value="Article 26">Article 26 (Double majorité)</option>
+                <option value="article sans vote">Information (Sans vote)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Intitulé de la résolution *</label>
+            <input type="text" id="resFormTitle" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label>Description / Détails de la convocation</label>
+            <textarea id="resFormDesc" class="form-control"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Consigne de vote du CS</label>
+              <select id="resFormCsConsigne" class="form-control">
+                <option value="POUR">✅ POUR (Recommandé par le CS)</option>
+                <option value="CONTRE">❌ CONTRE (Défavorable)</option>
+                <option value="ABSTENTION">⚠️ ABSTENTION</option>
+                <option value="LIBRE">ℹ️ VOTE LIBRE</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Statut actuel du vote</label>
+              <select id="resFormStatus" class="form-control">
+                <option value="EN_ATTENTE">En attente (Non votée)</option>
+                <option value="ADOPTEE">Adoptée ✅</option>
+                <option value="REJETEE">Rejetée ❌</option>
+                <option value="REPORTEE">Reportée / Retirée ⏳</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Arguments & Recommandations du Conseil Syndical</label>
+            <textarea id="resFormCsNotes" class="form-control" placeholder="Avis du conseil syndical, points d'attention..."></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tantièmes POUR (Optionnel)</label>
+              <input type="number" id="resFormTantiemesPour" class="form-control">
+            </div>
+            <div class="form-group">
+              <label>Tantièmes CONTRE (Optionnel)</label>
+              <input type="number" id="resFormTantiemesContre" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Notes / Décisions prises en séance</label>
+            <input type="text" id="resFormNotes" class="form-control" placeholder="Ex: Amendement voté en séance...">
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('resolutionModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL MEMBER (ADD / EDIT) -->
+  <div class="modal-overlay" id="memberModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="memberModalTitle">Ajouter un membre du CS</h3>
+        <button class="modal-close" onclick="closeModal('memberModal')">&times;</button>
+      </div>
+      <form id="memberForm" onsubmit="saveMember(event)">
+        <input type="hidden" id="memberFormId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nom et Prénom du membre CS *</label>
+            <input type="text" id="memFormName" class="form-control" placeholder="Ex: M. DUCHEZ" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Lot(s)</label>
+              <input type="text" id="memFormLots" class="form-control" placeholder="Ex: Appt B12">
+            </div>
+            <div class="form-group">
+              <label>Tantièmes Personnels</label>
+              <input type="number" id="memFormTantiemes" class="form-control" placeholder="Ex: 145">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Procurations / Pouvoirs reçus (Noms des mandants)</label>
+            <input type="text" id="memFormMandats" class="form-control" placeholder="Ex: M. Dupont (120)">
+          </div>
+          <div class="form-group">
+            <label>Tantièmes cumulés des mandats reçus</label>
+            <input type="number" id="memFormMandatTantiemes" class="form-control" placeholder="Ex: 120">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('memberModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC & CONVOCATION DATA -->
+  <script>
+    const STORAGE_KEY = 'AG_CS_VOTES_DATA_FLOREAL_2026';
+
+    // Exact data extracted from the convocation photos
+    const CONVOCATION_DATA = {
+      config: {
+        coproName: "RÉSIDENCE LE FLORÉAL",
+        agDate: "2026-11-25",
+        agTime: "18h00",
+        agLocation: "Salle Jacques Prévert, Rue du Moucherotte, 38360 Sassenage",
+        syndic: "Citya Agence Henry",
+        totalTantiemes: 10000,
+        presentTantiemes: 0
+      },
+      members: [
+        { id: "m1", name: "Mme GANET", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m2", name: "Mlle PIGOIS", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m3", name: "M. ou Mme GUERRE", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m4", name: "M. ou Mme GARCIA F. - OSIOL F.", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m5", name: "M. DUCHEZ", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m6", name: "M. ou Mme CASARI", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m7", name: "M. LOUIS", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m8", name: "M. ou Mme BEZY", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m9", name: "Mme ARMONIA PESENTI", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m10", name: "M. et Mme LEGRAND", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m11", name: "M. BONSIGNORE", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m12", name: "M. ou Mme BRUN", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m13", name: "Mme FANTINI", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m14", name: "M. SUZET", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m15", name: "Mme DABOIN SOTO", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m16", name: "Mme FALCON", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 },
+        { id: "m17", name: "M. ou Mme COURANT", lots: "", tantiemes: 0, mandats: "", mandatTantiemes: 0 }
+      ],
+      resolutions: [
+        {
+          id: "r01",
+          number: "01",
+          title: "Élection du/de la président(e) de séance de l'assemblée",
+          description: "Pour remplir les fonctions de président(e) de séance, l'assemblée générale élit : ...\nCette décision pour être adoptée devra recueillir la majorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Choisir un membre du conseil syndical pour présider la séance.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r02",
+          number: "02",
+          title: "Élection de scrutateur(s)/scrutatrice(s) de l'assemblée",
+          description: "Pour remplir les fonctions de scrutateur(s)/scrutatrice(s) de séance, l'assemblée générale élit : ...\nCette décision devra recueillir la majorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r03",
+          number: "03",
+          title: "Élection du secrétaire de séance de l'assemblée",
+          description: "Pour remplir les fonctions de secrétaire de séance, l'assemblée générale élit : ...\nLe syndic dépose sur le bureau la feuille de présence, les pouvoirs, les bulletins de vote par correspondance, le registre des LRAR.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Le syndic assure généralement le secrétariat.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r04",
+          number: "04",
+          title: "Rapport du conseil syndical pour l'exercice N du 01/07/2025 au 30/06/2026",
+          description: "Le conseil syndical fait lecture de son rapport d'activité au cours de l'exercice N.\nCette résolution est une information, elle n'appelle pas au vote.",
+          majorite: "article sans vote",
+          csConsigne: "LIBRE",
+          csNotes: "Présentation du bilan annuel par le Conseil Syndical.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r05",
+          number: "05",
+          title: "Approbation des comptes de l'exercice N du 01/07/2025 au 30/06/2026",
+          description: "Comptes joints à la convocation en annexe.\nApprobation en leur forme, teneur, imputation et répartition des comptes de charges dudit exercice pour un montant de 703 324,59 EUROS TTC.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Comptes vérifiés avec le grand livre et les factures justificatives.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r06",
+          number: "06",
+          title: "Désignation du syndic (contrats joints à la convocation en annexes)",
+          description: "Présentation des contrats de syndic en concurrence.\nCette résolution est une information, elle n'appelle pas au vote.",
+          majorite: "article sans vote",
+          csConsigne: "LIBRE",
+          csNotes: "Passer directement aux votes des candidatures 06a et 06b.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r06a",
+          number: "06a",
+          title: "Candidature du syndic : CITYA agence HENRY",
+          description: "Désignation du cabinet CITYA AGENCE HENRY pour une durée de 12 MOIS, prenant effet du 01.01.2027 au 31.12.2027.\nMajorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "Syndic sortant. Comparer les honoraires et prestations avec Trenta.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r06b",
+          number: "06b",
+          title: "Candidature du syndic : TRENTA IMMOBILIER",
+          description: "Désignation du cabinet TRENTA IMMOBILIER pour une durée de 18 MOIS.\nMajorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "LIBRE",
+          csNotes: "Candidature concurrente proposée à l'AG.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r07",
+          number: "07",
+          title: "Approbation du budget prévisionnel pour l'exercice N+2 du 01.07.2027 au 30.06.2028",
+          description: "Budget prévisionnel N+2 arrêté à la somme de 708 674 EUROS TTC.\nExigible par trimestres égaux le premier jour de chaque trimestre.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Budget nécessaire au fonctionnement courant de la résidence.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08",
+          number: "08",
+          title: "Élection du conseil syndical",
+          description: "Le conseil syndical assiste et contrôle la gestion du syndic. Les membres sont élus pour 1 an / 3 ans.\nCette résolution est une information, elle n'appelle pas au vote.",
+          majorite: "article sans vote",
+          csConsigne: "LIBRE",
+          csNotes: "Vote individuel candidat par candidat de 08a à 08n.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08a",
+          number: "08a",
+          title: "Élection au Conseil Syndical : MME GANET",
+          description: "Élection de MME GANET. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08b",
+          number: "08b",
+          title: "Élection au Conseil Syndical : MME PIGOIS",
+          description: "Élection de MME PIGOIS. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08c",
+          number: "08c",
+          title: "Élection au Conseil Syndical : MME GUERRE",
+          description: "Élection de MME GUERRE. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08d",
+          number: "08d",
+          title: "Élection au Conseil Syndical : MME GARCIA",
+          description: "Élection de MME GARCIA. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08e",
+          number: "08e",
+          title: "Élection au Conseil Syndical : M. DUCHEZ",
+          description: "Élection de M. DUCHEZ. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08f",
+          number: "08f",
+          title: "Élection au Conseil Syndical : M. CASARI",
+          description: "Élection de M. CASARI. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08g",
+          number: "08g",
+          title: "Élection au Conseil Syndical : M. LOUIS",
+          description: "Élection de M. LOUIS. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08h",
+          number: "08h",
+          title: "Élection au Conseil Syndical : M. BEZY",
+          description: "Élection de M. BEZY. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08i",
+          number: "08i",
+          title: "Élection au Conseil Syndical : MME ARMONIA PESENTI",
+          description: "Élection de MME ARMONIA PESENTI. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08j",
+          number: "08j",
+          title: "Élection au Conseil Syndical : M. LEGRAND",
+          description: "Élection de M. LEGRAND. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08k",
+          number: "08k",
+          title: "Élection au Conseil Syndical : M. BONSIGNORE",
+          description: "Élection de M. BONSIGNORE. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08l",
+          number: "08l",
+          title: "Élection au Conseil Syndical : M. BRUN",
+          description: "Élection de M. BRUN. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08m",
+          number: "08m",
+          title: "Élection au Conseil Syndical : MME FANTINI",
+          description: "Élection de MME FANTINI. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r08n",
+          number: "08n",
+          title: "Élection au Conseil Syndical : M. SUZET",
+          description: "Élection de M. SUZET. Majorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r09",
+          number: "09",
+          title: "Validation du cahier des charges pour l'installation de climatisations",
+          description: "PJ : projet de cahier des charges.\nL'assemblée générale, après avoir délibéré, décide de valider le cahier des charges joint à la convocation en annexe pour l'installation de climatisations.\nMajorité de l'Article 25 ou à défaut article 25-1.",
+          majorite: "Article 25 ou à défaut article 25-1",
+          csConsigne: "POUR",
+          csNotes: "Encadre l'esthétique et les règles techniques des climatiseurs privatifs.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r10",
+          number: "10",
+          title: "Décision quant à la mise en vente par adjudication du bien appartenant à PADRINES Jennifer",
+          description: "Information générale sur les procédures en recouvrement.\nCette résolution est une information, elle n'appelle pas au vote.",
+          majorite: "article sans vote",
+          csConsigne: "LIBRE",
+          csNotes: "Information préalable aux votes 10a, 10b, 10c.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r10a",
+          number: "10a",
+          title: "Saisie immobilière : montant des sommes estimées définitivement perdues",
+          description: "Lots 456 et 363. Eu égard aux sommes dues (comptes du syndic), risque de sommes susceptibles d'être définitivement perdues évalué à 13 716,95 €.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Nécessaire pour constater le montant de la créance irrécouvrable.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r10b",
+          number: "10b",
+          title: "Saisie immobilière : mise en vente des lots par adjudication",
+          description: "L'assemblée générale décide de faire procéder à la saisie immobilière en vue de la vente des lots 456 et 363, et donne tous pouvoirs au syndic.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "Permet de recouvrer les charges impayées au bénéfice du syndicat.",
+          status: "EN_ATTENTE"
+        },
+        {
+          id: "r10c",
+          number: "10c",
+          title: "Saisie immobilière : montant de la mise à prix",
+          description: "Fixe la mise à prix selon l'usage à un tiers de la valeur des biens, soit 42 000 €.\nSi défaut d'enchérisseur, le syndicat sera déclaré adjudicataire d'office pour le montant de la mise à prix.\nMajorité de l'Article 24.",
+          majorite: "Article 24",
+          csConsigne: "POUR",
+          csNotes: "",
+          status: "EN_ATTENTE"
+        }
+      ]
+    };
+
+    let appData = loadData();
+
+    function loadData() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          console.error("Erreur parsing localStorage", e);
+        }
+      }
+      return JSON.parse(JSON.stringify(CONVOCATION_DATA));
+    }
+
+    function persistData(broadcast = true) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      updateUI();
+      if (broadcast && isLiveActive) {
+        broadcastLiveUpdate({ type: 'SYNC_FULL_DATA', data: appData });
+      }
+    }
+
+    function reloadConvocationData() {
+      if (confirm("Réinitialiser avec toutes les résolutions de votre convocation du 25 novembre 2026 ?")) {
+        appData = JSON.parse(JSON.stringify(CONVOCATION_DATA));
+        persistData();
+      }
+    }
+
+    // Navigation Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('main > section').forEach(sec => sec.style.display = 'none');
+
+      document.getElementById('section-' + tabId).style.display = 'block';
+
+      const buttons = document.querySelectorAll('.tab-btn');
+      if (tabId === 'votes') buttons[0].classList.add('active');
+      else if (tabId === 'members') buttons[1].classList.add('active');
+      else if (tabId === 'settings') buttons[2].classList.add('active');
+    }
+
+    // Update UI elements
+    function updateUI() {
+      document.getElementById('headerSubtitle').innerText = `${appData.config.coproName} - AG du ${formatDate(appData.config.agDate)}`;
+      document.getElementById('printAgTitle').innerText = `${appData.config.coproName} - Assemblée Générale Annuelle`;
+      document.getElementById('printAgMeta').innerText = `Mercredi 25 novembre 2026 à 18h00 - Sassenage - Relevé de décisions & Votes du CS`;
+
+      // Filter out non-voting resolutions from stats
+      const voteResolutions = appData.resolutions.filter(r => r.majorite !== 'article sans vote');
+      const total = voteResolutions.length;
+      const adopted = voteResolutions.filter(r => r.status === 'ADOPTEE').length;
+      const rejected = voteResolutions.filter(r => r.status === 'REJETEE').length;
+      const postponed = voteResolutions.filter(r => r.status === 'REPORTEE').length;
+      const voted = adopted + rejected + postponed;
+
+      document.getElementById('statTotal').innerText = total;
+      document.getElementById('statVoted').innerText = voted;
+      document.getElementById('statAdopted').innerText = adopted;
+      document.getElementById('statRejected').innerText = rejected;
+      document.getElementById('statPercent').innerText = total > 0 ? Math.round((voted / total) * 100) + '% voté' : '0%';
+
+      const csPerso = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0), 0);
+      const csMandats = appData.members.reduce((acc, m) => acc + (Number(m.mandatTantiemes) || 0), 0);
+      const csTotal = csPerso + csMandats;
+      const totalTant = Number(appData.config.totalTantiemes) || 10000;
+      const csPct = totalTant > 0 ? ((csTotal / totalTant) * 100).toFixed(1) : '0';
+
+      document.getElementById('statCsWeight').innerText = `${csTotal} / ${totalTant}`;
+      document.getElementById('statCsPercent').innerText = `${csPct}% des tantièmes totaux`;
+
+      document.getElementById('badgeVotesCount').innerText = `${voted}/${total}`;
+      document.getElementById('badgeMembersCount').innerText = appData.members.length;
+
+      renderResolutions();
+      renderMembers(csPerso, csMandats, csTotal, totalTant);
+
+      document.getElementById('cfgCoproname').value = appData.config.coproName || '';
+      document.getElementById('cfgAgDate').value = appData.config.agDate || '';
+      document.getElementById('cfgTotalTantiemes').value = appData.config.totalTantiemes || 10000;
+      document.getElementById('cfgPresentTantiemes').value = appData.config.presentTantiemes || '';
+    }
+
+    function renderResolutions() {
+      const listEl = document.getElementById('resolutionsList');
+      const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('filterStatus')?.value || 'ALL';
+      const csFilter = document.getElementById('filterCsConsigne')?.value || 'ALL';
+
+      const filtered = appData.resolutions.filter(r => {
+        const matchSearch = (r.number + ' ' + r.title + ' ' + (r.description || '') + ' ' + (r.csNotes || '')).toLowerCase().includes(search);
+        const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+        const matchCs = csFilter === 'ALL' || r.csConsigne === csFilter;
+        return matchSearch && matchStatus && matchCs;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <p>Aucune résolution ne correspond à vos filtres de recherche.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(r => {
+        const isSansVote = (r.majorite === 'article sans vote');
+        const csBadgeClass = {
+          'POUR': 'tag-cs-pour',
+          'CONTRE': 'tag-cs-contre',
+          'ABSTENTION': 'tag-cs-abstention',
+          'LIBRE': 'tag-cs-libre'
+        }[r.csConsigne] || 'tag-cs-libre';
+
+        const statusLabel = {
+          'EN_ATTENTE': isSansVote ? 'Information' : 'En attente',
+          'ADOPTEE': '✅ Adoptée',
+          'REJETEE': '❌ Rejetée',
+          'REPORTEE': '⏳ Reportée / Retirée'
+        }[r.status] || r.status;
+
+        return `
+          <div class="resolution-card status-${r.status}" id="res-card-${r.id}">
+            <div class="resolution-header">
+              <div style="flex:1;">
+                <span class="resolution-num">Résolution n° ${escapeHtml(r.number)}</span>
+                <h2 class="resolution-title">${escapeHtml(r.title)}</h2>
+                <div class="tags">
+                  <span class="tag ${isSansVote ? 'tag-maj-sansvote' : 'tag-maj'}">${escapeHtml(r.majorite)}</span>
+                  ${!isSansVote ? `<span class="tag ${csBadgeClass}">Consigne CS : ${r.csConsigne}</span>` : ''}
+                  <span class="tag tag-status-${r.status}">${statusLabel}</span>
+                </div>
+              </div>
+              <div class="no-print" style="display:flex; gap:0.4rem;">
+                <button class="btn btn-secondary btn-sm" onclick="editResolution('${r.id}')" title="Modifier">✏️</button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteResolution('${r.id}')" title="Supprimer" style="color:var(--danger)">🗑️</button>
+              </div>
+            </div>
+
+            ${r.description ? `<div class="resolution-desc">${escapeHtml(r.description)}</div>` : ''}
+
+            ${r.csNotes ? `
+              <div class="cs-argument-box">
+                <strong>💡 Note / Consigne du CS :</strong> ${escapeHtml(r.csNotes)}
+              </div>
+            ` : ''}
+
+            ${r.notesSeance ? `
+              <div style="font-size:0.83rem; color:var(--gray-700); margin:0.4rem 0; font-style:italic;">
+                <strong>📝 Séance :</strong> ${escapeHtml(r.notesSeance)}
+              </div>
+            ` : ''}
+
+            ${!isSansVote ? `
+              <div class="resolution-vote-zone">
+                <div class="vote-quick-actions no-print">
+                  <span style="font-size:0.82rem; font-weight:600; color:var(--gray-500); margin-right:0.3rem;">Vote réel :</span>
+                  <button class="vote-btn-choice ${r.status === 'ADOPTEE' ? 'selected-adoptee' : ''}" onclick="setQuickVote('${r.id}', 'ADOPTEE')">
+                    ✅ Adoptée
+                  </button>
+                  <button class="vote-btn-choice ${r.status === 'REJETEE' ? 'selected-rejetee' : ''}" onclick="setQuickVote('${r.id}', 'REJETEE')">
+                    ❌ Rejetée
+                  </button>
+                  <button class="vote-btn-choice ${r.status === 'REPORTEE' ? 'selected-reportee' : ''}" onclick="setQuickVote('${r.id}', 'REPORTEE')">
+                    ⏳ Reportée
+                  </button>
+                  ${r.status !== 'EN_ATTENTE' ? `
+                    <button class="vote-btn-choice" onclick="setQuickVote('${r.id}', 'EN_ATTENTE')" title="Annuler le vote" style="color:var(--gray-500);">
+                      ↺ Annuler
+                    </button>
+                  ` : ''}
+                </div>
+
+                <div style="font-size:0.82rem; color:var(--gray-500); display:flex; gap:0.8rem;">
+                  ${r.tantiemesPour ? `<span>👍 Pour : <strong>${escapeHtml(r.tantiemesPour)}</strong></span>` : ''}
+                  ${r.tantiemesContre ? `<span>👎 Contre : <strong>${escapeHtml(r.tantiemesContre)}</strong></span>` : ''}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderMembers(csPerso, csMandats, csTotal, totalTant) {
+      const tbody = document.getElementById('membersTableBody');
+
+      if (appData.members.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun membre du Conseil Syndical renseigné.</td></tr>`;
+      } else {
+        tbody.innerHTML = appData.members.map(m => {
+          const perso = Number(m.tantiemes) || 0;
+          const mand = Number(m.mandatTantiemes) || 0;
+          const tot = perso + mand;
+          const pct = totalTant > 0 ? ((tot / totalTant) * 100).toFixed(1) : 0;
+          const isOverTenPct = totalTant > 0 && (tot / totalTant) > 0.10;
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(m.name)}</strong></td>
+              <td>${escapeHtml(m.lots || '-')}</td>
+              <td><span class="tantieme-pill">${perso}</span></td>
+              <td>${escapeHtml(m.mandats || 'Aucun')}</td>
+              <td><span class="tantieme-pill">${mand}</span></td>
+              <td>
+                <strong>${tot}</strong> (${pct}%)
+                ${isOverTenPct ? `<span title="Attention: dépasse 10% des voix totales de l'immeuble" style="color:var(--danger); font-size:0.75rem; font-weight:700;"> ⚠️ &gt;10%</span>` : ''}
+              </td>
+              <td class="no-print" style="text-align:right;">
+                <button class="btn btn-secondary btn-sm" onclick="editMember('${m.id}')">✏️ Saisir tantièmes</button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteMember('${m.id}')" style="color:var(--danger)">🗑️</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('footPersoTantiemes').innerText = csPerso;
+      document.getElementById('footMandatTantiemes').innerText = csMandats;
+      document.getElementById('footTotalCsTantiemes').innerText = `${csTotal} / ${totalTant} (${totalTant > 0 ? ((csTotal / totalTant) * 100).toFixed(1) : 0}%)`;
+    }
+
+    function setQuickVote(id, newStatus) {
+      const res = appData.resolutions.find(r => r.id === id);
+      if (res) {
+        res.status = newStatus;
+        persistData();
+      }
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function openNewResolutionModal() {
+      document.getElementById('resModalTitle').innerText = 'Ajouter une résolution';
+      document.getElementById('resFormId').value = '';
+      document.getElementById('resFormNum').value = String(appData.resolutions.length + 1).padStart(2, '0');
+      document.getElementById('resFormTitle').value = '';
+      document.getElementById('resFormDesc').value = '';
+      document.getElementById('resFormMaj').value = 'Article 24';
+      document.getElementById('resFormCsConsigne').value = 'POUR';
+      document.getElementById('resFormStatus').value = 'EN_ATTENTE';
+      document.getElementById('resFormCsNotes').value = '';
+      document.getElementById('resFormTantiemesPour').value = '';
+      document.getElementById('resFormTantiemesContre').value = '';
+      document.getElementById('resFormNotes').value = '';
+      openModal('resolutionModal');
+    }
+
+    function editResolution(id) {
+      const res = appData.resolutions.find(r => r.id === id);
+      if (!res) return;
+
+      document.getElementById('resModalTitle').innerText = `Modifier la résolution n° ${res.number}`;
+      document.getElementById('resFormId').value = res.id;
+      document.getElementById('resFormNum').value = res.number || '';
+      document.getElementById('resFormTitle').value = res.title || '';
+      document.getElementById('resFormDesc').value = res.description || '';
+      document.getElementById('resFormMaj').value = res.majorite || 'Article 24';
+      document.getElementById('resFormCsConsigne').value = res.csConsigne || 'POUR';
+      document.getElementById('resFormStatus').value = res.status || 'EN_ATTENTE';
+      document.getElementById('resFormCsNotes').value = res.csNotes || '';
+      document.getElementById('resFormTantiemesPour').value = res.tantiemesPour || '';
+      document.getElementById('resFormTantiemesContre').value = res.tantiemesContre || '';
+      document.getElementById('resFormNotes').value = res.notesSeance || '';
+
+      openModal('resolutionModal');
+    }
+
+    function saveResolution(e) {
+      e.preventDefault();
+      const id = document.getElementById('resFormId').value;
+      const resData = {
+        number: document.getElementById('resFormNum').value.trim(),
+        title: document.getElementById('resFormTitle').value.trim(),
+        description: document.getElementById('resFormDesc').value.trim(),
+        majorite: document.getElementById('resFormMaj').value,
+        csConsigne: document.getElementById('resFormCsConsigne').value,
+        status: document.getElementById('resFormStatus').value,
+        csNotes: document.getElementById('resFormCsNotes').value.trim(),
+        tantiemesPour: document.getElementById('resFormTantiemesPour').value.trim(),
+        tantiemesContre: document.getElementById('resFormTantiemesContre').value.trim(),
+        notesSeance: document.getElementById('resFormNotes').value.trim()
+      };
+
+      if (id) {
+        const index = appData.resolutions.findIndex(r => r.id === id);
+        if (index !== -1) {
+          appData.resolutions[index] = { ...appData.resolutions[index], ...resData };
+        }
+      } else {
+        appData.resolutions.push({ id: 'res_' + Date.now(), ...resData });
+      }
+
+      closeModal('resolutionModal');
+      persistData();
+    }
+
+    function deleteResolution(id) {
+      const res = appData.resolutions.find(r => r.id === id);
+      if (!res) return;
+      if (confirm(`Supprimer la résolution n° ${res.number} ?`)) {
+        appData.resolutions = appData.resolutions.filter(r => r.id !== id);
+        persistData();
+      }
+    }
+
+    function openNewMemberModal() {
+      document.getElementById('memberModalTitle').innerText = 'Ajouter un membre du CS';
+      document.getElementById('memberFormId').value = '';
+      document.getElementById('memFormName').value = '';
+      document.getElementById('memFormLots').value = '';
+      document.getElementById('memFormTantiemes').value = '';
+      document.getElementById('memFormMandats').value = '';
+      document.getElementById('memFormMandatTantiemes').value = '';
+      openModal('memberModal');
+    }
+
+    function editMember(id) {
+      const m = appData.members.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('memberModalTitle').innerText = `Modifier le membre : ${m.name}`;
+      document.getElementById('memberFormId').value = m.id;
+      document.getElementById('memFormName').value = m.name || '';
+      document.getElementById('memFormLots').value = m.lots || '';
+      document.getElementById('memFormTantiemes').value = m.tantiemes || '';
+      document.getElementById('memFormMandats').value = m.mandats || '';
+      document.getElementById('memFormMandatTantiemes').value = m.mandatTantiemes || '';
+      openModal('memberModal');
+    }
+
+    function saveMember(e) {
+      e.preventDefault();
+      const id = document.getElementById('memberFormId').value;
+      const memData = {
+        name: document.getElementById('memFormName').value.trim(),
+        lots: document.getElementById('memFormLots').value.trim(),
+        tantiemes: Number(document.getElementById('memFormTantiemes').value) || 0,
+        mandats: document.getElementById('memFormMandats').value.trim(),
+        mandatTantiemes: Number(document.getElementById('memFormMandatTantiemes').value) || 0
+      };
+
+      if (id) {
+        const index = appData.members.findIndex(m => m.id === id);
+        if (index !== -1) {
+          appData.members[index] = { ...appData.members[index], ...memData };
+        }
+      } else {
+        appData.members.push({ id: 'mem_' + Date.now(), ...memData });
+      }
+
+      closeModal('memberModal');
+      persistData();
+    }
+
+    function deleteMember(id) {
+      const m = appData.members.find(x => x.id === id);
+      if (!m) return;
+      if (confirm(`Supprimer "${m.name}" ?`)) {
+        appData.members = appData.members.filter(x => x.id !== id);
+        persistData();
+      }
+    }
+
+    function saveConfig() {
+      appData.config.coproName = document.getElementById('cfgCoproname').value.trim();
+      appData.config.agDate = document.getElementById('cfgAgDate').value;
+      appData.config.totalTantiemes = Number(document.getElementById('cfgTotalTantiemes').value) || 10000;
+      appData.config.presentTantiemes = Number(document.getElementById('cfgPresentTantiemes').value) || 0;
+      persistData();
+    }
+
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('filterStatus').value = 'ALL';
+      document.getElementById('filterCsConsigne').value = 'ALL';
+      renderResolutions();
+    }
+
+    function exportDataJson() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const filename = `Votes_AG_FLOREAL_25_NOV_2026.json`;
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importDataJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.resolutions && imported.config) {
+            appData = imported;
+            persistData();
+            alert("Données importées avec succès !");
+          } else {
+            alert("Format JSON non valide.");
+          }
+        } catch (err) {
+          alert("Erreur lors de la lecture du fichier : " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // Direct Multi-devices PeerJS
+    let peer = null;
+    let peerConnections = [];
+    let isLiveActive = false;
+    let isHost = false;
+
+    function openLiveSyncModal() { openModal('liveSyncModal'); }
+
+    function startHostingLive() {
+      if (typeof Peer === 'undefined') {
+        alert("La bibliothèque de synchronisation n'a pas pu être chargée. Vérifiez votre connexion.");
+        return;
+      }
+
+      const randomId = 'floreal-' + Math.random().toString(36).substr(2, 6);
+      peer = new Peer(randomId);
+
+      peer.on('open', (id) => {
+        isLiveActive = true;
+        isHost = true;
+        document.getElementById('liveSetupZone').style.display = 'none';
+        document.getElementById('liveActiveZone').style.display = 'block';
+        document.getElementById('liveSessionCodeDisplay').innerText = id;
+        document.getElementById('liveStatusBar').classList.add('active');
+        document.getElementById('liveStatusText').innerText = `Session en direct active (Hôte : ${id})`;
+
+        const isLocalFile = (window.location.protocol === 'file:');
+        const warningEl = document.getElementById('fileProtocolWarning');
+        if (warningEl) {
+          warningEl.style.display = isLocalFile ? 'block' : 'none';
+        }
+
+        const qrcodeContainer = document.getElementById('qrcodeContainer');
+        qrcodeContainer.innerHTML = '';
+        const currentUrl = window.location.href.split('?')[0] + '?room=' + id;
+        
+        document.getElementById('liveUrlDisplay').innerText = isLocalFile 
+          ? "⚠️ URL locale (inaccessible aux autres appareils sans LANCER_SERVEUR.bat ou hébergement)"
+          : currentUrl;
+
+        new QRCode(qrcodeContainer, {
+          text: currentUrl,
+          width: 160,
+          height: 160,
+          colorDark: "#1e3a8a",
+          colorLight: "#ffffff"
+        });
+      });
+
+      peer.on('connection', (conn) => {
+        peerConnections.push(conn);
+        updateConnectedPeersCount();
+
+        conn.on('open', () => {
+          conn.send({ type: 'SYNC_FULL_DATA', data: appData });
+        });
+
+        conn.on('data', (msg) => {
+          handleIncomingPeerMessage(msg);
+        });
+
+        conn.on('close', () => {
+          peerConnections = peerConnections.filter(c => c !== conn);
+          updateConnectedPeersCount();
+        });
+      });
+
+      peer.on('error', (err) => { console.error("PeerJS error:", err); });
+    }
+
+    function joinLiveSession(roomId) {
+      const code = roomId || document.getElementById('joinRoomCode').value.trim();
+      if (!code) {
+        alert("Veuillez saisir un code de session.");
+        return;
+      }
+
+      peer = new Peer();
+      peer.on('open', () => {
+        const conn = peer.connect(code);
+        isLiveActive = true;
+        isHost = false;
+
+        conn.on('open', () => {
+          peerConnections = [conn];
+          document.getElementById('liveSetupZone').style.display = 'none';
+          document.getElementById('liveActiveZone').style.display = 'block';
+          document.getElementById('liveSessionCodeDisplay').innerText = "Connecté à l'hôte : " + code;
+          document.getElementById('liveStatusBar').classList.add('active');
+          document.getElementById('liveStatusText').innerText = `Connecté en direct à l'AG (${code})`;
+          closeModal('liveSyncModal');
+        });
+
+        conn.on('data', (msg) => {
+          handleIncomingPeerMessage(msg);
+        });
+
+        conn.on('close', () => {
+          alert("La connexion à l'ordinateur principal a été coupée.");
+          stopLiveSync();
+        });
+      });
+
+      peer.on('error', (err) => {
+        alert("Impossible de se connecter à la session " + code);
+      });
+    }
+
+    function broadcastLiveUpdate(msg) {
+      peerConnections.forEach(conn => {
+        if (conn && conn.open) conn.send(msg);
+      });
+    }
+
+    function handleIncomingPeerMessage(msg) {
+      if (msg.type === 'SYNC_FULL_DATA') {
+        appData = msg.data;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        updateUI();
+      }
+    }
+
+    function updateConnectedPeersCount() {
+      const count = peerConnections.length + 1;
+      document.getElementById('livePeerCount').innerText = `Connecté(s) : ${count}`;
+    }
+
+    function stopLiveSync() {
+      if (peer) peer.destroy();
+      peer = null;
+      peerConnections = [];
+      isLiveActive = false;
+      document.getElementById('liveStatusBar').classList.remove('active');
+      document.getElementById('liveSetupZone').style.display = 'block';
+      document.getElementById('liveActiveZone').style.display = 'none';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        setTimeout(() => { joinLiveSession(roomParam); }, 600);
+      }
+    });
+
+    function formatDate(dStr) {
+      if (!dStr) return '';
+      const parts = dStr.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return dStr;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
