@@ -207,40 +207,65 @@ function renderCoproprietaires(totalTant) {
     return;
   }
 
+  // Calculate overall presence
   let totalPresents = 0;
   let countPresents = 0;
-
-  tbody.innerHTML = list.map(c => {
-    const isPresent = (c.statut === 'PRESENT' || c.statut === 'POUVOIR' || c.statut === 'VPC');
-    if (isPresent) {
+  list.forEach(c => {
+    if (c.statut === 'PRESENT' || c.statut === 'POUVOIR' || c.statut === 'VPC') {
       totalPresents += Number(c.tantiemes) || 0;
       countPresents++;
     }
+  });
 
-    const badgeMap = {
-      'PRESENT': '<span class="badge-present">Présent</span>',
-      'POUVOIR': `<span class="badge-pouvoir">Pouvoir à : ${escapeHtml(c.mandataire || '?')}</span>`,
-      'VPC': '<span class="badge-vpc">Vote Corresp.</span>',
-      'ABSENT': '<span class="badge-absent">Absent</span>'
-    };
+  const search = (document.getElementById('searchCoproInput')?.value || '').toLowerCase();
+  const filterStatut = document.getElementById('filterCoproStatut')?.value || 'ALL';
 
-    return `
-      <tr>
-        <td><strong>${escapeHtml(c.nom)}</strong></td>
-        <td>${escapeHtml(c.lots || '-')}</td>
-        <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
-        <td>${badgeMap[c.statut] || c.statut}</td>
-        <td>${escapeHtml(c.notes || '-')}</td>
-        <td class="no-print" style="text-align:right;">
-          <button class="btn btn-secondary btn-sm" onclick="editCopro('${c.id}')">✏️</button>
-          <button class="btn btn-secondary btn-sm" onclick="deleteCopro('${c.id}')" style="color:var(--danger)">🗑️</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  const filtered = list.filter(c => {
+    const matchSearch = (c.nom + ' ' + (c.mandataire || '') + ' ' + (c.notes || '')).toLowerCase().includes(search);
+    let matchStatut = true;
+    if (filterStatut === 'TOP20') {
+      matchStatut = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
+    } else if (filterStatut !== 'ALL') {
+      matchStatut = (c.statut === filterStatut);
+    }
+    return matchSearch && matchStatut;
+  });
 
-  document.getElementById('footPresentTantiemes').innerText = `${totalPresents} / ${totalTant} (${((totalPresents / totalTant) * 100).toFixed(1)}%) - ${countPresents} présents/représentés`;
-  // Auto-sync into config if 0
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire ne correspond à vos filtres.</td></tr>`;
+  } else {
+    tbody.innerHTML = filtered.map(c => {
+      const badgeMap = {
+        'PRESENT': '<span class="badge-present">Présent</span>',
+        'POUVOIR': `<span class="badge-pouvoir">Pouvoir : ${escapeHtml(c.mandataire || '?')}</span>`,
+        'VPC': '<span class="badge-vpc">Vote Corresp.</span>',
+        'ABSENT': '<span class="badge-absent">Absent</span>'
+      };
+
+      const isTop20 = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
+
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(c.nom)}</strong>
+            ${isTop20 ? '<span style="font-size:0.75rem; color:#dc2626; margin-left:0.3rem;">🔥 Top 20%</span>' : ''}
+          </td>
+          <td>${escapeHtml(c.lots || '-')}</td>
+          <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
+          <td>${badgeMap[c.statut] || c.statut}</td>
+          <td>${escapeHtml(c.notes || '-')}</td>
+          <td class="no-print" style="text-align:right;">
+            <button class="btn btn-secondary btn-sm" onclick="editCopro('${c.id}')">✏️</button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteCopro('${c.id}')" style="color:var(--danger)">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  const effectiveTotal = totalTant || 97478;
+  document.getElementById('footPresentTantiemes').innerText = `${totalPresents} / ${effectiveTotal} tantièmes (${((totalPresents / effectiveTotal) * 100).toFixed(1)}%) — ${countPresents} présents ou représentés`;
+  
   if (!appData.config.presentTantiemes || appData.config.presentTantiemes === 0) {
     appData.config.presentTantiemes = totalPresents;
   }

@@ -159,12 +159,19 @@
     <section id="section-presence" style="display:none;">
 
       <div class="filter-bar no-print">
-        <div style="font-weight:700; color:var(--gray-800);">
-          Registre des Copropriétaires, Pouvoirs & Feuille de présence
+        <div class="filter-group">
+          <input type="text" id="searchCoproInput" class="search-input" placeholder="🔍 Rechercher un copropriétaire..." oninput="renderCoproprietaires(appData.config.totalTantiemes)">
+          <select id="filterCoproStatut" class="select-input" onchange="renderCoproprietaires(appData.config.totalTantiemes)">
+            <option value="ALL">Tous les statuts</option>
+            <option value="POUVOIR">✉️ Pouvoirs / Représentés</option>
+            <option value="PRESENT">✅ Présents</option>
+            <option value="ABSENT">❌ Absents</option>
+            <option value="TOP20">🔥 Top 20%</option>
+          </select>
         </div>
         <div style="display:flex; gap:0.5rem;">
-          <button class="btn btn-primary" onclick="openNewCoproModal()">+ Ajouter un copropriétaire</button>
-          <button class="btn btn-secondary" onclick="openImportCoproModal()">📥 Importer la liste</button>
+          <button class="btn btn-primary" onclick="openNewCoproModal()">+ Ajouter</button>
+          <button class="btn btn-secondary" onclick="openImportCoproModal()">📥 Importer</button>
         </div>
       </div>
 
