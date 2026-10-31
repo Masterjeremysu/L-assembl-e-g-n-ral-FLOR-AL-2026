@@ -41,6 +41,10 @@
         <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL - AG du 25/11/2026</p>
       </div>
       <div class="header-actions no-print">
+        <button class="btn btn-warning-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
+          ✉️ + Enregistrer un Pouvoir
+        </button>
+
         <button class="btn btn-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones/tablettes">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
           Direct Multi-écrans (Gratuit)
@@ -69,6 +73,10 @@
       <button class="tab-btn" onclick="switchTab('presence')">
         🚪 Émargement & Départs
         <span class="badge-count" id="badgePresenceCount">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('pouvoirs')">
+        ✉️ Pouvoirs & Mandats
+        <span class="badge-count" id="badgePouvoirsCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('members')">
         👥 Membres Conseil Syndical
@@ -211,6 +219,107 @@
             </tr>
           </tfoot>
         </table>
+      </div>
+
+    </section>
+
+    <!-- SECTION POUVOIRS & MANDATS (ART. 22) -->
+    <section id="section-pouvoirs" style="display:none;">
+
+      <div class="legal-alert" style="margin-bottom:1.2rem;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <div>
+          <strong>Règle d'or légale des Pouvoirs (Art. 22 de la loi du 10 juillet 1965) :</strong><br>
+          • Un mandataire ne peut détenir plus de <strong>3 délégations de vote</strong>, <em>SAUF SI</em> le total de ses voix personnelles et de ses mandats n'excède pas <strong>10% des voix du syndicat</strong> (soit max <strong>9 747 tantièmes</strong> sur 97 478).<br>
+          • L'application contrôle automatiquement cette règle en direct pour chaque membre du CS afin de garantir un vote incontestable.
+        </div>
+      </div>
+
+      <!-- Stats Pouvoirs -->
+      <div class="stats-grid">
+        <div class="stat-card c-purple">
+          <div class="stat-label">Total Pouvoirs Reçus</div>
+          <div class="stat-value" id="statPouvoirsCountTotal">0</div>
+          <div class="stat-subtext" id="statPouvoirsTantTotal">0 tantièmes représentés</div>
+        </div>
+        <div class="stat-card c-info">
+          <div class="stat-label">Détenus par le CS</div>
+          <div class="stat-value" id="statPouvoirsCsCount">0</div>
+          <div class="stat-subtext" id="statPouvoirsCsTant">0 tantièmes de mandats</div>
+        </div>
+        <div class="stat-card c-warning">
+          <div class="stat-label">Pouvoirs en Blanc</div>
+          <div class="stat-value" id="statPouvoirsBlancsCount">0</div>
+          <div class="stat-subtext" id="statPouvoirsBlancsTant">À distribuer</div>
+        </div>
+        <div class="stat-card c-success">
+          <div class="stat-label">Force de vote totale CS</div>
+          <div class="stat-value" id="statTotalCsVoixPouvoirs">0</div>
+          <div class="stat-subtext" id="statTotalCsPctPouvoirs">Perso + Pouvoirs</div>
+        </div>
+      </div>
+
+      <!-- Alerte Pouvoirs en blanc si présents -->
+      <div id="pouvoirsBlancsBanner" class="badge-blank-alert" style="display:none;">
+        <div>
+          <strong>⚠️ <span id="nbBlancsAlertText">0 pouvoir(s) en blanc</span> non attribué(s) !</strong>
+          <div style="font-size:0.8rem; margin-top:0.2rem;">Ces pouvoirs ont été confiés sans mandataire désigné. Vous pouvez les répartir automatiquement et équitablement sur les membres du CS disponibles.</div>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="repartirPouvoirsBlancsAuto()">
+          ✨ Répartir automatiquement sur le CS
+        </button>
+      </div>
+
+      <!-- Répartition Membres CS -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
+        <h3 style="font-size:1.05rem; font-weight:700; color:var(--gray-900);">
+          👥 Répartition des pouvoirs par Membre du Conseil Syndical
+        </h3>
+        <button class="btn btn-sm btn-warning-gold" onclick="openNewPouvoirModal()">
+          ✉️ + Attribuer un pouvoir
+        </button>
+      </div>
+
+      <div class="cs-pouvoirs-grid" id="csPouvoirsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Registre Complet des Pouvoirs -->
+      <div style="margin-top:1.5rem;">
+        <div class="filter-bar no-print">
+          <div class="filter-group">
+            <input type="text" id="searchPouvoirInput" class="search-input" placeholder="🔍 Rechercher mandant, mandataire..." oninput="renderPouvoirsTab()">
+            <select id="filterPouvoirType" class="select-input" onchange="renderPouvoirsTab()">
+              <option value="ALL">Tous les pouvoirs</option>
+              <option value="CS">Détenus par le Conseil Syndical</option>
+              <option value="BLANC">Pouvoirs en blanc (sans nom)</option>
+              <option value="AUTRE">Mandataires externes</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <span style="font-size:0.82rem; font-weight:700; color:var(--primary);" id="statPouvoirsTableCount">0 pouvoir(s)</span>
+            <button class="btn btn-primary" onclick="openNewPouvoirModal()">+ Nouveau pouvoir</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Mandant (Copropriétaire)</th>
+                <th>Lot(s)</th>
+                <th>Tantièmes</th>
+                <th>Mandataire désigné</th>
+                <th>Type / Consignes</th>
+                <th>Statut Légal (Art. 22)</th>
+                <th class="no-print" style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pouvoirsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </section>
@@ -652,6 +761,139 @@ M. LEROY Jacques	Lot 8	85"></textarea>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('scrutinModal')">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer la décision</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL POUVOIR (ENREGISTRER / MODIFIER UN POUVOIR AU DERNIER MOMENT) -->
+  <div class="modal-overlay" id="pouvoirModal">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="pouvoirModalTitle">✉️ Enregistrer un Pouvoir</h3>
+        <button class="modal-close" onclick="closeModal('pouvoirModal')">&times;</button>
+      </div>
+      <form id="pouvoirForm" onsubmit="savePouvoirForm(event)">
+        <input type="hidden" id="pouvoirTargetCoproId">
+        <div class="modal-body">
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:0.75rem 1rem; border-radius:8px; font-size:0.83rem; color:#1e40af; line-height:1.45;">
+            <strong>⚡ Administration instantanée :</strong> Enregistrez les procurations reçues par email, SMS, courrier ou remises sur place en séance. Les tantièmes et jauges légales Art. 22 sont recalculés en direct.
+          </div>
+
+          <!-- 1. Mandant -->
+          <div class="form-group">
+            <label>1. Copropriétaire Mandant (qui donne son pouvoir) *</label>
+            <div id="pouvoirMandantSelectionZone">
+              <input type="text" id="pouvoirMandantSearch" class="form-control" placeholder="🔍 Taper un nom pour filtrer..." oninput="filterMandantOptions()" autocomplete="off">
+              <select id="pouvoirMandantSelect" class="form-control" style="margin-top:0.35rem;" size="5" onchange="onPouvoirMandantChanged()" required>
+                <!-- Dynamique -->
+              </select>
+            </div>
+            <div id="pouvoirMandantInfoBox" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.6rem; font-size:0.83rem; margin-top:0.35rem; display:none;">
+              <!-- Info dynamique (lots, tantièmes, statut actuel) -->
+            </div>
+          </div>
+
+          <!-- 2. Type d'attribution -->
+          <div class="form-group">
+            <label>2. Type de délégation</label>
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.2rem;">
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.85rem;">
+                <input type="radio" name="pouvoirTypeRadio" value="CS" checked onchange="togglePouvoirTypeInputs()">
+                <strong>Membre du Conseil Syndical</strong>
+              </label>
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.85rem;">
+                <input type="radio" name="pouvoirTypeRadio" value="BLANC" onchange="togglePouvoirTypeInputs()">
+                <span>Pouvoir en blanc (à répartir)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.85rem;">
+                <input type="radio" name="pouvoirTypeRadio" value="AUTRE" onchange="togglePouvoirTypeInputs()">
+                <span>Autre mandataire (externe)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 3. Membre CS -->
+          <div class="form-group" id="pouvoirCsZone">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+              <label>3. Membre du Conseil Syndical mandataire *</label>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="suggererMeilleurMembreCS()" title="Sélectionner le membre ayant le moins de pouvoirs">
+                ✨ Suggérer automatiquement
+              </button>
+            </div>
+            <select id="pouvoirMemberSelect" class="form-control" onchange="onPouvoirMemberChanged()">
+              <!-- Options dynamiques avec jauges -->
+            </select>
+            <div id="pouvoirLegalCheckNotice" style="font-size:0.8rem; margin-top:0.35rem;"></div>
+          </div>
+
+          <!-- 3bis. Autre mandataire externe -->
+          <div class="form-group" id="pouvoirAutreZone" style="display:none;">
+            <label>Nom du mandataire externe (Copropriétaire tiers)</label>
+            <input type="text" id="pouvoirAutreNom" class="form-control" placeholder="Ex: M. DUPONT Jean">
+          </div>
+
+          <!-- 4. Consignes / Notes -->
+          <div class="form-row">
+            <div class="form-group">
+              <label>Consignes particulières de vote (Optionnel)</label>
+              <input type="text" id="pouvoirConsignes" class="form-control" placeholder="Ex: Suit consigne CS, POUR clim...">
+            </div>
+            <div class="form-group">
+              <label>Origine / Mode de réception (Optionnel)</label>
+              <input type="text" id="pouvoirSource" class="form-control" placeholder="Ex: Reçu ce matin par email, SMS...">
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:space-between;">
+          <div>
+            <button type="button" id="btnRevokePouvoir" class="btn btn-danger" style="display:none;" onclick="revoquerPouvoirModal()">
+              ❌ Révoquer le pouvoir
+            </button>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('pouvoirModal')">Annuler</button>
+            <button type="submit" class="btn btn-primary">Enregistrer le pouvoir</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL TRANSFERT DE POUVOIR -->
+  <div class="modal-overlay" id="transfertPouvoirModal">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔄 Transférer un pouvoir</h3>
+        <button class="modal-close" onclick="closeModal('transfertPouvoirModal')">&times;</button>
+      </div>
+      <form id="transfertPouvoirForm" onsubmit="saveTransfertPouvoir(event)">
+        <input type="hidden" id="transfertCoproId">
+        <div class="modal-body">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:0.75rem 1rem; border-radius:8px;">
+            <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; font-weight:700;">Mandant</div>
+            <div style="font-size:1.05rem; font-weight:700; color:var(--primary);" id="transfertMandantNom">-</div>
+            <div style="font-size:0.83rem; color:var(--gray-600); margin-top:0.2rem;">
+              Voix : <strong id="transfertMandantTant">0</strong> tantièmes • Détenu par : <strong id="transfertAncienMandataire">-</strong>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:0.8rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+              <label>Transférer vers le membre CS :</label>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="suggererTransfertCS()">
+                ✨ Suggérer le plus disponible
+              </button>
+            </div>
+            <select id="transfertNouveauMembreSelect" class="form-control" required>
+              <!-- Options dynamiques -->
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('transfertPouvoirModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary">Confirmer le transfert</button>
         </div>
       </form>
     </div>

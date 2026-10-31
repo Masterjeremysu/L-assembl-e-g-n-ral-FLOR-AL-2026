@@ -588,3 +588,216 @@ tr:hover { background-color: #f8fafc; }
   .print-header { display: block !important; margin-bottom: 1.5rem; border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
 }
 .print-header { display: none; }
+
+/* ===================================================
+   GESTION DES POUVOIRS & MANDATS (ART. 22)
+   =================================================== */
+
+.cs-pouvoirs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cs-pouvoir-card {
+  background: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 1.1rem;
+  border-top: 4px solid var(--primary-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.cs-pouvoir-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.cs-pouvoir-card.legal-warning {
+  border-top-color: var(--danger);
+  background: #fffafa;
+}
+
+.cs-pouvoir-card.legal-safe {
+  border-top-color: var(--success);
+}
+
+.cs-pouvoir-card.no-mandat {
+  border-top-color: var(--gray-300);
+}
+
+.cs-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.6rem;
+  gap: 0.5rem;
+}
+
+.cs-card-title {
+  font-weight: 700;
+  color: var(--gray-900);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.cs-card-lots {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 0.1rem;
+}
+
+.legal-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.legal-badge.safe {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.legal-badge.warning {
+  background: #fee2e2;
+  color: #b91c1c;
+  animation: pulse-danger 1.5s infinite;
+}
+
+.legal-badge.neutral {
+  background: #f1f5f9;
+  color: var(--gray-600);
+}
+
+@keyframes pulse-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.cs-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.4rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.8rem;
+  text-align: center;
+}
+
+.cs-metric-label {
+  font-size: 0.68rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.cs-metric-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.cs-metric-val.highlight {
+  color: var(--primary-light);
+}
+
+.cs-mandats-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+  min-height: 28px;
+  align-items: center;
+}
+
+.mandat-chip {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 6px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mandat-chip-tant {
+  background: #dbeafe;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.mandat-chip-transfer-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #2563eb;
+  padding: 0.1rem 0.2rem;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.mandat-chip-transfer-btn:hover {
+  background: #bfdbfe;
+  color: #172554;
+}
+
+.cs-card-footer {
+  border-top: 1px solid var(--gray-100);
+  padding-top: 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-blank-alert {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 0.85rem 1.1rem;
+  border-radius: 8px;
+  margin-bottom: 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btn-warning-gold {
+  background: #f59e0b;
+  color: white;
+}
+.btn-warning-gold:hover {
+  background: #d97706;
+}
+
+.btn-outline-primary {
+  background: transparent;
+  border: 1px solid var(--primary-light);
+  color: var(--primary-light);
+}
+.btn-outline-primary:hover {
+  background: #eff6ff;
+}
+
+.btn-outline-info {
+  background: transparent;
+  border: 1px solid var(--info);
+  color: var(--info);
+}
+.btn-outline-info:hover {
+  background: var(--info-bg);
+}
+

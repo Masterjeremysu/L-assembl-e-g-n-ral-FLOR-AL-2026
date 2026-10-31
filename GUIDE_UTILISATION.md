@@ -45,3 +45,35 @@ Si vous voulez que chacun y accède depuis n'importe où via une adresse Interne
 Si la salle de réunion n'a pas de réseau Internet :
 - Copiez le fichier `index.html` sur une clé USB et donnez-le aux membres du CS.
 - Chacun peut l'ouvrir sur son PC/tablette sans connexion Internet.
+
+---
+
+## 4. ✉️ Administration des Pouvoirs & Mandats au dernier moment
+
+### Pourquoi ce module est indispensable ?
+À l'approche de l'AG ou le jour J à l'entrée de la salle, vous recevez des procurations (par email, SMS, courrier ou remises en main propre).
+L'application intègre un **module complet d'administration des pouvoirs** conforme à l'**Article 22 de la loi du 10 juillet 1965** :
+
+1. **Bouton doré rapide en haut `✉️ + Enregistrer un Pouvoir` :**
+   - Accessible partout en 1 clic.
+   - Sélectionnez le copropriétaire mandant dans la liste prédictive (ses lots et tantièmes s'affichent automatiquement).
+   - Choisissez à qui confier le pouvoir :
+     - **Membre du Conseil Syndical** : le bouton magique `✨ Suggérer automatiquement` choisit le membre CS le plus disponible ayant le moins de mandats.
+     - **Pouvoir en blanc** : enregistré sans nom de mandataire pour être réparti plus tard.
+     - **Autre mandataire externe**.
+   - Notez d'éventuelles consignes de vote spécifiques (ex: *"POUR clim, CONTRE clôture"*).
+   - Cliquez sur **« Enregistrer le pouvoir »** : les tantièmes en salle, la présence et les cumuls de voix du CS sont instantanément actualisés.
+
+2. **Règle légale stricte (Art. 22) contrôlée en temps réel :**
+   - Un mandataire ne peut détenir plus de **3 délégations de vote**, *SAUF SI* le cumul de ses voix personnelles et de ses mandats ne dépasse pas **10% des voix du syndicat** (soit max **9 747 tantièmes** sur 97 478).
+   - Chaque membre du CS dispose d'une jauge visuelle (🟢 Conforme / 🔴 Risque de dépassement) pour vous garantir **zéro risque d'annulation de l'AG**.
+
+3. **Actions directes dans l'onglet `🚪 Émargement & Départs` :**
+   - Sur chaque ligne de copropriétaire, le bouton **`✉️ Pouvoir`** permet d'attribuer ou de modifier le mandat en 2 secondes.
+   - **Arrivée surprise d'un copropriétaire en salle :** Si un copropriétaire ayant donné pouvoir arrive finalement en personne, cliquez sur `Présent` : l'application vous alerte et révoque automatiquement le pouvoir conformément à la loi, sans créer de doublon de voix !
+
+4. **Onglet dédié `✉️ Pouvoirs & Mandats` :**
+   - Vue en cartes de tous les membres du CS avec la liste des mandats reçus sous forme de badges cliquables.
+   - Bouton **`🔄 Transférer`** sur chaque mandat pour réassigner un pouvoir d'un membre à un autre en 1 clic en cas d'absence ou pour rééquilibrer les voix.
+   - Bouton **`✨ Répartir automatiquement les pouvoirs en blanc`** pour distribuer équitablement les pouvoirs reçus sans nom sur les membres disponibles.
+

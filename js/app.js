@@ -44,13 +44,17 @@ function switchTab(tabId) {
   const buttons = document.querySelectorAll('.tab-btn');
   if (tabId === 'votes') buttons[0]?.classList.add('active');
   else if (tabId === 'presence') buttons[1]?.classList.add('active');
-  else if (tabId === 'members') buttons[2]?.classList.add('active');
-  else if (tabId === 'settings') buttons[3]?.classList.add('active');
+  else if (tabId === 'pouvoirs') buttons[2]?.classList.add('active');
+  else if (tabId === 'members') buttons[3]?.classList.add('active');
+  else if (tabId === 'settings') buttons[4]?.classList.add('active');
 }
 
 // UI Updates
 function updateUI() {
   const totalTant = Number(appData.config.totalTantiemes) || 97478;
+
+  // Synchronisation stricte des mandats et des pouvoirs avec le Conseil Syndical
+  syncMembersAndPouvoirs();
 
   document.getElementById('headerSubtitle').innerText = `${appData.config.coproName} - AG du ${formatDate(appData.config.agDate)}`;
   document.getElementById('printAgTitle').innerText = `${appData.config.coproName} - Relevé Miroir des Votes du Conseil Syndical`;
@@ -119,6 +123,7 @@ function updateUI() {
   renderResolutions(totalExprimesEnSalle, totalTant);
   renderCoproprietaires(totalExprimesEnSalle, totalTant);
   renderMembers(csPerso, csMandats, csTotal, totalTant);
+  renderPouvoirsTab();
 
   // Settings
   document.getElementById('cfgCoproname').value = appData.config.coproName || '';
@@ -342,8 +347,11 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
           <td>${escapeHtml(c.notes || '-')}</td>
           <td class="no-print">
             <div class="pointage-btn-group">
-              <button class="btn btn-sm btn-success" onclick="setCoproStatut('${c.id}', 'PRESENT')" title="Pointer comme Présent en personne">
+              <button class="btn btn-sm btn-success" onclick="pointerCoproPresent('${c.id}')" title="Pointer comme Présent en personne (révoque son pouvoir si existant)">
                 Présent
+              </button>
+              <button class="btn btn-sm ${c.statut === 'POUVOIR' ? 'btn-info' : 'btn-outline-primary'}" onclick="openPouvoirModalForCopro('${c.id}')" title="Administrer / Attribuer le pouvoir">
+                ✉️ Pouvoir
               </button>
               <button class="btn btn-sm btn-warning" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
                 Parti
@@ -419,6 +427,7 @@ function renderMembers(csPerso, csMandats, csTotal, totalTant) {
             ${isOverTenPct ? `<span title="Attention: dépasse 10% des voix totales de l'immeuble" style="color:var(--danger); font-size:0.75rem; font-weight:700;"> ⚠️ &gt;10%</span>` : ''}
           </td>
           <td class="no-print" style="text-align:right;">
+            <button class="btn btn-warning-gold btn-sm" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ce membre du CS">✉️ + Pouvoir</button>
             <button class="btn btn-secondary btn-sm" onclick="editMember('${m.id}')">✏️ Saisir tantièmes</button>
             <button class="btn btn-secondary btn-sm" onclick="deleteMember('${m.id}')" style="color:var(--danger)">🗑️</button>
           </td>
@@ -857,6 +866,682 @@ function importDataJson(event) {
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+// ==========================================
+// GESTION ET ADMINISTRATION DES POUVOIRS (ART. 22)
+// ==========================================
+
+function findMemberByName(name) {
+  if (!name || !appData.members) return null;
+  const clean = name.trim().toLowerCase();
+  
+  // 1. Recherche exacte
+  let found = appData.members.find(m => m.name.toLowerCase() === clean);
+  if (found) return found;
+
+  // 2. Recherche par mots significatifs
+  const words = clean.split(/[\s,./\-]+/).filter(w => w.length >= 3 && !['mme', 'mr', 'monsieur', 'madame', 'mlle'].includes(w));
+  found = appData.members.find(m => {
+    const mName = m.name.toLowerCase();
+    return words.some(w => mName.includes(w));
+  });
+  return found || null;
+}
+
+function syncMembersAndPouvoirs() {
+  if (!appData.coproprietaires) appData.coproprietaires = [];
+  if (!appData.members) appData.members = [];
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const maxVoix10Pct = totalCopro * 0.10;
+
+  // Lier les mandataires existants s'ils n'ont pas encore mandataireMemberId
+  appData.coproprietaires.forEach(c => {
+    if (c.statut === 'POUVOIR') {
+      const mandataireStr = (c.mandataire || '').trim();
+      if (!c.mandataireMemberId) {
+        if (mandataireStr.toUpperCase().includes('BLANC')) {
+          c.mandataireMemberId = 'BLANC';
+        } else {
+          const m = findMemberByName(mandataireStr);
+          if (m) {
+            c.mandataireMemberId = m.id;
+          } else if (mandataireStr) {
+            c.mandataireMemberId = 'AUTRE';
+          } else {
+            c.mandataireMemberId = 'BLANC';
+            c.mandataire = 'POUVOIR EN BLANC';
+          }
+        }
+      }
+    }
+  });
+
+  // Calcul et synchronisation pour chaque membre du CS
+  appData.members.forEach(m => {
+    const assignedCopros = appData.coproprietaires.filter(c =>
+      c.statut === 'POUVOIR' && (
+        c.mandataireMemberId === m.id ||
+        (!c.mandataireMemberId && findMemberByName(c.mandataire)?.id === m.id)
+      )
+    );
+
+    m._assignedCopros = assignedCopros;
+    m._nbMandats = assignedCopros.length;
+    m.mandatTantiemes = assignedCopros.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+    m.mandats = assignedCopros.map(c => `${c.nom} (${c.tantiemes})`).join(', ');
+
+    const perso = Number(m.tantiemes) || 0;
+    const totalVoix = perso + m.mandatTantiemes;
+    m._totalVoix = totalVoix;
+    m._pctTotal = totalCopro > 0 ? ((totalVoix / totalCopro) * 100).toFixed(1) : '0';
+
+    // Règle d'or Art. 22 de la loi du 10 juillet 1965 :
+    // Max 3 mandats OU (nb > 3 SI totalVoix <= 10% du total de l'immeuble)
+    if (m._nbMandats <= 3) {
+      m._isLegalSafe = true;
+      m._legalStatusText = `Conforme (Art. 22 : ≤ 3 mandats)`;
+      m._legalBadgeClass = 'safe';
+    } else if (totalVoix <= maxVoix10Pct) {
+      m._isLegalSafe = true;
+      m._legalStatusText = `Conforme (Art. 22 : ${m._nbMandats} mandats autorisés car ${totalVoix} ≤ 10% des voix)`;
+      m._legalBadgeClass = 'safe';
+    } else {
+      m._isLegalSafe = false;
+      m._legalStatusText = `⚠️ DÉPASSEMENT ILLÉGAL (>3 mandats ET >10% : ${totalVoix} / ${Math.floor(maxVoix10Pct)}). Risque de nullité !`;
+      m._legalBadgeClass = 'warning';
+    }
+  });
+}
+
+function renderPouvoirsTab() {
+  const pouvoirsGrid = document.getElementById('csPouvoirsGrid');
+  const tableBody = document.getElementById('pouvoirsTableBody');
+  if (!pouvoirsGrid || !tableBody) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const copros = appData.coproprietaires || [];
+  const allPouvoirs = copros.filter(c => c.statut === 'POUVOIR');
+
+  const totalPouvoirsCount = allPouvoirs.length;
+  const totalPouvoirsTant = allPouvoirs.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+
+  const csPouvoirs = allPouvoirs.filter(c => {
+    return c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE';
+  });
+  const csPouvoirsCount = csPouvoirs.length;
+  const csPouvoirsTant = csPouvoirs.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+
+  const blancsPouvoirs = allPouvoirs.filter(c => c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')));
+  const blancsCount = blancsPouvoirs.length;
+  const blancsTant = blancsPouvoirs.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+
+  const csPerso = appData.members.reduce((sum, m) => sum + (Number(m.tantiemes) || 0), 0);
+  const csTotalVoix = csPerso + csPouvoirsTant;
+  const csTotalPct = totalCopro > 0 ? ((csTotalVoix / totalCopro) * 100).toFixed(1) : '0';
+
+  // Badges & Chiffres
+  document.getElementById('statPouvoirsCountTotal').innerText = totalPouvoirsCount;
+  document.getElementById('statPouvoirsTantTotal').innerText = `${totalPouvoirsTant} tantièmes (${totalCopro > 0 ? ((totalPouvoirsTant / totalCopro) * 100).toFixed(1) : 0}%)`;
+  document.getElementById('statPouvoirsCsCount').innerText = `${csPouvoirsCount} mandats`;
+  document.getElementById('statPouvoirsCsTant').innerText = `${csPouvoirsTant} tantièmes`;
+  document.getElementById('statPouvoirsBlancsCount').innerText = blancsCount;
+  document.getElementById('statPouvoirsBlancsTant').innerText = blancsCount > 0 ? `${blancsTant} tantièmes à attribuer` : 'Aucun pouvoir en attente';
+  document.getElementById('statTotalCsVoixPouvoirs').innerText = `${csTotalVoix} / ${totalCopro}`;
+  document.getElementById('statTotalCsPctPouvoirs').innerText = `${csTotalPct}% des voix du syndicat`;
+  document.getElementById('badgePouvoirsCount').innerText = totalPouvoirsCount;
+
+  // Bannière Pouvoirs en blanc
+  const bannerBlancs = document.getElementById('pouvoirsBlancsBanner');
+  if (bannerBlancs) {
+    if (blancsCount > 0) {
+      bannerBlancs.style.display = 'flex';
+      document.getElementById('nbBlancsAlertText').innerText = `${blancsCount} pouvoir(s) en blanc (${blancsTant} tantièmes)`;
+    } else {
+      bannerBlancs.style.display = 'none';
+    }
+  }
+
+  // 1. Grille des Membres CS
+  if (appData.members.length === 0) {
+    pouvoirsGrid.innerHTML = `<div style="grid-column: 1/-1; padding:1.5rem; text-align:center; color:var(--gray-500); background:white; border-radius:8px;">Aucun membre du Conseil Syndical enregistré.</div>`;
+  } else {
+    pouvoirsGrid.innerHTML = appData.members.map(m => {
+      const assigned = m._assignedCopros || [];
+      const perso = Number(m.tantiemes) || 0;
+      const mand = m.mandatTantiemes || 0;
+      const tot = m._totalVoix || (perso + mand);
+      const isSafe = m._isLegalSafe !== false;
+      const cardClass = assigned.length === 0 ? 'no-mandat' : (isSafe ? 'legal-safe' : 'legal-warning');
+      const badgeClass = assigned.length === 0 ? 'neutral' : (isSafe ? 'safe' : 'warning');
+      const badgeText = assigned.length === 0 ? '0 mandat' : (isSafe ? `🟢 ${m._nbMandats} mandat(s) : Conforme` : `🔴 Alerte Art. 22`);
+
+      return `
+        <div class="cs-pouvoir-card ${cardClass}">
+          <div>
+            <div class="cs-card-header">
+              <div>
+                <div class="cs-card-title">${escapeHtml(m.name)}</div>
+                <div class="cs-card-lots">${escapeHtml(m.lots || 'Conseil Syndical')}</div>
+              </div>
+              <span class="legal-badge ${badgeClass}" title="${escapeHtml(m._legalStatusText || '')}">${badgeText}</span>
+            </div>
+
+            <div class="cs-card-metrics">
+              <div>
+                <div class="cs-metric-label">Voix Perso</div>
+                <div class="cs-metric-val">${perso}</div>
+              </div>
+              <div>
+                <div class="cs-metric-label">Mandats (${m._nbMandats || 0})</div>
+                <div class="cs-metric-val highlight">+${mand}</div>
+              </div>
+              <div>
+                <div class="cs-metric-label">Total Voix</div>
+                <div class="cs-metric-val">${tot} (${m._pctTotal || 0}%)</div>
+              </div>
+            </div>
+
+            <div style="font-size:0.75rem; font-weight:700; color:var(--gray-700); margin-bottom:0.3rem;">
+              Pouvoirs détenus :
+            </div>
+            <div class="cs-mandats-list">
+              ${assigned.length === 0 ? '<span style="font-size:0.75rem; color:var(--gray-500); font-style:italic;">Aucun pouvoir reçu pour le moment</span>' :
+                assigned.map(cp => `
+                  <span class="mandat-chip" title="Pouvoir de ${escapeHtml(cp.nom)} (${cp.tantiemes} tant.)">
+                    <span>${escapeHtml(cp.nom)}</span>
+                    <span class="mandat-chip-tant">${cp.tantiemes}</span>
+                    <button class="mandat-chip-transfer-btn" onclick="openTransfertModal('${cp.id}')" title="Transférer le pouvoir de ${escapeHtml(cp.nom)} à un autre membre CS">
+                      🔄
+                    </button>
+                  </span>
+                `).join('')
+              }
+            </div>
+          </div>
+
+          <div class="cs-card-footer">
+            <span style="font-size:0.72rem; color:var(--gray-500);">${assigned.length}/3 mandats (ou &lt;10%)</span>
+            <button class="btn btn-sm btn-outline-primary" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ${escapeHtml(m.name)}">
+              + Assigner un pouvoir
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 2. Table de tous les Pouvoirs
+  const search = (document.getElementById('searchPouvoirInput')?.value || '').toLowerCase();
+  const filterType = document.getElementById('filterPouvoirType')?.value || 'ALL';
+
+  const filteredPouvoirs = allPouvoirs.filter(c => {
+    const matchSearch = (c.nom + ' ' + (c.mandataire || '') + ' ' + (c.lots || '') + ' ' + (c.notes || '')).toLowerCase().includes(search);
+    let matchType = true;
+    if (filterType === 'CS') {
+      matchType = c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE';
+    } else if (filterType === 'BLANC') {
+      matchType = c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC'));
+    } else if (filterType === 'AUTRE') {
+      matchType = c.mandataireMemberId === 'AUTRE';
+    }
+    return matchSearch && matchType;
+  });
+
+  document.getElementById('statPouvoirsTableCount').innerText = `${filteredPouvoirs.length} pouvoir(s) affiché(s)`;
+
+  if (filteredPouvoirs.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun pouvoir ne correspond à vos critères.</td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = filteredPouvoirs.map(c => {
+    let mandataireBadge = '';
+    let legalStatusBadge = '';
+    const isBlanc = c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC'));
+    const isCs = c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE';
+
+    if (isBlanc) {
+      mandataireBadge = `<span class="badge-vpc">⚠️ Pouvoir en blanc (Non attribué)</span>`;
+      legalStatusBadge = `<span style="font-size:0.75rem; color:var(--warning); font-weight:700;">À répartir en séance</span>`;
+    } else if (isCs) {
+      const m = appData.members.find(mem => mem.id === c.mandataireMemberId) || findMemberByName(c.mandataire);
+      mandataireBadge = `<span class="badge-pouvoir">👥 CS : <strong>${escapeHtml(m ? m.name : c.mandataire)}</strong></span>`;
+      if (m && m._isLegalSafe === false) {
+        legalStatusBadge = `<span class="legal-badge warning" title="Le mandataire dépasse le seuil légal">⚠️ Plafond Art. 22 dépassé</span>`;
+      } else {
+        legalStatusBadge = `<span class="legal-badge safe">🟢 Conforme Art. 22</span>`;
+      }
+    } else {
+      mandataireBadge = `<span style="background:#f1f5f9; color:#475569; padding:0.2rem 0.5rem; border-radius:4px; font-weight:600; font-size:0.78rem;">Extérieur : ${escapeHtml(c.mandataire || 'Inconnu')}</span>`;
+      legalStatusBadge = `<span style="font-size:0.75rem; color:var(--gray-500);">Mandataire extérieur</span>`;
+    }
+
+    const consignesText = c.consignes || c.notes || 'Pouvoir général';
+
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(c.nom)}</strong>
+          ${(c.categorie && c.categorie.includes('Top 20%')) ? '<span style="font-size:0.72rem; color:#dc2626; margin-left:0.3rem;">🔥 Top 20%</span>' : ''}
+        </td>
+        <td>${escapeHtml(c.lots || '-')}</td>
+        <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
+        <td>${mandataireBadge}</td>
+        <td style="font-size:0.82rem; color:var(--gray-700);">${escapeHtml(consignesText)}</td>
+        <td>${legalStatusBadge}</td>
+        <td class="no-print" style="text-align:right;">
+          <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
+            <button class="btn btn-sm btn-outline-primary" onclick="openTransfertModal('${c.id}')" title="Transférer vers un autre membre CS">
+              🔄 Transférer
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="openPouvoirModalForCopro('${c.id}')" title="Modifier le pouvoir">
+              ✏️
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="revoquerPouvoirDirect('${c.id}')" style="color:var(--danger)" title="Révoquer / Annuler ce pouvoir (ex: copropriétaire présent)">
+              ❌
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+let currentPouvoirCoproId = null;
+
+function openNewPouvoirModal(preselectedCoproId = null, preselectedMemberId = null) {
+  currentPouvoirCoproId = preselectedCoproId;
+  const copros = (appData.coproprietaires || []).slice().sort((a, b) => a.nom.localeCompare(b.nom));
+  const mandantSelect = document.getElementById('pouvoirMandantSelect');
+  const searchInput = document.getElementById('pouvoirMandantSearch');
+  searchInput.value = '';
+
+  mandantSelect.innerHTML = copros.map(c => {
+    const isPouv = c.statut === 'POUVOIR';
+    const isPres = c.statut === 'PRESENT';
+    let statusLabel = 'Absent';
+    if (isPouv) statusLabel = `✉️ Pouvoir (${c.mandataire || 'CS'})`;
+    else if (isPres) statusLabel = '✅ Présent';
+    else if (c.statut === 'VPC') statusLabel = '📬 VPC';
+    return `<option value="${c.id}">${escapeHtml(c.nom)} — ${c.tantiemes || 0} tant. [${escapeHtml(c.lots || 'Sans lot')}] (${statusLabel})</option>`;
+  }).join('');
+
+  populateCsMemberSelect(preselectedMemberId);
+
+  document.querySelector('input[name="pouvoirTypeRadio"][value="CS"]').checked = true;
+  togglePouvoirTypeInputs();
+
+  document.getElementById('pouvoirConsignes').value = '';
+  document.getElementById('pouvoirSource').value = '';
+  document.getElementById('btnRevokePouvoir').style.display = 'none';
+
+  if (preselectedCoproId) {
+    mandantSelect.value = preselectedCoproId;
+    onPouvoirMandantChanged();
+    const c = appData.coproprietaires.find(x => x.id === preselectedCoproId);
+    if (c && c.statut === 'POUVOIR') {
+      document.getElementById('pouvoirModalTitle').innerText = `✉️ Modifier le pouvoir de ${c.nom}`;
+      document.getElementById('btnRevokePouvoir').style.display = 'inline-block';
+      if (c.mandataireMemberId === 'BLANC') {
+        document.querySelector('input[name="pouvoirTypeRadio"][value="BLANC"]').checked = true;
+      } else if (c.mandataireMemberId === 'AUTRE') {
+        document.querySelector('input[name="pouvoirTypeRadio"][value="AUTRE"]').checked = true;
+        document.getElementById('pouvoirAutreNom').value = c.mandataire || '';
+      } else {
+        document.querySelector('input[name="pouvoirTypeRadio"][value="CS"]').checked = true;
+        if (c.mandataireMemberId) {
+          document.getElementById('pouvoirMemberSelect').value = c.mandataireMemberId;
+        }
+      }
+      togglePouvoirTypeInputs();
+      document.getElementById('pouvoirConsignes').value = c.consignes || '';
+      document.getElementById('pouvoirSource').value = c.sourceReception || '';
+    } else {
+      document.getElementById('pouvoirModalTitle').innerText = `✉️ Enregistrer un Pouvoir (au dernier moment)`;
+    }
+  } else {
+    document.getElementById('pouvoirModalTitle').innerText = `✉️ Enregistrer un Pouvoir (au dernier moment)`;
+    if (mandantSelect.options.length > 0) {
+      mandantSelect.selectedIndex = 0;
+      onPouvoirMandantChanged();
+    }
+  }
+
+  openModal('pouvoirModal');
+}
+
+function openPouvoirModalForCopro(id) {
+  openNewPouvoirModal(id, null);
+}
+
+function populateCsMemberSelect(targetMemberId = null) {
+  const select = document.getElementById('pouvoirMemberSelect');
+  if (!select) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const max10Pct = totalCopro * 0.10;
+
+  select.innerHTML = appData.members.map(m => {
+    const nb = m._nbMandats || 0;
+    const tot = m._totalVoix || ((Number(m.tantiemes) || 0) + (m.mandatTantiemes || 0));
+    let statusText = '🟢 Disponible';
+    if (nb >= 3 && tot > max10Pct) {
+      statusText = '🔴 Plafond dépassé';
+    } else if (nb >= 3) {
+      statusText = '🟡 >3 mandats (<10%)';
+    } else if (nb === 0) {
+      statusText = '🟢 0 mandat (Idéal)';
+    }
+
+    return `<option value="${m.id}">${escapeHtml(m.name)} — ${nb} mandat(s) (${tot} tant. total) — ${statusText}</option>`;
+  }).join('');
+
+  if (targetMemberId && appData.members.some(m => m.id === targetMemberId)) {
+    select.value = targetMemberId;
+  }
+  onPouvoirMemberChanged();
+}
+
+function filterMandantOptions() {
+  const search = (document.getElementById('pouvoirMandantSearch')?.value || '').toLowerCase();
+  const select = document.getElementById('pouvoirMandantSelect');
+  const copros = (appData.coproprietaires || []).slice().sort((a, b) => a.nom.localeCompare(b.nom));
+
+  const filtered = copros.filter(c => (c.nom + ' ' + (c.lots || '')).toLowerCase().includes(search));
+  select.innerHTML = filtered.map(c => {
+    const isPouv = c.statut === 'POUVOIR';
+    const isPres = c.statut === 'PRESENT';
+    let statusLabel = 'Absent';
+    if (isPouv) statusLabel = `✉️ Pouvoir (${c.mandataire || 'CS'})`;
+    else if (isPres) statusLabel = '✅ Présent';
+    else if (c.statut === 'VPC') statusLabel = '📬 VPC';
+    return `<option value="${c.id}">${escapeHtml(c.nom)} — ${c.tantiemes || 0} tant. [${escapeHtml(c.lots || 'Sans lot')}] (${statusLabel})</option>`;
+  }).join('');
+
+  if (select.options.length > 0) {
+    select.selectedIndex = 0;
+    onPouvoirMandantChanged();
+  }
+}
+
+function onPouvoirMandantChanged() {
+  const select = document.getElementById('pouvoirMandantSelect');
+  const coproId = select.value;
+  const infoBox = document.getElementById('pouvoirMandantInfoBox');
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  if (!c) {
+    infoBox.style.display = 'none';
+    return;
+  }
+
+  infoBox.style.display = 'block';
+  infoBox.innerHTML = `
+    <strong>${escapeHtml(c.nom)}</strong> • Voix : <strong style="color:var(--primary); font-size:0.95rem;">${c.tantiemes || 0}</strong> tantièmes • Lot(s) : ${escapeHtml(c.lots || 'Non précisé')}<br>
+    <span style="font-size:0.78rem; color:var(--gray-600);">Statut actuel : <strong>${c.statut || 'ABSENT'}</strong> ${c.mandataire ? `(Mandataire : ${escapeHtml(c.mandataire)})` : ''}</span>
+  `;
+  onPouvoirMemberChanged();
+}
+
+function togglePouvoirTypeInputs() {
+  const type = document.querySelector('input[name="pouvoirTypeRadio"]:checked')?.value || 'CS';
+  document.getElementById('pouvoirCsZone').style.display = (type === 'CS') ? 'block' : 'none';
+  document.getElementById('pouvoirAutreZone').style.display = (type === 'AUTRE') ? 'block' : 'none';
+}
+
+function onPouvoirMemberChanged() {
+  const memberId = document.getElementById('pouvoirMemberSelect')?.value;
+  const m = appData.members.find(x => x.id === memberId);
+  const noticeEl = document.getElementById('pouvoirLegalCheckNotice');
+  if (!m || !noticeEl) return;
+
+  const coproId = document.getElementById('pouvoirMandantSelect')?.value;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  const addTant = (c && c.mandataireMemberId !== m.id) ? (Number(c.tantiemes) || 0) : 0;
+
+  const currentMandats = m._nbMandats || 0;
+  const nextMandats = (c && c.mandataireMemberId === m.id) ? currentMandats : currentMandats + 1;
+  const nextVoix = (m._totalVoix || 0) + addTant;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const max10Pct = totalCopro * 0.10;
+
+  if (nextMandats <= 3) {
+    noticeEl.innerHTML = `<span style="color:var(--success); font-weight:700;">🟢 Légal (Art. 22) :</span> ${m.name} aura ${nextMandats} mandat(s) (≤ 3 autorisés).`;
+  } else if (nextVoix <= max10Pct) {
+    noticeEl.innerHTML = `<span style="color:var(--success); font-weight:700;">🟢 Légal (Art. 22) :</span> ${m.name} aura ${nextMandats} mandats, total ${nextVoix} tantièmes ≤ 10% (${Math.floor(max10Pct)} max). Dérogation légale valide.`;
+  } else {
+    noticeEl.innerHTML = `<span style="color:var(--danger); font-weight:700;">⚠️ RISQUE D'ANNULATION :</span> ${m.name} aura ${nextMandats} mandats et dépasserait les 10% (${nextVoix} > ${Math.floor(max10Pct)}). Choisissez un autre membre !`;
+  }
+}
+
+function suggererMeilleurMembreCS() {
+  const coproId = document.getElementById('pouvoirMandantSelect')?.value;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  const tantToAdd = c ? (Number(c.tantiemes) || 0) : 0;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const max10Pct = totalCopro * 0.10;
+
+  const sorted = appData.members.slice().sort((a, b) => {
+    const aNb = a._nbMandats || 0;
+    const bNb = b._nbMandats || 0;
+    const aSafe = (aNb + 1 <= 3) || (((a._totalVoix || 0) + tantToAdd) <= max10Pct);
+    const bSafe = (bNb + 1 <= 3) || (((b._totalVoix || 0) + tantToAdd) <= max10Pct);
+
+    if (aSafe && !bSafe) return -1;
+    if (!aSafe && bSafe) return 1;
+    if (aNb !== bNb) return aNb - bNb;
+    return (a._totalVoix || 0) - (b._totalVoix || 0);
+  });
+
+  if (sorted.length > 0) {
+    const best = sorted[0];
+    document.getElementById('pouvoirMemberSelect').value = best.id;
+    onPouvoirMemberChanged();
+    showToast(`✨ Recommandé : ${best.name} (${best._nbMandats || 0} mandat, charge minimale)`, "info");
+  }
+}
+
+function savePouvoirForm(e) {
+  e.preventDefault();
+  const coproId = document.getElementById('pouvoirMandantSelect').value;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  if (!c) {
+    alert("Veuillez sélectionner un copropriétaire.");
+    return;
+  }
+
+  const type = document.querySelector('input[name="pouvoirTypeRadio"]:checked')?.value || 'CS';
+  let mandataireNom = '';
+  let memberId = '';
+
+  if (type === 'CS') {
+    memberId = document.getElementById('pouvoirMemberSelect').value;
+    const m = appData.members.find(x => x.id === memberId);
+    if (!m) {
+      alert("Veuillez choisir un membre du Conseil Syndical.");
+      return;
+    }
+    mandataireNom = m.name;
+  } else if (type === 'BLANC') {
+    memberId = 'BLANC';
+    mandataireNom = 'POUVOIR EN BLANC';
+  } else {
+    memberId = 'AUTRE';
+    mandataireNom = document.getElementById('pouvoirAutreNom').value.trim() || 'Mandataire tiers';
+  }
+
+  const consignes = document.getElementById('pouvoirConsignes').value.trim();
+  const source = document.getElementById('pouvoirSource').value.trim();
+
+  c.statut = 'POUVOIR';
+  c.mandataire = mandataireNom;
+  c.mandataireMemberId = memberId;
+  c.consignes = consignes;
+  c.sourceReception = source;
+  c.notes = (consignes ? `Consignes : ${consignes}` : 'Pouvoir') + (source ? ` | ${source}` : '');
+  delete c.heureDepart;
+
+  closeModal('pouvoirModal');
+  persistData();
+  showToast(`✉️ Pouvoir de ${c.nom} (${c.tantiemes} tant.) confié à ${mandataireNom} !`, "success");
+}
+
+function revoquerPouvoirModal() {
+  const coproId = document.getElementById('pouvoirMandantSelect')?.value;
+  revoquerPouvoirDirect(coproId);
+  closeModal('pouvoirModal');
+}
+
+function revoquerPouvoirDirect(coproId) {
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  if (!c) return;
+
+  if (confirm(`Révoquer le pouvoir de ${c.nom} (${c.tantiemes} tantièmes) ?\nCe copropriétaire sera marqué comme Absent.`)) {
+    c.statut = 'ABSENT';
+    c.mandataire = '';
+    delete c.mandataireMemberId;
+    delete c.consignes;
+    delete c.sourceReception;
+    persistData();
+    showToast(`Pouvoir de ${c.nom} révoqué.`, "warning");
+  }
+}
+
+// Transfert Modal
+let currentTransfertCoproId = null;
+
+function openTransfertModal(coproId) {
+  currentTransfertCoproId = coproId;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  if (!c) return;
+
+  document.getElementById('transfertCoproId').value = c.id;
+  document.getElementById('transfertMandantNom').innerText = c.nom;
+  document.getElementById('transfertMandantTant').innerText = c.tantiemes || 0;
+  document.getElementById('transfertAncienMandataire').innerText = c.mandataire || 'Non défini';
+
+  const select = document.getElementById('transfertNouveauMembreSelect');
+  const otherMembers = appData.members.filter(m => m.id !== c.mandataireMemberId);
+
+  select.innerHTML = otherMembers.map(m => {
+    const nb = m._nbMandats || 0;
+    const tot = m._totalVoix || 0;
+    return `<option value="${m.id}">${escapeHtml(m.name)} — ${nb} mandat(s) (${tot} tant.)</option>`;
+  }).join('');
+
+  if (select.options.length > 0) {
+    select.selectedIndex = 0;
+  }
+
+  openModal('transfertPouvoirModal');
+}
+
+function suggererTransfertCS() {
+  const coproId = currentTransfertCoproId;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  const tantToAdd = c ? (Number(c.tantiemes) || 0) : 0;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const max10Pct = totalCopro * 0.10;
+
+  const candidates = appData.members.filter(m => m.id !== c?.mandataireMemberId);
+  candidates.sort((a, b) => {
+    const aNb = a._nbMandats || 0;
+    const bNb = b._nbMandats || 0;
+    const aSafe = (aNb + 1 <= 3) || (((a._totalVoix || 0) + tantToAdd) <= max10Pct);
+    const bSafe = (bNb + 1 <= 3) || (((b._totalVoix || 0) + tantToAdd) <= max10Pct);
+
+    if (aSafe && !bSafe) return -1;
+    if (!aSafe && bSafe) return 1;
+    if (aNb !== bNb) return aNb - bNb;
+    return (a._totalVoix || 0) - (b._totalVoix || 0);
+  });
+
+  if (candidates.length > 0) {
+    document.getElementById('transfertNouveauMembreSelect').value = candidates[0].id;
+    showToast(`Suggéré : ${candidates[0].name}`, "info");
+  }
+}
+
+function saveTransfertPouvoir(e) {
+  e.preventDefault();
+  const coproId = document.getElementById('transfertCoproId').value;
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+  if (!c) return;
+
+  const newMemberId = document.getElementById('transfertNouveauMembreSelect').value;
+  const newMember = appData.members.find(x => x.id === newMemberId);
+  if (!newMember) return;
+
+  c.mandataireMemberId = newMember.id;
+  c.mandataire = newMember.name;
+  c.notes = (c.notes ? c.notes + ' | ' : '') + `Transféré à ${newMember.name}`;
+
+  closeModal('transfertPouvoirModal');
+  persistData();
+  showToast(`Pouvoir de ${c.nom} transféré avec succès à ${newMember.name} !`, "success");
+}
+
+function repartirPouvoirsBlancsAuto() {
+  const blancs = (appData.coproprietaires || []).filter(c =>
+    c.statut === 'POUVOIR' && (c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')))
+  );
+
+  if (blancs.length === 0) {
+    showToast("Aucun pouvoir en blanc à répartir.", "info");
+    return;
+  }
+
+  if (!confirm(`Voulez-vous répartir automatiquement les ${blancs.length} pouvoir(s) en blanc sur les membres du CS les plus disponibles ?`)) {
+    return;
+  }
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const max10Pct = totalCopro * 0.10;
+
+  blancs.forEach(c => {
+    const tant = Number(c.tantiemes) || 0;
+    const candidates = appData.members.slice().sort((a, b) => {
+      const aNb = a._nbMandats || 0;
+      const bNb = b._nbMandats || 0;
+      const aSafe = (aNb + 1 <= 3) || (((a._totalVoix || 0) + tant) <= max10Pct);
+      const bSafe = (bNb + 1 <= 3) || (((b._totalVoix || 0) + tant) <= max10Pct);
+
+      if (aSafe && !bSafe) return -1;
+      if (!aSafe && bSafe) return 1;
+      if (aNb !== bNb) return aNb - bNb;
+      return (a._totalVoix || 0) - (b._totalVoix || 0);
+    });
+
+    if (candidates.length > 0) {
+      const chosen = candidates[0];
+      c.mandataireMemberId = chosen.id;
+      c.mandataire = chosen.name;
+      c.notes = (c.notes ? c.notes + ' | ' : '') + `Pouvoir en blanc attribué au CS (${chosen.name})`;
+      chosen._nbMandats = (chosen._nbMandats || 0) + 1;
+      chosen._totalVoix = (chosen._totalVoix || 0) + tant;
+    }
+  });
+
+  persistData();
+  showToast(`${blancs.length} pouvoir(s) en blanc réparti(s) équitablement sur le CS !`, "success");
+}
+
+function pointerCoproPresent(id) {
+  const c = appData.coproprietaires.find(x => x.id === id);
+  if (!c) return;
+
+  if (c.statut === 'POUVOIR') {
+    const mandataireNom = c.mandataire || 'un mandataire';
+    const conf = confirm(`⚠️ ATTENTION (Loi du 10 juillet 1965 - Art. 22) :\n\n${c.nom} avait délégué son pouvoir à "${mandataireNom}".\n\nEn pointant ce copropriétaire comme PRÉSENT en séance, la loi révoque automatiquement ce pouvoir.\n\nConfirmer la présence physique de ${c.nom} ?`);
+    if (!conf) return;
+    c.mandataire = '';
+    delete c.mandataireMemberId;
+    delete c.consignes;
+    delete c.sourceReception;
+  }
+
+  setCoproStatut(id, 'PRESENT');
 }
 
 // Formatting helpers
