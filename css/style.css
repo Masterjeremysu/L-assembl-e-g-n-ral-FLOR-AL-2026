@@ -627,6 +627,42 @@ tr:hover { background-color: #f8fafc; }
 .badge-parti { background:#fee2e2; color:#b91c1c; padding:0.25rem 0.55rem; border-radius:4px; font-weight:700; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem; border:1px dashed #ef4444; }
 .badge-absent { background:#f1f5f9; color:#64748b; padding:0.25rem 0.55rem; border-radius:4px; font-weight:600; font-size:0.75rem; }
 
+/* Badges de Classification des Lots (Le Floréal) */
+.badge-lot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-lot-garage {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.badge-lot-t4 {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-lot-t5 {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+}
+
+.badge-lot-parking {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
 /* Cartes pointage */
 .pointage-btn-group { display:flex; gap:0.3rem; flex-wrap:wrap; }
 
@@ -1262,6 +1298,30 @@ body.dark-mode .badge-absent {
   background: #334155 !important;
   color: #94a3b8 !important;
   border: 1px solid #475569 !important;
+}
+
+body.dark-mode .badge-lot-garage {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fde047 !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+body.dark-mode .badge-lot-t4 {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+body.dark-mode .badge-lot-t5 {
+  background-color: rgba(168, 85, 247, 0.2) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+body.dark-mode .badge-lot-parking {
+  background-color: #334155 !important;
+  color: #cbd5e1 !important;
+  border-color: #475569 !important;
 }
 
 /* Modales & Bannières d'information */

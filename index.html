@@ -256,7 +256,7 @@
 
       <div class="filter-bar no-print">
         <div class="filter-group">
-          <input type="text" id="searchCoproInput" class="search-input" placeholder="🔍 Rechercher un copropriétaire..." oninput="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
+          <input type="text" id="searchCoproInput" class="search-input" placeholder="🔍 Rechercher un copropriétaire, lot..." oninput="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
           <select id="filterCoproStatut" class="select-input" onchange="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
             <option value="ALL">Tous les statuts</option>
             <option value="POUVOIR">✉️ Pouvoirs / Représentés</option>
@@ -264,6 +264,13 @@
             <option value="PARTI">🚪 Partis en cours d'AG</option>
             <option value="ABSENT">❌ Absents non représentés</option>
             <option value="TOP20">🔥 Top 20%</option>
+          </select>
+          <select id="filterCoproLotType" class="select-input" onchange="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
+            <option value="ALL">Tous les types de lots</option>
+            <option value="T4">🏢 Logements T4 (~350 à 445 t.)</option>
+            <option value="T5_CUMUL">🏰 T5 & Cumuls Box (> 450 t.)</option>
+            <option value="GARAGE">🚗 Garages / Box seuls (~44 t.)</option>
+            <option value="PARKING">🅿️ Parkings / Caves (< 20 t.)</option>
           </select>
         </div>
         <div style="display:flex; gap:0.5rem; align-items:center;">
@@ -276,9 +283,14 @@
         <table>
           <thead>
             <tr>
-              <th>Nom du Copropriétaire</th>
+              <th onclick="toggleCoproSort('nom')" style="cursor:pointer;" title="Cliquer pour trier par Nom alphabétique">
+                Nom du Copropriétaire <span id="sortIndicatorNom">▲</span>
+              </th>
               <th>Lot(s)</th>
-              <th>Tantièmes</th>
+              <th onclick="toggleCoproSort('tantiemes')" style="cursor:pointer;" title="Cliquer pour trier par Tantièmes (croissant / décroissant)">
+                Tantièmes <span id="sortIndicatorTant">↕️</span>
+              </th>
+              <th>Type de Lot</th>
               <th>Statut Présence</th>
               <th>Notes / Mandataire</th>
               <th class="no-print" style="text-align:right;">Actions</th>
@@ -290,7 +302,8 @@
           <tfoot>
             <tr style="background:#f8fafc; font-weight:700;">
               <td colspan="2">TOTAL PRÉSENTS & REPRÉSENTÉS</td>
-              <td id="footPresentTantiemes" colspan="3" class="tantieme-pill">0</td>
+              <td id="footPresentTantiemes" class="tantieme-pill">0</td>
+              <td colspan="3"></td>
               <td class="no-print"></td>
             </tr>
           </tfoot>

@@ -315,6 +315,56 @@ function renderResolutions(totalEnSalle, totalCopro) {
   }).join('');
 }
 
+// ==========================================
+// CLASSIFICATION DES LOTS & TANTIÈMES (RÉSIDENCE LE FLORÉAL)
+// ==========================================
+
+function getCoproLotType(tantiemes) {
+  const t = Number(tantiemes) || 0;
+  if (t < 20) {
+    return {
+      code: 'PARKING',
+      label: 'Parking / Cave',
+      badgeClass: 'badge-lot-parking',
+      icon: '🅿️'
+    };
+  } else if (t < 100) {
+    return {
+      code: 'GARAGE',
+      label: 'Box seul (~44 t.)',
+      badgeClass: 'badge-lot-garage',
+      icon: '🚗'
+    };
+  } else if (t <= 445) {
+    return {
+      code: 'T4',
+      label: 'Logement T4',
+      badgeClass: 'badge-lot-t4',
+      icon: '🏢'
+    };
+  } else {
+    return {
+      code: 'T5_CUMUL',
+      label: 'T5 / Cumul Box',
+      badgeClass: 'badge-lot-t5',
+      icon: '🏰'
+    };
+  }
+}
+
+let coproSortCol = 'nom';
+let coproSortDir = 'asc';
+
+function toggleCoproSort(col) {
+  if (coproSortCol === col) {
+    coproSortDir = (coproSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    coproSortCol = col;
+    coproSortDir = (col === 'tantiemes') ? 'desc' : 'asc';
+  }
+  renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);
+}
+
 // Render Copropriétaires (Accueil / Émargement & Départs en séance)
 function renderCoproprietaires(totalEnSalle, totalTant) {
   const tbody = document.getElementById('coproTableBody');
@@ -323,23 +373,49 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
   const list = appData.coproprietaires || [];
   const search = (document.getElementById('searchCoproInput')?.value || '').toLowerCase();
   const filterStatut = document.getElementById('filterCoproStatut')?.value || 'ALL';
+  const filterLot = document.getElementById('filterCoproLotType')?.value || 'ALL';
 
   const filtered = list.filter(c => {
-    const matchSearch = (c.nom + ' ' + (c.mandataire || '') + ' ' + (c.notes || '')).toLowerCase().includes(search);
+    const matchSearch = (c.nom + ' ' + (c.mandataire || '') + ' ' + (c.notes || '') + ' ' + (c.lots || '')).toLowerCase().includes(search);
     let matchStatut = true;
     if (filterStatut === 'TOP20') {
       matchStatut = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
     } else if (filterStatut !== 'ALL') {
       matchStatut = (c.statut === filterStatut);
     }
-    return matchSearch && matchStatut;
+
+    let matchLot = true;
+    if (filterLot !== 'ALL') {
+      const lotInfo = getCoproLotType(c.tantiemes);
+      matchLot = (lotInfo.code === filterLot);
+    }
+
+    return matchSearch && matchStatut && matchLot;
   });
 
+  // Tri dynamique
+  filtered.sort((a, b) => {
+    let res = 0;
+    if (coproSortCol === 'tantiemes') {
+      res = (Number(a.tantiemes) || 0) - (Number(b.tantiemes) || 0);
+    } else {
+      res = (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' });
+    }
+    return coproSortDir === 'desc' ? -res : res;
+  });
+
+  // Indicateurs de tri dans les en-têtes
+  const indNom = document.getElementById('sortIndicatorNom');
+  const indTant = document.getElementById('sortIndicatorTant');
+  if (indNom) indNom.innerText = coproSortCol === 'nom' ? (coproSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  if (indTant) indTant.innerText = coproSortCol === 'tantiemes' ? (coproSortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕️';
+
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire trouvé.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire trouvé avec ces filtres.</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
       const isTop20 = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
+      const lotInfo = getCoproLotType(c.tantiemes);
 
       let statutBadge = '';
       if (c.statut === 'PRESENT') {
@@ -362,6 +438,7 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
           </td>
           <td>${escapeHtml(c.lots || '-')}</td>
           <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
+          <td><span class="badge-lot ${lotInfo.badgeClass}">${lotInfo.icon} ${lotInfo.label}</span></td>
           <td>${statutBadge}</td>
           <td>${escapeHtml(c.notes || '-')}</td>
           <td class="no-print">
@@ -1913,15 +1990,18 @@ function onSpotlightSearchInput() {
 
   if (copros.length > 0) {
     html += `<div style="font-size:0.75rem; font-weight:700; color:var(--primary); padding:0.4rem 0.6rem; text-transform:uppercase;">Copropriétaires & Pouvoirs (${copros.length})</div>`;
-    html += copros.map(c => `
-      <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('presence'); document.getElementById('searchCoproInput').value='${escapeHtml(c.nom)}'; renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);">
-        <div>
-          <strong>${escapeHtml(c.nom)}</strong>
-          <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">[${escapeHtml(c.lots || 'Sans lot')}] • Statut : <strong>${c.statut}</strong> ${c.mandataire ? `(➔ ${escapeHtml(c.mandataire)})` : ''}</span>
+    html += copros.map(c => {
+      const lotInfo = getCoproLotType(c.tantiemes);
+      return `
+        <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('presence'); document.getElementById('searchCoproInput').value='${escapeHtml(c.nom)}'; renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);">
+          <div>
+            <strong>${escapeHtml(c.nom)}</strong>
+            <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">[${escapeHtml(c.lots || 'Sans lot')}] • ${lotInfo.icon} ${lotInfo.label} • Statut : <strong>${c.statut}</strong> ${c.mandataire ? `(➔ ${escapeHtml(c.mandataire)})` : ''}</span>
+          </div>
+          <span class="tantieme-pill">${c.tantiemes} tantièmes</span>
         </div>
-        <span class="tantieme-pill">${c.tantiemes} tantièmes</span>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   if (resMatches.length > 0) {
