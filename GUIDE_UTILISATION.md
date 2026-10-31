@@ -77,3 +77,39 @@ L'application intègre un **module complet d'administration des pouvoirs** confo
    - Bouton **`🔄 Transférer`** sur chaque mandat pour réassigner un pouvoir d'un membre à un autre en 1 clic en cas d'absence ou pour rééquilibrer les voix.
    - Bouton **`✨ Répartir automatiquement les pouvoirs en blanc`** pour distribuer équitablement les pouvoirs reçus sans nom sur les membres disponibles.
 
+---
+
+## 5. 🎯 Mode Séance Focus en direct (Spécial Smartphone & AG)
+
+En assemblée, faire défiler 28 résolutions sur un petit écran de smartphone est fastidieux. Cliquez sur le bouton bleu **`▶ Mode Séance`** :
+1. **Affichage épuré grand écran** : seule la résolution en débat est mise en avant.
+2. **Consigne géante du CS** : badge bien visible (`✅ POUR`, `❌ CONTRE`, `⚠️ ABSTENTION`, `ℹ️ LIBRE`) et arguments chocs rédigés par le CS.
+3. **Synchronisation automatique** : dès que l'ordinateur principal avance à la résolution suivante (`Suivante ➡`), **tous les smartphones des membres connectés basculent automatiquement sur la même résolution** !
+4. **Navigation au clavier** : utilisez les touches `Flèche Gauche` et `Flèche Droite` de votre PC portable pour passer d'une résolution à l'autre en un éclair.
+
+---
+
+## 6. ⚖️ Simulateur Tactique de Majorité & Alerte Passerelle Art. 25-1
+
+Sur chaque résolution, une **jauge visuelle animée** calcule en temps réel :
+- **Pour l'Article 24 (Majorité simple) :** Compare la force du CS avec les voix exprimées en salle, et vous indique si la résolution est déjà acquise ou combien de voix extérieures il vous manque.
+- **Pour l'Article 25 (Majorité absolue - 48 740 voix) :** Vous montre l'avancement vers les 50% de l'immeuble.
+- **Alerte Passerelle Art. 25-1 automatique :** Si une résolution soumise à l'Art. 25 recueille au moins 1/3 des voix (32 493 tantièmes), un bandeau clignotant vous alerte :  
+  *« 🚨 PASSERELLE ART. 25-1 DE DROIT : Le syndic DOIT organiser un 2nd vote immédiat à l'Art. 24 ! »*
+- **Horodatage officiel :** Dès qu'un vote est enregistré, l'heure exacte est horodatée (`⏱️ Votée à 18h42`) pour prouver l'ordre des délibérations.
+
+---
+
+## 7. 🔍 Recherche Universelle Rapide (Spotlight)
+
+- Cliquez sur le bouton **`🔍 Chercher`** ou appuyez simplement sur la touche **`/`** de votre clavier.
+- Tapez un nom de copropriétaire, un numéro de lot, un nom de membre CS ou un numéro de résolution : accédez au dossier complet en une fraction de seconde !
+
+---
+
+## 8. 🌙 Mode Sombre & 📄 Relevé Officiel PV Miroir de fin d'AG
+
+- **Mode Sombre (Bouton `🌙` dans l'en-tête) :** Économise la batterie de vos smartphones OLED pendant les 3-4 heures de l'assemblée et reste discret dans la salle.
+- **Relevé Officiel PV Miroir (Bouton `📄 Relevé PV CS`) :** À la fin de l'AG, générez en 1 clic le rapport complet officiel du Conseil Syndical (synthèse de quorum, départs horodatés, résultats exacts de chaque scrutin, opposants consignés) imprimable ou enregistrable en PDF pour cadrer le syndic dès le lendemain !
+
+

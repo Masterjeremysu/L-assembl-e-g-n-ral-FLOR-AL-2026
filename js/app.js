@@ -125,6 +125,10 @@ function updateUI() {
   renderMembers(csPerso, csMandats, csTotal, totalTant);
   renderPouvoirsTab();
 
+  if (isModeSeanceActive) {
+    renderModeSeance();
+  }
+
   // Settings
   document.getElementById('cfgCoproname').value = appData.config.coproName || '';
   document.getElementById('cfgAgDate').value = appData.config.agDate || '';
@@ -138,6 +142,9 @@ function renderResolutions(totalEnSalle, totalCopro) {
   const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
   const statusFilter = document.getElementById('filterStatus')?.value || 'ALL';
   const csFilter = document.getElementById('filterCsConsigne')?.value || 'ALL';
+
+  // Calcul du cumul des voix détenues par le CS (voix perso + mandats reçus)
+  const csTotalVoix = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
 
   const filtered = appData.resolutions.filter(r => {
     const matchSearch = (r.number + ' ' + r.title + ' ' + (r.description || '') + ' ' + (r.csNotes || '')).toLowerCase().includes(search);
@@ -214,13 +221,17 @@ function renderResolutions(totalEnSalle, totalCopro) {
               <span class="tag ${isSansVote ? 'tag-maj-sansvote' : 'tag-maj'}">${escapeHtml(r.majorite)}</span>
               ${!isSansVote ? `<span class="tag ${csBadgeClass}">Consigne CS : ${r.csConsigne}</span>` : ''}
               <span class="tag tag-status-${r.status}">${statusLabel}</span>
+              ${r.heureVote ? `<span class="tag" style="background:#f1f5f9; color:#475569; font-weight:600;" title="Heure officielle du vote">⏱️ Votée à ${r.heureVote}</span>` : ''}
               ${r.opponentsList && r.opponentsList.length > 0 ? `<span class="badge-anti-fraude">🚨 ${r.opponentsList.length} opposant(s) consigné(s)</span>` : ''}
             </div>
           </div>
-          <div class="no-print" style="display:flex; gap:0.4rem;">
+          <div class="no-print" style="display:flex; gap:0.4rem; align-items:center;">
             ${!isSansVote ? `
+              <button class="btn btn-outline-primary btn-sm" onclick="ouvrirSeanceSurRes('${r.id}')" title="Passer en mode séance grand format sur cette résolution">
+                ▶ Séance
+              </button>
               <button class="btn btn-purple btn-sm" onclick="openScrutinModal('${r.id}')" title="Contrôle des opposants et abstentions">
-                🎯 Dépouillement Miroir
+                🎯 Dépouillement
               </button>
             ` : ''}
             <button class="btn btn-secondary btn-sm" onclick="editResolution('${r.id}')" title="Modifier">✏️</button>
@@ -241,6 +252,8 @@ function renderResolutions(totalEnSalle, totalCopro) {
             <strong>📝 Note de séance :</strong> ${escapeHtml(r.notesSeance)}
           </div>
         ` : ''}
+
+        ${!isSansVote ? renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) : ''}
 
         ${hasNumbers ? `
           <div class="depouillement-box">
@@ -446,9 +459,18 @@ function setQuickVote(id, newStatus) {
   const res = appData.resolutions.find(r => r.id === id);
   if (res) {
     res.status = newStatus;
+    if (newStatus !== 'EN_ATTENTE') {
+      const now = new Date();
+      res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+    } else {
+      delete res.heureVote;
+    }
     persistData();
+    if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && activeSeanceResId === id) {
+      renderModeSeance();
+    }
     if (isLiveActive) {
-      broadcastLiveUpdate({ type: 'QUICK_VOTE', id: id, status: newStatus });
+      broadcastLiveUpdate({ type: 'QUICK_VOTE', id: id, status: newStatus, heureVote: res.heureVote });
     }
   }
 }
@@ -618,8 +640,15 @@ function saveScrutin(e) {
     res.status = (res.tantiemesPour >= seuil25) ? 'ADOPTEE' : 'REJETEE';
   }
 
+  // Horodatage officiel du vote
+  const now = new Date();
+  res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+
   closeModal('scrutinModal');
   persistData();
+  if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && activeSeanceResId === res.id) {
+    renderModeSeance();
+  }
   showToast(`Résultat miroir enregistré pour la résolution ${res.number} !`, "success");
 }
 
@@ -1544,6 +1573,455 @@ function pointerCoproPresent(id) {
   setCoproStatut(id, 'PRESENT');
 }
 
+// ==========================================
+// SIMULATEUR TACTIQUE DE MAJORITÉ & JAUGES
+// ==========================================
+
+function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
+  const isSansVote = (r.majorite === 'article sans vote');
+  if (isSansVote) return '';
+
+  const isArt24 = (r.majorite === 'Article 24');
+  const isArt25 = r.majorite.includes('Article 25');
+  const isArt26 = r.majorite.includes('Article 26');
+
+  // Voix du dépouillement en direct si saisi
+  const pour = Number(r.tantiemesPour) || 0;
+  const contre = Number(r.tantiemesContre) || 0;
+  const abs = Number(r.tantiemesAbs) || 0;
+  const hasNumbers = (pour > 0 || contre > 0 || abs > 0);
+
+  let targetSeuil = 0;
+  let targetLabel = '';
+  let passerelleSeuil = 0;
+  let currentVal = hasNumbers ? pour : csTotalVoix;
+  let percent = 0;
+  let messageTactique = '';
+  let alertPasserelleHtml = '';
+
+  if (isArt24) {
+    // Art 24 : Majorité des voix exprimées en salle
+    const exprimesActuels = hasNumbers ? (pour + contre) : (totalEnSalle || 1);
+    targetSeuil = Math.floor(exprimesActuels / 2) + 1;
+    targetLabel = `Art. 24 (Majorité simple) : > 50% des exprimés en salle (~${targetSeuil} voix)`;
+    percent = exprimesActuels > 0 ? Math.min(100, Math.round((currentVal / exprimesActuels) * 100)) : 0;
+
+    if (csTotalVoix >= targetSeuil) {
+      messageTactique = `<span style="color:var(--success); font-weight:700;">🟢 Force CS suffisante :</span> Le CS détient ${csTotalVoix} voix, soit plus que les ${targetSeuil} nécessaires pour l'adopter !`;
+    } else {
+      const besoin = Math.max(0, targetSeuil - csTotalVoix);
+      messageTactique = `<span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin}</strong> voix parmi les présents pour l'emporter.</span>`;
+    }
+  } else if (isArt25) {
+    // Art 25 : Majorité de tous les copropriétaires (50% de totalCopro)
+    targetSeuil = Math.floor(totalCopro / 2) + 1; // 48 740
+    passerelleSeuil = Math.ceil(totalCopro / 3); // 32 493
+    targetLabel = `Art. 25 (Majorité absolue) : ${targetSeuil} voix requises (>50% de l'immeuble)`;
+    percent = totalCopro > 0 ? Math.min(100, Math.round((currentVal / totalCopro) * 100)) : 0;
+    const besoin25 = Math.max(0, targetSeuil - csTotalVoix);
+    const besoinPasserelle = Math.max(0, passerelleSeuil - csTotalVoix);
+
+    if (hasNumbers && pour >= passerelleSeuil && pour < targetSeuil) {
+      alertPasserelleHtml = `
+        <div class="passerelle-alert-badge">
+          🚨 PASSERELLE ART. 25-1 DE DROIT : ${pour} voix >= ${passerelleSeuil} (1/3 atteint). Le syndic DOIT organiser un 2nd vote immédiat à l'Art. 24 !
+        </div>
+      `;
+    }
+
+    messageTactique = `
+      <span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin25}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle}</strong> voix pour déclencher la passerelle 25-1).</span>
+    `;
+  } else if (isArt26) {
+    targetSeuil = Math.ceil((totalCopro * 2) / 3); // 2/3
+    targetLabel = `Art. 26 (Double majorité) : ~${targetSeuil} voix requises (2/3 de l'immeuble)`;
+    percent = totalCopro > 0 ? Math.min(100, Math.round((currentVal / totalCopro) * 100)) : 0;
+    const besoin26 = Math.max(0, targetSeuil - csTotalVoix);
+    messageTactique = `<span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin26}</strong> voix pour atteindre les 2/3.</span>`;
+  }
+
+  const fillClass = percent >= 50 ? 'success' : (percent >= 33 ? 'warning' : '');
+
+  return `
+    <div class="majority-gauge-container">
+      <div class="gauge-info-row">
+        <span style="font-weight:700; color:var(--primary); font-size:0.75rem;">🎯 ${targetLabel}</span>
+        <span style="font-weight:700; font-size:0.75rem;">${hasNumbers ? `Scrutin : ${pour} POUR` : `Force CS : ${csTotalVoix}`} (${percent}%)</span>
+      </div>
+
+      <div class="gauge-track">
+        <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
+        ${isArt25 ? `
+          <div class="gauge-marker" style="left: 33.3%; background:#f59e0b;" title="Seuil 1/3 Passerelle Art. 25-1">
+            <span class="gauge-marker-label" style="color:#b45309;">1/3 (Passerelle)</span>
+          </div>
+        ` : ''}
+        <div class="gauge-marker" style="left: 50%;" title="Seuil d'adoption (50%)">
+          <span class="gauge-marker-label">Seuil 50%</span>
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem; color:var(--gray-600); margin-top:0.4rem; display:flex; justify-content:space-between; align-items:center;">
+        <div>${messageTactique}</div>
+      </div>
+      ${alertPasserelleHtml}
+    </div>
+  `;
+}
+
+// ==========================================
+// DARK MODE (ÉCO-BATTERIE & SÉANCE)
+// ==========================================
+
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('AG_DARK_MODE', isDark ? 'true' : 'false');
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.innerText = isDark ? '☀️' : '🌙';
+}
+
+function initDarkMode() {
+  const saved = localStorage.getItem('AG_DARK_MODE');
+  if (saved === 'true') {
+    document.body.classList.add('dark-mode');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerText = '☀️';
+  }
+}
+
+// ==========================================
+// MODE SÉANCE FOCUS (SPÉCIAL AG & SMARTPHONE)
+// ==========================================
+
+let isModeSeanceActive = false;
+let activeSeanceResId = null;
+
+function toggleModeSeance() {
+  isModeSeanceActive = !isModeSeanceActive;
+  const panel = document.getElementById('seanceFocusPanel');
+  const btn = document.getElementById('btnToggleSeance');
+
+  if (isModeSeanceActive) {
+    if (!activeSeanceResId) {
+      const pending = appData.resolutions.find(r => r.status === 'EN_ATTENTE' && r.majorite !== 'article sans vote');
+      activeSeanceResId = pending ? pending.id : appData.resolutions[0]?.id;
+    }
+    if (panel) panel.style.display = 'block';
+    if (btn) btn.innerHTML = '⏸ Quitter Séance';
+    renderModeSeance();
+    if (panel && typeof panel.scrollIntoView === 'function') {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (isLiveActive) {
+      broadcastLiveUpdate({ type: 'CHANGE_ACTIVE_SEANCE_RES', resId: activeSeanceResId });
+    }
+  } else {
+    if (panel) panel.style.display = 'none';
+    if (btn) btn.innerHTML = '▶ Mode Séance';
+  }
+}
+
+function ouvrirSeanceSurRes(resId) {
+  activeSeanceResId = resId;
+  if (!isModeSeanceActive) {
+    toggleModeSeance();
+  } else {
+    renderModeSeance();
+    const focusPanel = document.getElementById('seanceFocusPanel');
+    if (focusPanel && typeof focusPanel.scrollIntoView === 'function') {
+      focusPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (isLiveActive) {
+      broadcastLiveUpdate({ type: 'CHANGE_ACTIVE_SEANCE_RES', resId: activeSeanceResId });
+    }
+  }
+}
+
+function naviguerSeance(dir) {
+  if (!appData.resolutions || appData.resolutions.length === 0) return;
+  const currentIndex = appData.resolutions.findIndex(r => r.id === activeSeanceResId);
+  let nextIndex = currentIndex + dir;
+
+  if (nextIndex < 0) nextIndex = 0;
+  if (nextIndex >= appData.resolutions.length) nextIndex = appData.resolutions.length - 1;
+
+  activeSeanceResId = appData.resolutions[nextIndex].id;
+  renderModeSeance();
+
+  if (isLiveActive) {
+    broadcastLiveUpdate({ type: 'CHANGE_ACTIVE_SEANCE_RES', resId: activeSeanceResId });
+  }
+}
+
+function renderModeSeance() {
+  const panel = document.getElementById('seanceFocusPanel');
+  if (!panel || !activeSeanceResId) return;
+
+  const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+  if (!res) return;
+
+  const index = appData.resolutions.findIndex(r => r.id === activeSeanceResId);
+  const total = appData.resolutions.length;
+
+  document.getElementById('seanceResNumberBadge').innerText = res.number;
+  document.getElementById('seanceResProgress').innerText = `Résolution ${index + 1} sur ${total}`;
+  document.getElementById('seanceResTitle').innerText = res.title;
+  document.getElementById('seanceResDesc').innerText = res.description || 'Aucune description détaillée.';
+  document.getElementById('seanceResMajorite').innerText = `Règle de vote : ${res.majorite} • Statut actuel : ${res.status}`;
+
+  const badgeEl = document.getElementById('seanceConsigneBadge');
+  badgeEl.className = `seance-consigne-giant ${res.csConsigne || 'LIBRE'}`;
+  const icon = { 'POUR': '✅', 'CONTRE': '❌', 'ABSTENTION': '⚠️', 'LIBRE': 'ℹ️' }[res.csConsigne] || 'ℹ️';
+  badgeEl.innerText = `${icon} ${res.csConsigne || 'LIBRE'}`;
+
+  document.getElementById('seanceCsArgumentsText').innerText = res.csNotes || 'Aucun argument particulier spécifié par le CS.';
+
+  // Simulateur tactique
+  const csTotalVoix = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
+  const totalEnSalle = appData.config.presentTantiemes || 0;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+
+  const zone = document.getElementById('seanceTactiqueZone');
+  if (zone) {
+    zone.innerHTML = renderTacticalMajorityGauge(res, totalEnSalle, totalCopro, csTotalVoix);
+  }
+}
+
+function setSeanceVote(status) {
+  if (!activeSeanceResId) return;
+  setQuickVote(activeSeanceResId, status);
+  renderModeSeance();
+  showToast(`Résolution enregistrée : ${status}`, "success");
+}
+
+// ==========================================
+// RECHERCHE UNIVERSELLE SPOTLIGHT (TOUCHE '/')
+// ==========================================
+
+function openSpotlightModal() {
+  openModal('spotlightModal');
+  const input = document.getElementById('spotlightSearchInput');
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 100);
+  }
+  onSpotlightSearchInput();
+}
+
+function onSpotlightSearchInput() {
+  const query = (document.getElementById('spotlightSearchInput')?.value || '').toLowerCase().trim();
+  const listEl = document.getElementById('spotlightResultsList');
+  if (!listEl) return;
+
+  if (!query) {
+    listEl.innerHTML = `
+      <div style="padding:1.5rem; text-align:center; color:var(--gray-500); font-size:0.85rem;">
+        Tapez un <strong>nom</strong> de copropriétaire, un <strong>n° de lot</strong>, un <strong>membre CS</strong> ou une <strong>résolution</strong>...
+      </div>
+    `;
+    return;
+  }
+
+  const copros = (appData.coproprietaires || []).filter(c =>
+    (c.nom + ' ' + (c.lots || '') + ' ' + (c.mandataire || '')).toLowerCase().includes(query)
+  ).slice(0, 6);
+
+  const resMatches = (appData.resolutions || []).filter(r =>
+    (r.number + ' ' + r.title + ' ' + (r.csNotes || '')).toLowerCase().includes(query)
+  ).slice(0, 4);
+
+  const memMatches = (appData.members || []).filter(m =>
+    (m.name + ' ' + (m.lots || '') + ' ' + (m.mandats || '')).toLowerCase().includes(query)
+  ).slice(0, 3);
+
+  let html = '';
+
+  if (copros.length > 0) {
+    html += `<div style="font-size:0.75rem; font-weight:700; color:var(--primary); padding:0.4rem 0.6rem; text-transform:uppercase;">Copropriétaires & Pouvoirs (${copros.length})</div>`;
+    html += copros.map(c => `
+      <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('presence'); document.getElementById('searchCoproInput').value='${escapeHtml(c.nom)}'; renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);">
+        <div>
+          <strong>${escapeHtml(c.nom)}</strong>
+          <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">[${escapeHtml(c.lots || 'Sans lot')}] • Statut : <strong>${c.statut}</strong> ${c.mandataire ? `(➔ ${escapeHtml(c.mandataire)})` : ''}</span>
+        </div>
+        <span class="tantieme-pill">${c.tantiemes} tantièmes</span>
+      </div>
+    `).join('');
+  }
+
+  if (resMatches.length > 0) {
+    html += `<div style="font-size:0.75rem; font-weight:700; color:var(--primary); padding:0.6rem 0.6rem 0.4rem; text-transform:uppercase;">Résolutions (${resMatches.length})</div>`;
+    html += resMatches.map(r => `
+      <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('votes'); ouvrirSeanceSurRes('${r.id}');">
+        <div>
+          <span class="resolution-num" style="font-size:0.75rem; margin-right:0.4rem;">N° ${escapeHtml(r.number)}</span>
+          <strong>${escapeHtml(r.title)}</strong>
+        </div>
+        <span class="tag tag-status-${r.status}">${r.status}</span>
+      </div>
+    `).join('');
+  }
+
+  if (memMatches.length > 0) {
+    html += `<div style="font-size:0.75rem; font-weight:700; color:var(--primary); padding:0.6rem 0.6rem 0.4rem; text-transform:uppercase;">Conseil Syndical (${memMatches.length})</div>`;
+    html += memMatches.map(m => `
+      <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('pouvoirs');">
+        <div>
+          <strong>${escapeHtml(m.name)}</strong>
+          <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">${m._nbMandats || 0} mandat(s) détenu(s)</span>
+        </div>
+        <span class="tantieme-pill">${(Number(m.tantiemes)||0) + (Number(m.mandatTantiemes)||0)} voix</span>
+      </div>
+    `).join('');
+  }
+
+  if (!html) {
+    html = `<div style="padding:1.5rem; text-align:center; color:var(--gray-500); font-size:0.85rem;">Aucun résultat trouvé pour « ${escapeHtml(query)} ».</div>`;
+  }
+
+  listEl.innerHTML = html;
+}
+
+// ==========================================
+// PV MIROIR OFFICIEL & EXPORT DE FIN D'AG
+// ==========================================
+
+function openPvMiroirModal() {
+  const container = document.getElementById('pvMiroirPrintContent');
+  if (!container) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const copros = appData.coproprietaires || [];
+  const presents = copros.filter(c => c.statut === 'PRESENT');
+  const pouvoirs = copros.filter(c => c.statut === 'POUVOIR');
+  const partis = copros.filter(c => c.statut === 'PARTI');
+
+  const presTant = presents.reduce((s, c) => s + (Number(c.tantiemes)||0), 0);
+  const pouvTant = pouvoirs.reduce((s, c) => s + (Number(c.tantiemes)||0), 0);
+  const totalSalle = presTant + pouvTant;
+
+  const resolutions = appData.resolutions || [];
+  const votees = resolutions.filter(r => r.majorite !== 'article sans vote');
+  const adoptees = votees.filter(r => r.status === 'ADOPTEE').length;
+  const rejetees = votees.filter(r => r.status === 'REJETEE').length;
+
+  container.innerHTML = `
+    <div class="pv-header-box">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h1 style="font-size:1.4rem; font-weight:800; color:#1e3a8a; margin-bottom:0.2rem;">${escapeHtml(appData.config.coproName || 'RÉSIDENCE LE FLORÉAL')}</h1>
+          <p style="font-size:0.9rem; color:#475569; font-weight:600;">Assemblée Générale Ordinaire du ${formatDate(appData.config.agDate || '2026-11-25')}</p>
+          <p style="font-size:0.8rem; color:#64748b;">Syndic : ${escapeHtml(appData.config.syndic || 'Citya Agence Henry')} • Lieu : ${escapeHtml(appData.config.agLocation || 'Salle Jacques Prévert')}</p>
+        </div>
+        <div style="text-align:right; border-left:3px solid #1e3a8a; padding-left:0.8rem;">
+          <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:#64748b;">Document Officiel</div>
+          <strong style="color:#1e3a8a; font-size:1rem;">Relevé Miroir du CS</strong>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:0.2rem;">Contrôle anti-fraude & conformité légale</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feuille de Quorum & Présence -->
+    <div style="background:#f1f5f9; padding:0.9rem 1rem; border-radius:6px; margin-bottom:1.2rem; font-size:0.84rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.6rem;">
+      <div>Total Copropriété : <strong>${totalCopro} tantièmes</strong></div>
+      <div>Présents & Représentés : <strong>${totalSalle} tantièmes (${((totalSalle/totalCopro)*100).toFixed(1)}%)</strong></div>
+      <div>Présents physiques : <strong>${presents.length} copropriétaires (${presTant} t.)</strong></div>
+      <div>Pouvoirs enregistrés : <strong>${pouvoirs.length} mandats (${pouvTant} t.)</strong></div>
+      <div>Départs en séance : <strong>${partis.length} consigné(s)</strong></div>
+      <div>Bilan des votes : <strong>${adoptees} adoptée(s), ${rejetees} rejetée(s)</strong></div>
+    </div>
+
+    <!-- Tableau détaillé des décisions -->
+    <h3 style="font-size:1.05rem; font-weight:700; color:#1e3a8a; margin-bottom:0.6rem;">Relevé des Délibérations & Scrutins</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:0.8rem; margin-bottom:1.5rem;">
+      <thead>
+        <tr style="background:#e2e8f0; border-bottom:2px solid #cbd5e1; text-align:left;">
+          <th style="padding:0.4rem 0.6rem;">N°</th>
+          <th style="padding:0.4rem 0.6rem;">Intitulé Résolution</th>
+          <th style="padding:0.4rem 0.6rem;">Majorité</th>
+          <th style="padding:0.4rem 0.6rem;">Décision CS</th>
+          <th style="padding:0.4rem 0.6rem;">Pour</th>
+          <th style="padding:0.4rem 0.6rem;">Contre</th>
+          <th style="padding:0.4rem 0.6rem;">Opposants consignés</th>
+          <th style="padding:0.4rem 0.6rem;">Heure</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${resolutions.map(r => `
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="padding:0.45rem 0.6rem; font-weight:700;">${escapeHtml(r.number)}</td>
+            <td style="padding:0.45rem 0.6rem;">${escapeHtml(r.title)}</td>
+            <td style="padding:0.45rem 0.6rem; font-size:0.75rem; color:#64748b;">${escapeHtml(r.majorite)}</td>
+            <td style="padding:0.45rem 0.6rem;"><span class="pv-badge-status ${r.status}">${r.status}</span></td>
+            <td style="padding:0.45rem 0.6rem; color:#15803d; font-weight:700;">${r.tantiemesPour || '-'}</td>
+            <td style="padding:0.45rem 0.6rem; color:#dc2626; font-weight:700;">${r.tantiemesContre || '-'}</td>
+            <td style="padding:0.45rem 0.6rem; font-size:0.75rem;">${escapeHtml(r.opponentsText || (r.opponentsList ? r.opponentsList.join(', ') : '-'))}</td>
+            <td style="padding:0.45rem 0.6rem; font-size:0.75rem; color:#64748b;">${r.heureVote || '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    ${partis.length > 0 ? `
+      <div style="background:#fee2e2; border-left:4px solid #ef4444; padding:0.6rem 0.9rem; font-size:0.8rem; margin-bottom:1.5rem;">
+        <strong>🚪 Départs anticipés consignés à la feuille de présence (Art. 14 et 17 du décret de 1967) :</strong><br>
+        ${partis.map(p => `• ${escapeHtml(p.nom)} (${p.tantiemes} tantièmes) — Départ officiel consigné à ${p.heureDepart || 'en cours d\'AG'}`).join('<br>')}
+      </div>
+    ` : ''}
+
+    <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid #cbd5e1; display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+      <div>Établi en séance par le Conseil Syndical • Résidence Le Floréal</div>
+      <div style="text-align:right;">Signatures du Président de séance et Scrutateurs :</div>
+    </div>
+  `;
+
+  openModal('pvMiroirModal');
+}
+
+function imprimerPvMiroir() {
+  const content = document.getElementById('pvMiroirPrintContent')?.innerHTML;
+  if (!content) return;
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Relevé Officiel AG 2026 - Le Floréal</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f172a; line-height: 1.4; font-size: 11pt; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+        th { background: #f1f5f9; }
+        .pv-badge-status { font-weight: bold; }
+        .ADOPTEE { color: #15803d; }
+        .REJETEE { color: #b91c1c; }
+        @media print { button { display: none; } }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// Raccourcis clavier (Spotlight & Navigation séance)
+window.addEventListener('keydown', (e) => {
+  if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+    e.preventDefault();
+    openSpotlightModal();
+  }
+  if (e.key === 'ArrowRight' && isModeSeanceActive && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+    naviguerSeance(1);
+  }
+  if (e.key === 'ArrowLeft' && isModeSeanceActive && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+    naviguerSeance(-1);
+  }
+});
+
 // Formatting helpers
 function formatDate(dStr) {
   if (!dStr) return '';
@@ -1563,5 +2041,6 @@ function escapeHtml(text) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initDarkMode();
   updateUI();
 });

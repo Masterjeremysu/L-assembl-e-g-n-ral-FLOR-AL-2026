@@ -42,22 +42,32 @@
       </div>
       <div class="header-actions no-print">
         <button class="btn btn-warning-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
-          ✉️ + Enregistrer un Pouvoir
+          ✉️ + Pouvoir
+        </button>
+
+        <button class="btn btn-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
+          ▶ Mode Séance
+        </button>
+
+        <button class="btn btn-outline" onclick="openSpotlightModal()" title="Recherche universelle (Copropriétaire, lot, mandat, résolution) - Raccourci '/'">
+          🔍 Chercher
         </button>
 
         <button class="btn btn-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones/tablettes">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-          Direct Multi-écrans (Gratuit)
+          Direct Multi-écrans
         </button>
 
-        <button class="btn btn-white" onclick="openNewResolutionModal()">
-          + Résolution
+        <button class="btn btn-outline" onclick="openPvMiroirModal()" title="Générer le relevé officiel et synthèse des votes du CS en fin d'AG">
+          📄 Relevé PV CS
         </button>
-        <button class="btn btn-outline" onclick="window.print()">
-          🖨️ Imprimer / PDF
-        </button>
-        <button class="btn btn-outline" onclick="exportDataJson()">
+
+        <button class="btn btn-outline" onclick="exportDataJson()" title="Télécharger la sauvegarde complète de secours (JSON)">
           💾 Exporter
+        </button>
+
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre / Éco-Batterie">
+          🌙
         </button>
       </div>
     </div>
@@ -93,6 +103,59 @@
 
     <!-- SECTION 1: VOTES -->
     <section id="section-votes">
+
+      <!-- MODE SÉANCE FOCUS EN DIRECT (SPÉCIAL AG & SMARTPHONE) -->
+      <div id="seanceFocusPanel" class="seance-focus-bar no-print" style="display:none;">
+        <div class="seance-nav-controls">
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span style="background:rgba(255,255,255,0.2); padding:0.25rem 0.6rem; border-radius:9999px; font-weight:800; font-size:0.85rem;" id="seanceResNumberBadge">01</span>
+            <span style="font-size:0.82rem; color:#bfdbfe;" id="seanceResProgress">Résolution 1 sur 28</span>
+          </div>
+          <div style="display:flex; gap:0.4rem; align-items:center;">
+            <button class="btn btn-sm btn-white" onclick="naviguerSeance(-1)" title="Résolution précédente (Flèche Gauche)">⬅ Précédente</button>
+            <button class="btn btn-sm btn-white" onclick="naviguerSeance(1)" title="Résolution suivante (Flèche Droite)">Suivante ➡</button>
+            <button class="btn btn-sm btn-outline" style="color:white; border-color:rgba(255,255,255,0.4);" onclick="toggleModeSeance()" title="Fermer le mode séance">✕ Quitter</button>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+          <div style="flex:1; min-width:280px;">
+            <h2 id="seanceResTitle" style="font-size:1.3rem; font-weight:800; line-height:1.3; margin-bottom:0.4rem; color:white;">-</h2>
+            <div id="seanceResDesc" style="font-size:0.85rem; color:#cbd5e1; line-height:1.45; max-height:85px; overflow-y:auto;">-</div>
+            <div style="font-size:0.8rem; color:#93c5fd; margin-top:0.35rem; font-weight:600;" id="seanceResMajorite">-</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:#bfdbfe; margin-bottom:0.25rem;">Consigne du CS :</div>
+            <div id="seanceConsigneBadge" class="seance-consigne-giant POUR">✅ POUR</div>
+          </div>
+        </div>
+
+        <!-- Arguments clés du CS -->
+        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #60a5fa; border-radius:6px; padding:0.65rem 0.9rem; margin-bottom:0.9rem; font-size:0.86rem; color:#e0f2fe;" id="seanceCsArguments">
+          <strong>Avis du CS :</strong> <span id="seanceCsArgumentsText">-</span>
+        </div>
+
+        <!-- Simulateur Tactique de Majorité -->
+        <div id="seanceTactiqueZone" class="majority-gauge-container">
+          <!-- Dynamique -->
+        </div>
+
+        <!-- Boutons de Vote Rapide Séance -->
+        <div class="seance-quick-votes">
+          <button class="seance-btn-vote" style="background:#15803d; color:white;" onclick="setSeanceVote('ADOPTEE')">
+            <span>✅ Adoptée</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Conforme à la majorité</span>
+          </button>
+          <button class="seance-btn-vote" style="background:#dc2626; color:white;" onclick="setSeanceVote('REJETEE')">
+            <span>❌ Rejetée</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Rejetée par l'AG</span>
+          </button>
+          <button class="seance-btn-vote" style="background:#0284c7; color:white;" onclick="openScrutinModal(activeSeanceResId)">
+            <span>🎯 Dépouillement Miroir</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Contrôle anti-fraude</span>
+          </button>
+        </div>
+      </div>
 
       <!-- AG Info Banner -->
       <div class="ag-info-banner">
@@ -898,6 +961,49 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       </form>
     </div>
   </div>
+
+  <!-- MODAL SPOTLIGHT (RECHERCHE UNIVERSELLE RAPIDE) -->
+  <div class="modal-overlay" id="spotlightModal">
+    <div class="spotlight-box">
+      <div class="spotlight-input-container">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--gray-500);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="spotlightSearchInput" class="spotlight-search-field" placeholder="Rechercher un nom, un lot, un membre CS, une résolution..." oninput="onSpotlightSearchInput()" autocomplete="off">
+        <button class="modal-close" style="font-size:1.2rem;" onclick="closeModal('spotlightModal')">&times;</button>
+      </div>
+      <div class="spotlight-results" id="spotlightResultsList">
+        <!-- Dynamique -->
+      </div>
+      <div style="background:var(--gray-50); padding:0.5rem 1rem; border-top:1px solid var(--gray-200); font-size:0.75rem; color:var(--gray-500); display:flex; justify-content:space-between;">
+        <span>Astuce : Appuyez sur la touche <kbd style="background:#e2e8f0; padding:1px 4px; border-radius:3px;">/</kbd> pour ouvrir cette recherche</span>
+        <span>Échap pour fermer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PV MIROIR OFFICIEL CS (SYNTHÈSE DE FIN D'AG & EXPORT PDF) -->
+  <div class="modal-overlay" id="pvMiroirModal">
+    <div class="modal-box" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📄 Relevé Officiel des Décisions du Conseil Syndical</h3>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-sm btn-primary" onclick="imprimerPvMiroir()">🖨️ Imprimer / PDF</button>
+          <button class="modal-close" onclick="closeModal('pvMiroirModal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="background:#f8fafc; padding:1.2rem;">
+        <div id="pvMiroirPrintContent" class="pv-report-container">
+          <!-- Dynamique -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('pvMiroirModal')">Fermer</button>
+        <button type="button" class="btn btn-primary" onclick="imprimerPvMiroir()">🖨️ Imprimer / Enregistrer en PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container de notifications toasts -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <!-- Fichiers modulaires de l'application -->
   <script src="js/data.js"></script>

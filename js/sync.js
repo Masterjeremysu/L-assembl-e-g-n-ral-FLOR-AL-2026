@@ -190,9 +190,16 @@ function handleIncomingPeerMessage(msg, senderConn) {
     const res = appData.resolutions.find(r => r.id === msg.id);
     if (res) {
       res.status = msg.status;
+      if (msg.heureVote) res.heureVote = msg.heureVote;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       updateUI();
+      if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && typeof renderModeSeance === 'function') {
+        renderModeSeance();
+      }
       showToast(`Résolution ${res.number} : ${msg.status}`, "success");
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(80); } catch (e) {}
+      }
 
       // Relai de l'Hôte vers tous les autres appareils
       if (isHost) {
@@ -202,6 +209,25 @@ function handleIncomingPeerMessage(msg, senderConn) {
           }
         });
       }
+    }
+  } else if (msg.type === 'CHANGE_ACTIVE_SEANCE_RES') {
+    if (typeof activeSeanceResId !== 'undefined') {
+      activeSeanceResId = msg.resId;
+      if (typeof isModeSeanceActive !== 'undefined' && !isModeSeanceActive) {
+        isModeSeanceActive = true;
+        const panel = document.getElementById('seanceFocusPanel');
+        if (panel) panel.style.display = 'block';
+        const btn = document.getElementById('btnToggleSeance');
+        if (btn) btn.innerHTML = '⏸ Quitter Séance';
+      }
+      if (typeof renderModeSeance === 'function') renderModeSeance();
+    }
+    if (isHost) {
+      peerConnections.forEach(c => {
+        if (c.peer !== senderConn?.peer && c.open) {
+          c.send(msg);
+        }
+      });
     }
   }
 }
