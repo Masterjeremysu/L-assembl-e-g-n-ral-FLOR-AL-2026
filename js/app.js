@@ -225,7 +225,7 @@ function renderResolutions(totalEnSalle, totalCopro) {
               ${r.opponentsList && r.opponentsList.length > 0 ? `<span class="badge-anti-fraude">🚨 ${r.opponentsList.length} opposant(s) consigné(s)</span>` : ''}
             </div>
           </div>
-          <div class="no-print" style="display:flex; gap:0.4rem; align-items:center;">
+          <div class="resolution-actions no-print">
             ${!isSansVote ? `
               <button class="btn btn-outline-primary btn-sm" onclick="ouvrirSeanceSurRes('${r.id}')" title="Passer en mode séance grand format sur cette résolution">
                 ▶ Séance
@@ -240,6 +240,12 @@ function renderResolutions(totalEnSalle, totalCopro) {
         </div>
 
         ${r.description ? `<div class="resolution-desc">${escapeHtml(r.description)}</div>` : ''}
+
+        ${r.eluNom ? `
+          <div class="badge-elu-winner">
+            👑 Élu(e) / Désigné(e) : <strong>${escapeHtml(r.eluNom)}</strong>
+          </div>
+        ` : ''}
 
         ${r.csNotes ? `
           <div class="cs-argument-box">
@@ -259,7 +265,7 @@ function renderResolutions(totalEnSalle, totalCopro) {
           <div class="depouillement-box">
             <div class="depouillement-header">
               <span>📊 Contrôle des voix (Feuille de vote CS)</span>
-              <span style="font-size:0.75rem; color:var(--gray-500);">En salle au moment du vote : ${totalEnSalle} tantièmes</span>
+              <span style="font-size:0.75rem; color:var(--gray-600); font-weight:600;">En salle au moment du vote : ${totalEnSalle} tantièmes</span>
             </div>
             <div class="depouillement-meters">
               <div class="meter-card">
@@ -498,6 +504,8 @@ function openScrutinModal(resId) {
   document.getElementById('scrutinAbsInput').value = res.tantiemesAbs || '';
   document.getElementById('scrutinSyndicClaim').value = res.syndicClaimStatus || '';
   document.getElementById('scrutinOpponentsList').value = res.opponentsText || '';
+  const eluInput = document.getElementById('scrutinEluNomInput');
+  if (eluInput) eluInput.value = res.eluNom || '';
 
   // Calcul instantané des opposants cochés
   renderScrutinChecklist();
@@ -527,7 +535,7 @@ function renderScrutinChecklist() {
     <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:0.4rem;">
       Appel des opposants (Cochez les copropriétaires qui lèvent la main) :
     </div>
-    <div style="max-height:160px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:0.5rem; background:#fff;">
+    <div class="scrutin-checklist-box">
       ${presents.map(c => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.25rem 0; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
           <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
@@ -630,6 +638,8 @@ function saveScrutin(e) {
   res.tantiemesAbs = Number(document.getElementById('scrutinAbsInput').value) || 0;
   res.syndicClaimStatus = document.getElementById('scrutinSyndicClaim').value;
   res.opponentsText = document.getElementById('scrutinOpponentsList').value.trim();
+  const eluVal = document.getElementById('scrutinEluNomInput')?.value.trim();
+  if (eluVal !== undefined) res.eluNom = eluVal;
 
   // Détermination automatique du statut
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
@@ -670,6 +680,8 @@ function openNewResolutionModal() {
   document.getElementById('resFormTantiemesPour').value = '';
   document.getElementById('resFormTantiemesContre').value = '';
   document.getElementById('resFormNotes').value = '';
+  const eluInput = document.getElementById('resFormEluNom');
+  if (eluInput) eluInput.value = '';
   openModal('resolutionModal');
 }
 
@@ -689,6 +701,8 @@ function editResolution(id) {
   document.getElementById('resFormTantiemesPour').value = res.tantiemesPour || '';
   document.getElementById('resFormTantiemesContre').value = res.tantiemesContre || '';
   document.getElementById('resFormNotes').value = res.notesSeance || '';
+  const eluInput = document.getElementById('resFormEluNom');
+  if (eluInput) eluInput.value = res.eluNom || '';
 
   openModal('resolutionModal');
 }
@@ -706,7 +720,8 @@ function saveResolution(e) {
     csNotes: document.getElementById('resFormCsNotes').value.trim(),
     tantiemesPour: document.getElementById('resFormTantiemesPour').value.trim(),
     tantiemesContre: document.getElementById('resFormTantiemesContre').value.trim(),
-    notesSeance: document.getElementById('resFormNotes').value.trim()
+    notesSeance: document.getElementById('resFormNotes').value.trim(),
+    eluNom: document.getElementById('resFormEluNom')?.value.trim() || ''
   };
 
   if (id) {
@@ -1607,10 +1622,10 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
     percent = exprimesActuels > 0 ? Math.min(100, Math.round((currentVal / exprimesActuels) * 100)) : 0;
 
     if (csTotalVoix >= targetSeuil) {
-      messageTactique = `<span style="color:var(--success); font-weight:700;">🟢 Force CS suffisante :</span> Le CS détient ${csTotalVoix} voix, soit plus que les ${targetSeuil} nécessaires pour l'adopter !`;
+      messageTactique = `<span class="badge-force-cs-ok">🟢 Force CS suffisante :</span> <span class="tactique-desc">Le CS détient <strong>${csTotalVoix}</strong> voix, soit plus que les <strong>${targetSeuil}</strong> nécessaires pour l'adopter !</span>`;
     } else {
       const besoin = Math.max(0, targetSeuil - csTotalVoix);
-      messageTactique = `<span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin}</strong> voix parmi les présents pour l'emporter.</span>`;
+      messageTactique = `<span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin}</strong> voix parmi les présents pour l'emporter.</span>`;
     }
   } else if (isArt25) {
     // Art 25 : Majorité de tous les copropriétaires (50% de totalCopro)
@@ -1630,14 +1645,14 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
     }
 
     messageTactique = `
-      <span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin25}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle}</strong> voix pour déclencher la passerelle 25-1).</span>
+      <span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin25}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle}</strong> voix pour déclencher la passerelle 25-1).</span>
     `;
   } else if (isArt26) {
     targetSeuil = Math.ceil((totalCopro * 2) / 3); // 2/3
     targetLabel = `Art. 26 (Double majorité) : ~${targetSeuil} voix requises (2/3 de l'immeuble)`;
     percent = totalCopro > 0 ? Math.min(100, Math.round((currentVal / totalCopro) * 100)) : 0;
     const besoin26 = Math.max(0, targetSeuil - csTotalVoix);
-    messageTactique = `<span>Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin26}</strong> voix pour atteindre les 2/3.</span>`;
+    messageTactique = `<span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin26}</strong> voix pour atteindre les 2/3.</span>`;
   }
 
   const fillClass = percent >= 50 ? 'success' : (percent >= 33 ? 'warning' : '');
@@ -1645,15 +1660,15 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
   return `
     <div class="majority-gauge-container">
       <div class="gauge-info-row">
-        <span style="font-weight:700; color:var(--primary); font-size:0.75rem;">🎯 ${targetLabel}</span>
-        <span style="font-weight:700; font-size:0.75rem;">${hasNumbers ? `Scrutin : ${pour} POUR` : `Force CS : ${csTotalVoix}`} (${percent}%)</span>
+        <span class="gauge-target-label">🎯 ${targetLabel}</span>
+        <span class="gauge-force-label">${hasNumbers ? `Scrutin : ${pour} POUR` : `Force CS : ${csTotalVoix}`} (${percent}%)</span>
       </div>
 
       <div class="gauge-track">
         <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
         ${isArt25 ? `
           <div class="gauge-marker" style="left: 33.3%; background:#f59e0b;" title="Seuil 1/3 Passerelle Art. 25-1">
-            <span class="gauge-marker-label" style="color:#b45309;">1/3 (Passerelle)</span>
+            <span class="gauge-marker-label passerelle-label">1/3 (Passerelle)</span>
           </div>
         ` : ''}
         <div class="gauge-marker" style="left: 50%;" title="Seuil d'adoption (50%)">
@@ -1661,8 +1676,8 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
         </div>
       </div>
 
-      <div style="font-size:0.75rem; color:var(--gray-600); margin-top:0.4rem; display:flex; justify-content:space-between; align-items:center;">
-        <div>${messageTactique}</div>
+      <div class="tactique-msg-row">
+        ${messageTactique}
       </div>
       ${alertPasserelleHtml}
     </div>
@@ -1776,6 +1791,39 @@ function renderModeSeance() {
 
   document.getElementById('seanceCsArgumentsText').innerText = res.csNotes || 'Aucun argument particulier spécifié par le CS.';
 
+  // Zone Candidat / Élu(e) de la séance
+  const eluZone = document.getElementById('seanceElectionZone');
+  const eluInput = document.getElementById('seanceEluInput');
+  const eluDatalist = document.getElementById('seanceEluDatalist');
+  const eluBadge = document.getElementById('seanceEluBadge');
+
+  if (eluZone && eluInput && eluDatalist) {
+    let optionsHtml = '';
+    optionsHtml += '<optgroup label="Membres du CS">';
+    (appData.members || []).forEach(m => {
+      optionsHtml += `<option value="${escapeHtml(m.name)}">Conseil Syndical</option>`;
+    });
+    optionsHtml += '</optgroup>';
+    optionsHtml += '<optgroup label="Syndic">';
+    optionsHtml += `<option value="Cabinet ${escapeHtml(appData.config.syndic || 'Citya Agence Henry')} (Secrétaire de séance)">Syndic</option>`;
+    optionsHtml += '</optgroup>';
+    optionsHtml += '<optgroup label="Copropriétaires Présents">';
+    (appData.coproprietaires || []).filter(c => c.statut === 'PRESENT').forEach(c => {
+      optionsHtml += `<option value="${escapeHtml(c.nom)}">Présent (${c.tantiemes} tantièmes)</option>`;
+    });
+    optionsHtml += '</optgroup>';
+    eluDatalist.innerHTML = optionsHtml;
+
+    eluInput.value = res.eluNom || '';
+    if (res.eluNom) {
+      eluBadge.style.display = 'inline-block';
+      eluBadge.innerHTML = `✓ Élu(e) : <strong>${escapeHtml(res.eluNom)}</strong>`;
+    } else {
+      eluBadge.style.display = 'none';
+      eluBadge.innerHTML = '';
+    }
+  }
+
   // Simulateur tactique
   const csTotalVoix = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
   const totalEnSalle = appData.config.presentTantiemes || 0;
@@ -1787,8 +1835,35 @@ function renderModeSeance() {
   }
 }
 
+function onSeanceEluChange() {
+  enregistrerSeanceElu();
+}
+
+function enregistrerSeanceElu() {
+  if (!activeSeanceResId) return;
+  const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+  if (!res) return;
+
+  const val = (document.getElementById('seanceEluInput')?.value || '').trim();
+  res.eluNom = val;
+  persistData();
+  renderModeSeance();
+  if (val) {
+    showToast(`Élu(e) enregistré(e) : ${val}`, "success");
+  } else {
+    showToast("Nom réinitialisé", "info");
+  }
+}
+
 function setSeanceVote(status) {
   if (!activeSeanceResId) return;
+  const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+  if (res) {
+    const inputEl = document.getElementById('seanceEluInput');
+    if (inputEl && inputEl.value.trim() && !res.eluNom) {
+      res.eluNom = inputEl.value.trim();
+    }
+  }
   setQuickVote(activeSeanceResId, status);
   renderModeSeance();
   showToast(`Résolution enregistrée : ${status}`, "success");
@@ -1950,7 +2025,10 @@ function openPvMiroirModal() {
         ${resolutions.map(r => `
           <tr style="border-bottom:1px solid #e2e8f0;">
             <td style="padding:0.45rem 0.6rem; font-weight:700;">${escapeHtml(r.number)}</td>
-            <td style="padding:0.45rem 0.6rem;">${escapeHtml(r.title)}</td>
+            <td style="padding:0.45rem 0.6rem;">
+              <strong>${escapeHtml(r.title)}</strong>
+              ${r.eluNom ? `<div style="font-size:0.75rem; color:#15803d; font-weight:700; margin-top:2px;">👑 Élu(e) : ${escapeHtml(r.eluNom)}</div>` : ''}
+            </td>
             <td style="padding:0.45rem 0.6rem; font-size:0.75rem; color:#64748b;">${escapeHtml(r.majorite)}</td>
             <td style="padding:0.45rem 0.6rem;"><span class="pv-badge-status ${r.status}">${r.status}</span></td>
             <td style="padding:0.45rem 0.6rem; color:#15803d; font-weight:700;">${r.tantiemesPour || '-'}</td>

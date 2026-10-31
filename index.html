@@ -135,8 +135,21 @@
           <strong>Avis du CS :</strong> <span id="seanceCsArgumentsText">-</span>
         </div>
 
+        <!-- Candidat / Élu(e) désigné(e) en séance -->
+        <div id="seanceElectionZone" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); border-radius:8px; padding:0.65rem 0.9rem; margin-bottom:0.9rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <div style="font-size:0.85rem; font-weight:800; color:#fde047; display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
+            👑 Candidat / Élu(e) :
+          </div>
+          <div style="flex:1; min-width:220px; display:flex; gap:0.4rem;">
+            <input type="text" id="seanceEluInput" list="seanceEluDatalist" class="form-control" style="background:rgba(0,0,0,0.35); color:white; border-color:rgba(255,255,255,0.35); font-size:0.88rem; font-weight:600;" placeholder="Sélectionner ou saisir le nom de l'élu(e)..." onchange="onSeanceEluChange()">
+            <datalist id="seanceEluDatalist"></datalist>
+            <button type="button" class="btn btn-sm btn-white" onclick="enregistrerSeanceElu()" title="Valider le nom">Valider</button>
+          </div>
+          <div id="seanceEluBadge" style="display:none; font-size:0.82rem; font-weight:700; color:#4ade80;"></div>
+        </div>
+
         <!-- Simulateur Tactique de Majorité -->
-        <div id="seanceTactiqueZone" class="majority-gauge-container">
+        <div id="seanceTactiqueZone">
           <!-- Dynamique -->
         </div>
 
@@ -701,6 +714,11 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           </div>
 
           <div class="form-group">
+            <label>👑 Personne élue / désignée (si élection de membre ou bureau)</label>
+            <input type="text" id="resFormEluNom" class="form-control" placeholder="Ex: M. Jeremy SUZET, Mme GANET, Syndic...">
+          </div>
+
+          <div class="form-group">
             <label>Notes / Décisions prises en séance</label>
             <input type="text" id="resFormNotes" class="form-control" placeholder="Ex: Amendement voté en séance...">
           </div>
@@ -764,7 +782,7 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       </div>
       <form id="scrutinForm" onsubmit="saveScrutin(event)">
         <div class="modal-body">
-          <div style="background:#eff6ff; border-left:4px solid var(--primary-light); padding:0.75rem 1rem; border-radius:0 6px 6px 0;">
+          <div class="modal-info-banner">
             <div style="font-weight:700; color:var(--primary-dark);" id="scrutinResTitle">Résolution</div>
             <div style="font-size:0.83rem; color:var(--gray-600);" id="scrutinResMaj">Majorité légale requise</div>
             <div style="font-size:0.83rem; font-weight:700; color:#1d4ed8; margin-top:0.25rem;">
@@ -795,8 +813,8 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           </div>
 
           <!-- Verdict juridique en direct -->
-          <div style="background:#fff; border:2px solid #cbd5e1; border-radius:8px; padding:0.85rem;">
-            <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; font-weight:700; margin-bottom:0.2rem;">
+          <div class="legal-verdict-box">
+            <div class="legal-verdict-title">
               ⚖️ Verdict Juridique Impartial (Selon la loi du 10 juillet 1965) :
             </div>
             <div id="scrutinLegalVerdict" style="font-size:0.92rem; line-height:1.4;">
@@ -820,6 +838,11 @@ M. LEROY Jacques	Lot 8	85"></textarea>
             </div>
           </div>
 
+          <div class="form-group">
+            <label style="font-weight:700; color:var(--gray-800);">👑 Personne élue / désignée (si élection de membre ou bureau)</label>
+            <input type="text" id="scrutinEluNomInput" list="seanceEluDatalist" class="form-control" placeholder="Nom de l'élu(e) (ex: M. Jeremy SUZET, Mme GANET, ou Syndic...)">
+          </div>
+
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('scrutinModal')">Annuler</button>
@@ -839,7 +862,7 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       <form id="pouvoirForm" onsubmit="savePouvoirForm(event)">
         <input type="hidden" id="pouvoirTargetCoproId">
         <div class="modal-body">
-          <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:0.75rem 1rem; border-radius:8px; font-size:0.83rem; color:#1e40af; line-height:1.45;">
+          <div class="modal-info-banner">
             <strong>⚡ Administration instantanée :</strong> Enregistrez les procurations reçues par email, SMS, courrier ou remises sur place en séance. Les tantièmes et jauges légales Art. 22 sont recalculés en direct.
           </div>
 
