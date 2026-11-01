@@ -382,18 +382,80 @@ function toggleCoproSort(col) {
   renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);
 }
 
+// ==========================================
+// MOTEUR DE RECHERCHE FUZZY PUR JAVASCRIPT
+// ==========================================
+function normalizeStr(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function levenshteinDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function fuzzyMatch(query, target) {
+  if (!query) return true;
+  if (!target) return false;
+
+  const nQuery = normalizeStr(query);
+  const nTarget = normalizeStr(target);
+  if (!nQuery) return true;
+  if (nTarget.includes(nQuery)) return true;
+
+  const qTokens = nQuery.split(' ').filter(Boolean);
+  const tTokens = nTarget.split(' ').filter(Boolean);
+
+  return qTokens.every(qTok => {
+    if (tTokens.some(tTok => tTok.includes(qTok))) return true;
+    if (qTok.length >= 3) {
+      const maxDist = qTok.length <= 4 ? 1 : 2;
+      return tTokens.some(tTok => {
+        if (Math.abs(tTok.length - qTok.length) > maxDist) return false;
+        return levenshteinDistance(qTok, tTok) <= maxDist;
+      });
+    }
+    return false;
+  });
+}
+
 // Render Copropriétaires (Accueil / Émargement & Départs en séance)
 function renderCoproprietaires(totalEnSalle, totalTant) {
   const tbody = document.getElementById('coproTableBody');
   if (!tbody) return;
 
   const list = appData.coproprietaires || [];
-  const search = (document.getElementById('searchCoproInput')?.value || '').toLowerCase();
+  const search = document.getElementById('searchCoproInput')?.value || '';
   const filterStatut = document.getElementById('filterCoproStatut')?.value || 'ALL';
   const filterLot = document.getElementById('filterCoproLotType')?.value || 'ALL';
 
   const filtered = list.filter(c => {
-    const matchSearch = (c.nom + ' ' + (c.mandataire || '') + ' ' + (c.notes || '') + ' ' + (c.lots || '')).toLowerCase().includes(search);
+    const matchSearch = fuzzyMatch(search, `${c.nom} ${c.mandataire || ''} ${c.notes || ''} ${c.lots || ''}`);
     let matchStatut = true;
     if (filterStatut === 'TOP20') {
       matchStatut = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
@@ -611,6 +673,8 @@ function openScrutinModal(resId) {
   document.getElementById('scrutinContreInput').value = res.tantiemesContre || '';
   document.getElementById('scrutinAbsInput').value = res.tantiemesAbs || '';
   document.getElementById('scrutinSyndicClaim').value = res.syndicClaimStatus || '';
+  const voixInput = document.getElementById('scrutinSyndicVoixInput');
+  if (voixInput) voixInput.value = res.syndicClaimVoix || '';
   document.getElementById('scrutinOpponentsList').value = res.opponentsText || '';
   const eluInput = document.getElementById('scrutinEluNomInput');
   if (eluInput) eluInput.value = res.eluNom || '';
@@ -618,6 +682,7 @@ function openScrutinModal(resId) {
   // Calcul instantané des opposants cochés
   renderScrutinChecklist();
   computeScrutinTotals();
+  verifierDiscordanceScrutin();
   openModal('scrutinModal');
 }
 
@@ -734,6 +799,111 @@ function computeScrutinTotals() {
       resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE Définitivement</span> (${pourCalcule} Pour < ${seuil13} requis pour la passerelle).`;
     }
   }
+
+  // Contrôle automatique des discordances syndic en direct
+  verifierDiscordanceScrutin();
+}
+
+function verifierDiscordanceScrutin() {
+  const box = document.getElementById('scrutinDiscordanceBox');
+  if (!box) return;
+
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  if (!res || res.majorite === 'article sans vote') {
+    box.style.display = 'none';
+    return;
+  }
+
+  const claim = document.getElementById('scrutinSyndicClaim')?.value;
+  const syndicVoix = Number(document.getElementById('scrutinSyndicVoixInput')?.value) || 0;
+  const pourCalcule = Number(document.getElementById('scrutinPourInput')?.value) || 0;
+  const contre = Number(document.getElementById('scrutinContreInput')?.value) || 0;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+
+  let legalVerdict = 'REJETEE';
+  let isPasserelle = false;
+
+  if (res.majorite === 'Article 24') {
+    legalVerdict = (pourCalcule > contre) ? 'ADOPTEE' : 'REJETEE';
+  } else if (res.majorite.includes('Article 25')) {
+    const seuil25 = Math.floor(totalCopro / 2) + 1;
+    const seuil13 = Math.ceil(totalCopro / 3);
+    if (pourCalcule >= seuil25) {
+      legalVerdict = 'ADOPTEE';
+    } else if (pourCalcule >= seuil13) {
+      legalVerdict = 'REJETEE';
+      isPasserelle = true;
+    } else {
+      legalVerdict = 'REJETEE';
+    }
+  }
+
+  const isDiscordanceStatus = claim && (claim !== legalVerdict);
+  const diffVoix = (syndicVoix > 0) ? Math.abs(syndicVoix - pourCalcule) : 0;
+  const isDiscordanceVoix = (syndicVoix > 0 && diffVoix >= 300);
+
+  if (isDiscordanceStatus || isDiscordanceVoix || (isPasserelle && claim === 'REJETEE')) {
+    box.style.display = 'block';
+    box.style.background = '#fef2f2';
+    box.style.border = '2px solid #ef4444';
+    box.style.borderRadius = '8px';
+    box.style.padding = '0.75rem 1rem';
+    box.style.color = '#991b1b';
+
+    let details = [];
+    if (isDiscordanceStatus) {
+      details.push(`Le syndic Citya prétend la résolution <strong>${claim === 'ADOPTEE' ? 'ADOPTÉE' : 'REJETÉE'}</strong> alors que le décompte légal conclut à <strong>${legalVerdict === 'ADOPTEE' ? 'ADOPTÉE' : 'REJETÉE'}</strong> !`);
+    }
+    if (isPasserelle && claim === 'REJETEE') {
+      details.push(`Attention : Le seuil du 1/3 (Art. 25-1) étant atteint (${pourCalcule.toLocaleString('fr-FR')} voix), Citya ne PEUT PAS prononcer un rejet définitif : un second vote immédiat à l'Art. 24 est obligatoire !`);
+    }
+    if (isDiscordanceVoix) {
+      details.push(`Écart sur les voix : Citya annonce <strong>${syndicVoix.toLocaleString('fr-FR')} voix</strong> vs <strong>${pourCalcule.toLocaleString('fr-FR')} réelles</strong> (différence de ${diffVoix.toLocaleString('fr-FR')} voix).`);
+    }
+
+    box.innerHTML = `
+      <div style="font-weight:800; font-size:0.92rem; margin-bottom:0.25rem;">🚨 ALERTE DISCORDANCE IMMÉDIATE (SYNDIC vs CONSEIL SYNDICAL)</div>
+      <div style="font-size:0.84rem; line-height:1.45;">
+        ${details.map(d => `<div>• ${d}</div>`).join('')}
+      </div>
+      <div style="margin-top:0.4rem; font-weight:700; color:#dc2626;">
+        ⚖️ Cliquez ci-dessous sur « ⚠️ Rédiger une réserve au PV » pour consigner cette irrégularité avant le vote suivant !
+      </div>
+    `;
+  } else if (claim && claim === legalVerdict) {
+    box.style.display = 'block';
+    box.style.background = '#ecfdf5';
+    box.style.border = '1px solid #10b981';
+    box.style.borderRadius = '8px';
+    box.style.padding = '0.5rem 0.85rem';
+    box.style.color = '#065f46';
+    box.innerHTML = `
+      <strong>✅ Annonce conforme au calcul légal :</strong> Le syndic et le dépouillement s'accordent sur le résultat (<strong>${claim}</strong>).
+    `;
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function ouvrirReserveModalDepuisScrutin() {
+  if (!currentScrutinResId) return;
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  const claim = document.getElementById('scrutinSyndicClaim')?.value;
+  const syndicVoix = document.getElementById('scrutinSyndicVoixInput')?.value;
+  const pour = document.getElementById('scrutinPourInput')?.value;
+
+  closeModal('scrutinModal');
+  openReserveModal(currentScrutinResId);
+
+  // Pré-remplir les détails si discordance
+  const detailsInput = document.getElementById('reserveDetailsInput');
+  if (detailsInput && claim) {
+    let detailMsg = `Le syndic prétend la résolution ${claim}`;
+    if (syndicVoix) detailMsg += ` avec ${syndicVoix} voix`;
+    if (pour) detailMsg += ` alors que le dépouillement contradictoire dénombre ${pour} voix pour`;
+    detailsInput.value = detailMsg;
+    genererTexteReserve();
+  }
 }
 
 function saveScrutin(e) {
@@ -745,6 +915,8 @@ function saveScrutin(e) {
   res.tantiemesContre = Number(document.getElementById('scrutinContreInput').value) || 0;
   res.tantiemesAbs = Number(document.getElementById('scrutinAbsInput').value) || 0;
   res.syndicClaimStatus = document.getElementById('scrutinSyndicClaim').value;
+  const syndicVoixVal = Number(document.getElementById('scrutinSyndicVoixInput')?.value) || 0;
+  if (syndicVoixVal > 0) res.syndicClaimVoix = syndicVoixVal;
   res.opponentsText = document.getElementById('scrutinOpponentsList').value.trim();
   const eluVal = document.getElementById('scrutinEluNomInput')?.value.trim();
   if (eluVal !== undefined) res.eluNom = eluVal;
@@ -1500,11 +1672,11 @@ function populateCsMemberSelect(targetMemberId = null) {
 }
 
 function filterMandantOptions() {
-  const search = (document.getElementById('pouvoirMandantSearch')?.value || '').toLowerCase();
+  const search = document.getElementById('pouvoirMandantSearch')?.value || '';
   const select = document.getElementById('pouvoirMandantSelect');
   const copros = (appData.coproprietaires || []).slice().sort((a, b) => a.nom.localeCompare(b.nom));
 
-  const filtered = copros.filter(c => (c.nom + ' ' + (c.lots || '')).toLowerCase().includes(search));
+  const filtered = copros.filter(c => fuzzyMatch(search, `${c.nom} ${c.lots || ''}`));
   select.innerHTML = filtered.map(c => {
     const isPouv = c.statut === 'POUVOIR';
     const isPres = c.statut === 'PRESENT';
@@ -2155,15 +2327,15 @@ function onSpotlightSearchInput() {
   }
 
   const copros = (appData.coproprietaires || []).filter(c =>
-    (c.nom + ' ' + (c.lots || '') + ' ' + (c.mandataire || '')).toLowerCase().includes(query)
+    fuzzyMatch(query, `${c.nom} ${c.lots || ''} ${c.mandataire || ''}`)
   ).slice(0, 6);
 
   const resMatches = (appData.resolutions || []).filter(r =>
-    (r.number + ' ' + r.title + ' ' + (r.csNotes || '')).toLowerCase().includes(query)
+    fuzzyMatch(query, `${r.number} ${r.title} ${r.csNotes || ''}`)
   ).slice(0, 4);
 
   const memMatches = (appData.members || []).filter(m =>
-    (m.name + ' ' + (m.lots || '') + ' ' + (m.mandats || '')).toLowerCase().includes(query)
+    fuzzyMatch(query, `${m.name} ${m.lots || ''} ${m.mandats || ''}`)
   ).slice(0, 3);
 
   let html = '';
@@ -2346,17 +2518,337 @@ function imprimerPvMiroir() {
   printWindow.document.close();
 }
 
-// Raccourcis clavier (Spotlight & Navigation séance)
+// =======================================================
+// FICHE D'OUVERTURE DE SÉANCE & DISCOURS AG (18h00)
+// =======================================================
+
+function openOuvertureModal() {
+  renderFicheOuverture();
+  openModal('ouvertureModal');
+}
+
+function renderFicheOuverture() {
+  const container = document.getElementById('ouverturePrintZone');
+  if (!container) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const copros = appData.coproprietaires || [];
+  const nbTotal = copros.length || 259;
+
+  const presents = copros.filter(c => c.statut === 'PRESENT');
+  const tantPresents = presents.reduce((acc, c) => acc + (Number(c.tantiemes) || 0), 0);
+
+  const pouvoirs = copros.filter(c => c.statut === 'POUVOIR');
+  const tantPouvoirs = pouvoirs.reduce((acc, c) => acc + (Number(c.tantiemes) || 0), 0);
+
+  const pouvoirsCS = pouvoirs.filter(c => c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE');
+  const tantPouvoirsCS = pouvoirsCS.reduce((acc, c) => acc + (Number(c.tantiemes) || 0), 0);
+
+  const vpc = copros.filter(c => c.statut === 'VPC');
+  const tantVpc = vpc.reduce((acc, c) => acc + (Number(c.tantiemes) || 0), 0);
+
+  const activeMembersCS = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const tantPersoCS = activeMembersCS.reduce((acc, m) => acc + (Number(m.tantiemes) || 0), 0);
+  const totalForceCS = tantPersoCS + tantPouvoirsCS;
+
+  const totalRepresentes = tantPresents + tantPouvoirs + tantVpc;
+  const nbRepresentes = presents.length + pouvoirs.length + vpc.length;
+  const pctRepresentes = totalCopro > 0 ? ((totalRepresentes / totalCopro) * 100).toFixed(1) : 0;
+  const seuil25 = Math.floor(totalCopro / 2) + 1; // 48 740
+  const seuilPasserelle = Math.ceil(totalCopro / 3); // 32 493
+
+  const isQuorum25 = totalRepresentes >= seuil25;
+  const isQuorumPasserelle = totalRepresentes >= seuilPasserelle;
+
+  container.innerHTML = `
+    <div class="fiche-ouverture-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; border-bottom:2px solid #e2e8f0; padding-bottom:0.75rem;">
+        <div>
+          <h2 style="margin:0; font-size:1.25rem; color:#0f172a;">🏢 Résidence Le Floréal — Assemblée Générale Ordinaire</h2>
+          <div style="font-size:0.85rem; color:#64748b; margin-top:0.2rem;">
+            Séance du <strong>25 Novembre 2026 à 18h00</strong> • Salle Jacques Prévert, Noisy-le-Grand
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <span style="background:#e0e7ff; color:#3730a3; padding:4px 10px; border-radius:6px; font-weight:700; font-size:0.82rem;">
+            Syndic : ${escapeHtml(appData.config.syndic || 'Citya Agence Henry')}
+          </span>
+        </div>
+      </div>
+
+      <!-- GRILLE STATISTIQUES ÉMARGEMENT -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.75rem; margin-bottom:1.25rem;">
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#64748b; font-weight:700;">Présents Physiques</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#0f172a;">${tantPresents.toLocaleString('fr-FR')} <span style="font-size:0.75rem; font-weight:500;">voix</span></div>
+          <div style="font-size:0.75rem; color:#64748b;">${presents.length} copropriétaires (${((tantPresents/totalCopro)*100).toFixed(1)}%)</div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#64748b; font-weight:700;">Pouvoirs Recueillis</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#3b82f6;">${tantPouvoirs.toLocaleString('fr-FR')} <span style="font-size:0.75rem; font-weight:500;">voix</span></div>
+          <div style="font-size:0.75rem; color:#64748b;">${pouvoirs.length} mandats (${((tantPouvoirs/totalCopro)*100).toFixed(1)}%)</div>
+        </div>
+
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#1d4ed8; font-weight:700;">Force de Frappe CS</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#1e40af;">${totalForceCS.toLocaleString('fr-FR')} <span style="font-size:0.75rem; font-weight:500;">voix</span></div>
+          <div style="font-size:0.75rem; color:#1e40af;">${activeMembersCS.length} membres actifs (${((totalForceCS/totalCopro)*100).toFixed(1)}%)</div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#64748b; font-weight:700;">Votes Correspondance (VPC)</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#8b5cf6;">${tantVpc.toLocaleString('fr-FR')} <span style="font-size:0.75rem; font-weight:500;">voix</span></div>
+          <div style="font-size:0.75rem; color:#64748b;">${vpc.length} formulaires (${((tantVpc/totalCopro)*100).toFixed(1)}%)</div>
+        </div>
+
+        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#065f46; font-weight:700;">Total Représenté</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#047857;">${totalRepresentes.toLocaleString('fr-FR')} <span style="font-size:0.75rem; font-weight:500;">/ ${totalCopro.toLocaleString('fr-FR')}</span></div>
+          <div style="font-size:0.75rem; font-weight:700; color:#047857;">${pctRepresentes}% de l'immeuble (${nbRepresentes} / ${nbTotal})</div>
+        </div>
+      </div>
+
+      <!-- ANALYSE JURIDIQUE DE SÉANCE -->
+      <div style="background:#f1f5f9; border-radius:6px; padding:0.6rem 0.9rem; font-size:0.83rem; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong>⚖️ État juridique des seuils :</strong>
+          ${isQuorum25
+            ? `<span style="color:#15803d; font-weight:700; margin-left:0.3rem;">✅ Majorité absolue Art. 25 atteignable en 1er vote (${totalRepresentes.toLocaleString('fr-FR')} >= ${seuil25.toLocaleString('fr-FR')})</span>`
+            : (isQuorumPasserelle
+                ? `<span style="color:#b45309; font-weight:700; margin-left:0.3rem;">⚠️ Art. 25 strict impossible sans 100% de Pour — Passerelle Art. 25-1 immédiatement disponible (${totalRepresentes.toLocaleString('fr-FR')} >= 32 493 voix)</span>`
+                : `<span style="color:#dc2626; font-weight:700; margin-left:0.3rem;">❌ Représentation < 1/3 (${totalRepresentes.toLocaleString('fr-FR')} < 32 493). Mobilisation obligatoire !</span>`
+              )
+          }
+        </div>
+      </div>
+
+      <!-- DISCOURS OFFICIEL D'OUVERTURE PRÊT À LIRE -->
+      <div style="margin-bottom:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <span style="font-weight:700; font-size:0.88rem; color:#0f172a;">🎙️ Discours officiel d'ouverture (Conseil Syndical — Prêt à lire au micro) :</span>
+          <button class="btn btn-sm btn-outline-primary" onclick="copierDiscoursOuverture()">📋 Copier le texte</button>
+        </div>
+        <div class="speech-box" id="discoursOuvertureTexte">
+« Mesdames, Messieurs les copropriétaires, chers voisins,<br><br>
+
+Au nom de l'ensemble du Conseil Syndical de la Résidence Le Floréal, nous vous remercions très chaleureusement pour votre présence massive ce soir à notre Assemblée Générale annuelle.<br><br>
+
+À l'ouverture officielle de notre séance, nous constatons un taux de mobilisation exceptionnel : <strong>${totalRepresentes.toLocaleString('fr-FR')} tantièmes</strong> sont représentés ce soir, soit <strong>${pctRepresentes}%</strong> des voix de notre copropriété (répartis entre ${presents.length} copropriétaires présents en salle, ${pouvoirs.length} pouvoirs réguliers et ${vpc.length} votes par correspondance).<br><br>
+
+Le Conseil Syndical détient à lui seul un mandat de confiance de <strong>${totalForceCS.toLocaleString('fr-FR')} tantièmes</strong> (${((totalForceCS/totalCopro)*100).toFixed(1)}% de la copropriété), que nous exercerons avec la plus stricte rigueur dans l'intérêt exclusif de notre patrimoine commun et de la maîtrise de nos charges.<br><br>
+
+Nous rappelons au cabinet Citya et au futur bureau de séance nos exigences démocratiques fondamentales pour cette soirée :<br>
+1. La tenue scrupuleuse de la feuille de présence et l'enregistrement officiel de chaque vote nominatif contre et abstention au procès-verbal, conformément à l'article 17 du décret de 1967 ;<br>
+2. Le respect absolu de la passerelle de l'article 25-1 : dès qu'une résolution recueille au moins un tiers des voix de la copropriété (32 493 tantièmes), le second vote immédiat à la majorité simple de l'article 24 est obligatoire de plein droit ;<br>
+3. Des débats loyaux, transparents et respectueux du temps de parole de chaque copropriétaire.<br><br>
+
+Nous vous invitons à suivre attentivement les consignes de vote affichées et argumentées par le Conseil Syndical. Déclarons maintenant la séance ouverte ! »
+        </div>
+      </div>
+
+      <div style="font-size:0.78rem; color:#64748b; text-align:center; padding-top:0.5rem; border-top:1px solid #e2e8f0;">
+        Fiche générée en temps réel par l'application Anti-Fraude AG 2026 • Conseil Syndical Le Floréal
+      </div>
+    </div>
+  `;
+}
+
+function copierDiscoursOuverture() {
+  const el = document.getElementById('discoursOuvertureTexte');
+  if (!el) return;
+  const rawText = el.innerText || el.textContent;
+  navigator.clipboard.writeText(rawText).then(() => {
+    showToast("📋 Discours d'ouverture copié dans le presse-papier !", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement.", "error");
+  });
+}
+
+function imprimerFicheOuverture() {
+  const content = document.getElementById('ouverturePrintZone')?.innerHTML;
+  if (!content) return;
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Fiche d'Ouverture de Séance - AG 2026 Le Floréal</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 25px; color: #0f172a; line-height: 1.5; font-size: 11pt; }
+        .fiche-ouverture-card { border: none !important; box-shadow: none !important; }
+        .speech-box { background: #f8fafc !important; border: 1px solid #cbd5e1 !important; color: #0f172a !important; font-size: 10.5pt !important; line-height: 1.6 !important; }
+        .btn { display: none !important; }
+        @media print { button { display: none !important; } }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// =======================================================
+// GÉNÉRATEUR DE RÉSERVES FORMELLES AU PV (ART. 17 DÉCRET 1967)
+// =======================================================
+
+function openReserveModal(resId) {
+  const select = document.getElementById('reserveResolutionSelect');
+  if (select) {
+    select.innerHTML = (appData.resolutions || []).map(r => `
+      <option value="${r.id}" ${r.id === resId ? 'selected' : ''}>
+        N° ${r.number} — ${escapeHtml(r.title)} (${r.majorite})
+      </option>
+    `).join('');
+  }
+
+  onReserveTypeChange();
+  openModal('reserveModal');
+}
+
+function onReserveTypeChange() {
+  genererTexteReserve();
+}
+
+function genererTexteReserve() {
+  const type = document.getElementById('reserveTypeSelect')?.value || 'PASSERELLE';
+  const resId = document.getElementById('reserveResolutionSelect')?.value;
+  const res = appData.resolutions.find(r => r.id === resId) || { number: 'XX', title: 'Résolution', majorite: 'Art. 25' };
+  const details = document.getElementById('reserveDetailsInput')?.value.trim();
+  const textarea = document.getElementById('reserveTexteGenere');
+  if (!textarea) return;
+
+  let text = '';
+  const prefix = `[RÉSERVE FORMELLE AU PROCÈS-VERBAL — Art. 17 Décret n° 67-223 du 17 mars 1967]\n\nSur la Résolution n° ${res.number} (« ${res.title} ») :\n`;
+
+  if (type === 'PASSERELLE') {
+    text = `${prefix}Le Conseil Syndical et les copropriétaires soussignés constatent que cette décision relève de l'Article 25 de la Loi du 10 juillet 1965 et a recueilli au moins le tiers des voix de tous les copropriétaires (seuil légal de 32 493 tantièmes).\n\nEn conséquence, nous exigeons expressément et de plein droit l'application immédiate de la passerelle de vote prévue à l'Article 25-1 de la Loi du 10 juillet 1965 (mise aux voix immédiate à la majorité simple de l'Article 24 au cours de la même séance).\n\nTout refus, clôture unilatérale ou passage à la résolution suivante sans ce second vote entache la décision d'un vice de forme substantiel entraînant sa nullité absolue au titre de l'Article 42 de la Loi de 1965.${details ? `\n\nPrécisions constatées : ${details}` : ''}`;
+  } else if (type === 'COMPTE_VOIX') {
+    text = `${prefix}Le Conseil Syndical et les copropriétaires soussignés contestent formellement le décompte et le résultat proclamé par le syndic / le président de séance.\n\nLe pointage contradictoire contradictoirement établi en salle démontre une discordance flagrante entre les votes exprimés à main levée et l'annonce verbale faite à la tribune.\n\nNous exigeons la consignation nominative intégrale au présent procès-verbal de chaque copropriétaire opposant et abstentionniste avec mention exacte de ses tantièmes, ainsi que le recompte formel avant toute adoption.${details ? `\n\nConstat d'écart : ${details}` : ''}`;
+  } else if (type === 'POUVOIR_REJET') {
+    text = `${prefix}Nous formulons une réserve solennelle contre le refus d'enregistrement ou le rejet arbitraire de pouvoirs / mandats régulièrement délivrés conformément à l'Article 22 de la Loi du 10 juillet 1965.\n\nCette privation irrégulière du droit de vote fausse la sincérité du scrutin et fait l'objet d'une réserve expresse pour tout recours judiciaire ultérieur.${details ? `\n\nMandats contestés : ${details}` : ''}`;
+  } else if (type === 'REFUS_PAROLE') {
+    text = `${prefix}Constat formel d'un refus d'accorder la parole, d'un rejet de question préalable ou d'une interruption délibérée des représentants du Conseil Syndical lors des débats préalables au vote de la présente résolution, en violation de la loyauté des délibérations.${details ? `\n\nFaits constatés : ${details}` : ''}`;
+  } else if (type === 'ORDRE_JOUR') {
+    text = `${prefix}Contestation formelle d'une modification unilatérale du texte de la résolution ou de son champ d'application par le syndic en séance, sans rapport avec le projet notifié aux copropriétaires avec l'ordre du jour officiel (Art. 13 du Décret du 17 mars 1967).${details ? `\n\nModification contestée : ${details}` : ''}`;
+  } else {
+    text = `${prefix}Déclaration solennelle demandée à être consignée mot pour mot au procès-verbal de la présente assemblée générale en application de l'Article 17 du Décret du 17 mars 1967 :\n\n${details || 'Irrégularité constatée lors du vote.'}`;
+  }
+
+  textarea.value = text;
+}
+
+function copierTexteReserve() {
+  const textarea = document.getElementById('reserveTexteGenere');
+  if (!textarea) return;
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    showToast("📋 Réserve copiée ! Prête à être remise ou dictée au secrétaire.", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement.", "error");
+  });
+}
+
+function enregistrerReserveResolution() {
+  const resId = document.getElementById('reserveResolutionSelect')?.value;
+  const res = appData.resolutions.find(r => r.id === resId);
+  const text = document.getElementById('reserveTexteGenere')?.value.trim();
+
+  if (!res || !text) {
+    alert("Veuillez sélectionner une résolution et générer un texte de réserve.");
+    return;
+  }
+
+  res.reservesPV = res.reservesPV || [];
+  const now = new Date();
+  const heure = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  res.reservesPV.push({
+    heure,
+    texte: text,
+    type: document.getElementById('reserveTypeSelect')?.value || 'PASSERELLE'
+  });
+
+  res.hasReserve = true;
+  res.opponentsText = (res.opponentsText ? res.opponentsText + ' | ' : '') + `[RÉSERVE PV déposée à ${heure}]`;
+
+  persistData();
+  closeModal('reserveModal');
+  showToast(`⚖️ Réserve officielle consignée sur la Résolution n° ${res.number} !`, "warning");
+}
+
+// =======================================================
+// RACCOURCIS CLAVIER "MODE TURBO" & AUTO-BACKUP
+// =======================================================
+
+function openShortcutsModal() {
+  openModal('shortcutsModal');
+}
+
+// Auto-Backup cyclique (toutes les 60 secondes en arrière-plan)
+function initAutoBackup() {
+  setInterval(() => {
+    try {
+      const snap = {
+        timestamp: new Date().toISOString(),
+        presentTantiemes: appData.config.presentTantiemes,
+        resolutionsVotes: appData.resolutions.map(r => ({ id: r.id, status: r.status, pour: r.tantiemesPour, contre: r.tantiemesContre, elu: r.eluNom })),
+        coproPresentsCount: (appData.coproprietaires || []).filter(c => c.statut === 'PRESENT').length,
+        pouvoirsCount: (appData.coproprietaires || []).filter(c => c.statut === 'POUVOIR').length
+      };
+      const historyRaw = localStorage.getItem('AG_SNAPSHOT_HISTORY');
+      let history = historyRaw ? JSON.parse(historyRaw) : [];
+      if (!Array.isArray(history)) history = [];
+      history.push(snap);
+      if (history.length > 30) history = history.slice(-30);
+      localStorage.setItem('AG_SNAPSHOT_HISTORY', JSON.stringify(history));
+    } catch (e) {
+      console.warn("Auto-backup failed", e);
+    }
+  }, 60000);
+}
+
+// Raccourcis clavier (Mode AG Turbo)
 window.addEventListener('keydown', (e) => {
-  if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+  const tag = document.activeElement?.tagName;
+  const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
+
+  if (e.key === 'Escape') {
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal'].forEach(id => closeModal(id));
+    return;
+  }
+
+  if (isTyping) return;
+
+  if (e.key === '/') {
     e.preventDefault();
     openSpotlightModal();
-  }
-  if (e.key === 'ArrowRight' && isModeSeanceActive && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+  } else if (e.key === '?' || e.key === 'k') {
+    e.preventDefault();
+    openShortcutsModal();
+  } else if (e.key === 'o' || e.key === 'O') {
+    e.preventDefault();
+    openOuvertureModal();
+  } else if (e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    toggleModeSeance();
+  } else if (e.key === 'ArrowRight' && isModeSeanceActive) {
+    e.preventDefault();
     naviguerSeance(1);
-  }
-  if (e.key === 'ArrowLeft' && isModeSeanceActive && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+  } else if (e.key === 'ArrowLeft' && isModeSeanceActive) {
+    e.preventDefault();
     naviguerSeance(-1);
+  } else if ((e.key === 'a' || e.key === 'A') && isModeSeanceActive) {
+    e.preventDefault();
+    setSeanceVote('ADOPTEE');
+  } else if ((e.key === 'r' || e.key === 'R') && isModeSeanceActive) {
+    e.preventDefault();
+    setSeanceVote('REJETEE');
+  } else if ((e.key === 'd' || e.key === 'D') && isModeSeanceActive && activeSeanceResId) {
+    e.preventDefault();
+    openScrutinModal(activeSeanceResId);
   }
 });
 
@@ -2380,5 +2872,6 @@ function escapeHtml(text) {
 
 document.addEventListener('DOMContentLoaded', () => {
   initDarkMode();
+  initAutoBackup();
   updateUI();
 });

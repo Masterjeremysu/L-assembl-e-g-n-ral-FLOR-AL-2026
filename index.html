@@ -45,6 +45,10 @@
           ✉️ + Pouvoir
         </button>
 
+        <button class="btn btn-outline" onclick="openOuvertureModal()" title="Fiche de présence & discours officiel d'ouverture de séance (Prêt à lire à 18h00)">
+          🎙️ Ouverture AG
+        </button>
+
         <button class="btn btn-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
           ▶ Mode Séance
         </button>
@@ -64,6 +68,10 @@
 
         <button class="btn btn-outline" onclick="exportDataJson()" title="Télécharger la sauvegarde complète de secours (JSON)">
           💾 Exporter
+        </button>
+
+        <button class="btn btn-outline" onclick="openShortcutsModal()" title="Raccourcis Clavier Mode Turbo (Touche ?)">
+          ⌨️
         </button>
 
         <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre / Éco-Batterie">
@@ -856,8 +864,8 @@ M. LEROY Jacques	Lot 8	85"></textarea>
 
           <div class="form-row">
             <div class="form-group">
-              <label>Annonce prétendue par le Syndic</label>
-              <select id="scrutinSyndicClaim" class="form-control">
+              <label>Annonce prétendue par le Syndic (Citya)</label>
+              <select id="scrutinSyndicClaim" class="form-control" onchange="verifierDiscordanceScrutin()">
                 <option value="">Sélectionner ce qu'annonce le syndic...</option>
                 <option value="ADOPTEE">Le syndic annonce : ADOPTÉE ✅</option>
                 <option value="REJETEE">Le syndic annonce : REJETÉE ❌</option>
@@ -865,9 +873,19 @@ M. LEROY Jacques	Lot 8	85"></textarea>
               </select>
             </div>
             <div class="form-group">
-              <label>Noms des opposants consignés au PV (Preuve contestation)</label>
-              <input type="text" id="scrutinOpponentsList" class="form-control" placeholder="Ex: M. Dupont (145), Mme Leroy (220)...">
+              <label>Voix POUR annoncées par Citya (si précisées)</label>
+              <input type="number" id="scrutinSyndicVoixInput" class="form-control" placeholder="Ex: 5200" oninput="verifierDiscordanceScrutin()">
             </div>
+          </div>
+
+          <!-- Alerte Anti-Fraude & Discordance Immédiate -->
+          <div id="scrutinDiscordanceBox" style="display:none; padding:0.75rem 1rem; border-radius:8px; margin:0.6rem 0; font-size:0.86rem; line-height:1.45;">
+            <!-- Rendu dynamique par verifierDiscordanceScrutin() -->
+          </div>
+
+          <div class="form-group">
+            <label>Noms des opposants consignés au PV (Preuve contestation)</label>
+            <input type="text" id="scrutinOpponentsList" class="form-control" placeholder="Ex: M. Dupont (145), Mme Leroy (220)...">
           </div>
 
           <div class="form-group">
@@ -876,9 +894,14 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           </div>
 
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('scrutinModal')">Annuler</button>
-          <button type="submit" class="btn btn-primary">Enregistrer la décision</button>
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="btn btn-outline-danger" onclick="ouvrirReserveModalDepuisScrutin()" title="Déposer immédiatement une réserve écrite au procès-verbal">
+            ⚠️ Rédiger une réserve au PV
+          </button>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('scrutinModal')">Annuler</button>
+            <button type="submit" class="btn btn-primary">Enregistrer la décision</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1053,6 +1076,103 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('pvMiroirModal')">Fermer</button>
         <button type="button" class="btn btn-primary" onclick="imprimerPvMiroir()">🖨️ Imprimer / Enregistrer en PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FICHE D'OUVERTURE DE SÉANCE & DISCOURS AG -->
+  <div class="modal-overlay" id="ouvertureModal">
+    <div class="modal-box" style="max-width: 820px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🎙️ Fiche d'Ouverture de Séance & Bilan d'Émargement</h3>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-sm btn-outline-primary" onclick="copierDiscoursOuverture()">📋 Copier le discours</button>
+          <button class="btn btn-sm btn-primary" onclick="imprimerFicheOuverture()">🖨️ Imprimer A4</button>
+          <button class="modal-close" onclick="closeModal('ouvertureModal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="background:#f8fafc; padding:1.2rem;" id="ouverturePrintZone">
+        <!-- Rendu dynamique par renderFicheOuverture() -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('ouvertureModal')">Fermer</button>
+        <button type="button" class="btn btn-primary" onclick="copierDiscoursOuverture()">📋 Copier le texte officiel prêt à lire</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RÉSERVES FORMELLES AU PV (ART. 17 DÉCRET 1967) -->
+  <div class="modal-overlay" id="reserveModal">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--danger);">⚠️ Déposer une Réserve Formelle au Procès-Verbal</h3>
+        <button class="modal-close" onclick="closeModal('reserveModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #ef4444; padding:0.75rem 1rem; border-radius:6px; margin-bottom:1rem; font-size:0.84rem; color:#991b1b;">
+          <strong>⚖️ Garantie juridique (Art. 17 Décret du 17 mars 1967) :</strong> Le secrétaire de séance a l'obligation légale de consigner au PV toute déclaration formulée par les membres de séance. Cette mention servira de preuve irréfutable en cas d'action en nullité (Art. 42 loi 1965).
+        </div>
+
+        <div class="form-group">
+          <label>Type de contestation ou d'irrégularité :</label>
+          <select id="reserveTypeSelect" class="form-control" onchange="onReserveTypeChange()">
+            <option value="PASSERELLE">🚨 Refus illégal du syndic d'appliquer la passerelle Art. 25-1 (2nd vote immédiat obligatoire)</option>
+            <option value="COMPTE_VOIX">🚨 Discordance flagrante de dépouillement (mains levées vs annonce syndic)</option>
+            <option value="POUVOIR_REJET">🚨 Rejet arbitraire d'un mandat / pouvoir régulier</option>
+            <option value="REFUS_PAROLE">🚨 Refus d'inscription d'un vote ou parole coupée</option>
+            <option value="ORDRE_JOUR">🚨 Modification unilatérale de la résolution ou de son libellé</option>
+            <option value="LIBRE">✍️ Motif personnalisé libre</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Résolution contestée :</label>
+          <select id="reserveResolutionSelect" class="form-control" onchange="onReserveTypeChange()">
+            <!-- Dynamique -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Détails / Précisions factuelles (facultatif) :</label>
+          <input type="text" id="reserveDetailsInput" class="form-control" placeholder="Ex: Annonce 4 500 voix alors que le pointage donne 3 800 voix..." oninput="genererTexteReserve()">
+        </div>
+
+        <div class="form-group">
+          <label>Texte officiel de la réserve à consigner mot pour mot :</label>
+          <textarea id="reserveTexteGenere" class="form-control" rows="5" style="font-family:monospace; font-size:0.86rem; background:#f8fafc; font-weight:600; color:#1e293b;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('reserveModal')">Annuler</button>
+        <button type="button" class="btn btn-outline-primary" onclick="copierTexteReserve()">📋 Copier la réserve</button>
+        <button type="button" class="btn btn-danger" onclick="enregistrerReserveResolution()">💾 Consigner la réserve au PV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RACCOURCIS CLAVIER MODE TURBO -->
+  <div class="modal-overlay" id="shortcutsModal">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⌨️ Raccourcis Clavier (Mode AG Turbo)</h3>
+        <button class="modal-close" onclick="closeModal('shortcutsModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size:0.88rem;">
+        <p style="color:var(--gray-600); margin-bottom:1rem;">Pilotez l'Assemblée Générale à la vitesse de l'éclair sans toucher la souris :</p>
+        <table class="shortcuts-table" style="width:100%; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">→</kbd></td><td>Résolution <strong>Suivante</strong> en Mode Séance</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">←</kbd></td><td>Résolution <strong>Précédente</strong> en Mode Séance</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">A</kbd></td><td>Valider la résolution comme <strong>Adoptée ✅</strong></td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">R</kbd></td><td>Valider la résolution comme <strong>Rejetée ❌</strong></td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">D</kbd></td><td>Ouvrir le <strong>Dépouillement Miroir</strong> (comptage opposants)</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">S</kbd></td><td>Basculer le <strong>Mode Séance Focus</strong> (Grand écran)</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">O</kbd></td><td>Ouvrir la <strong>Fiche d'Ouverture</strong> de séance</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">/</kbd></td><td>Ouvrir la <strong>Recherche universelle Spotlight</strong></td></tr>
+          <tr style="height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">Échap</kbd></td><td>Fermer la fenêtre active</td></tr>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="closeModal('shortcutsModal')">Compris !</button>
       </div>
     </div>
   </div>
