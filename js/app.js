@@ -3367,6 +3367,126 @@ function calculerQuotePartVoisin() {
 // FICHE DE CLÔTURE & ATTESTATION CONTRADICTOIRE SCRUTATEURS
 // =======================================================
 
+// Détection intelligente du syndic désigné pour le mandat 2027
+function getSyndicEluInfo(resolutions) {
+  const list = resolutions || appData.resolutions || [];
+  // Candidatures syndic : r06a (Citya), r06b (Trenta) ou titres équivalents
+  const candidatures = list.filter(r => 
+    (r.number && r.number.startsWith('06') && r.number !== '06') || 
+    (r.title && /candidature.*syndic|d[ée]signation.*syndic/i.test(r.title) && r.majorite !== 'article sans vote')
+  );
+
+  const elu = candidatures.find(r => r.status === 'ADOPTEE');
+
+  if (elu) {
+    const isTrenta = /trenta/i.test(elu.title) || (elu.eluNom && /trenta/i.test(elu.eluNom));
+    const isCitya = /citya/i.test(elu.title) || (elu.eluNom && /citya/i.test(elu.eluNom));
+
+    if (isTrenta) {
+      return {
+        status: 'NOUVEAU',
+        nom: 'Cabinet TRENTA IMMOBILIER',
+        nomCourt: 'cabinet Trenta Immobilier',
+        resNum: elu.number,
+        badgeHtml: '<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:3px 9px; border-radius:999px; font-weight:800; font-size:0.75rem;">🎉 NOUVEAU SYNDIC ÉLU</span>',
+        titreBloc: '🎉 Élection d\'un nouveau syndic : Cabinet TRENTA IMMOBILIER',
+        descBloc: 'L\'Assemblée Générale a voté pour le renouvellement de la gestion en élisant le <strong>cabinet Trenta Immobilier</strong> pour gérer la copropriété. Le Conseil Syndical veillera scrupuleusement à une passation exemplaire et ordonnée de l\'ensemble des dossiers, archives et comptes bancaires avec le cabinet sortant Citya.',
+        phraseCS: 'Ont été élus pour vous représenter, piloter la transition et contrôler la gestion du nouveau cabinet Trenta Immobilier :',
+        footerPV: 'Le procès-verbal officiel vous sera notifié par le nouveau syndic (cabinet Trenta Immobilier). En attendant, vos conseillers syndicaux restent à votre entière disposition dans vos montées pour toute précision.'
+      };
+    } else if (isCitya) {
+      return {
+        status: 'RECONDUIT',
+        nom: 'Cabinet CITYA Agence Henry',
+        nomCourt: 'cabinet Citya',
+        resNum: elu.number,
+        badgeHtml: '<span style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:3px 9px; border-radius:999px; font-weight:800; font-size:0.75rem;">🏢 SYNDIC RECONDUIT</span>',
+        titreBloc: '🏢 Reconduction du syndic sortant : Cabinet CITYA Agence Henry',
+        descBloc: 'Le mandat du <strong>cabinet Citya Agence Henry</strong> a été renouvelé par l\'Assemblée Générale. Le Conseil Syndical maintiendra une vigilance absolue et un contrôle scrupuleux de sa gestion administrative, comptable et technique.',
+        phraseCS: 'Ont été élus pour vous représenter et contrôler scrupuleusement la gestion du cabinet Citya :',
+        footerPV: 'Le procès-verbal officiel vous sera envoyé par le cabinet Citya. En attendant, vos conseillers syndicaux restent à votre disposition dans vos montées pour toute précision.'
+      };
+    } else {
+      const nomAutre = elu.eluNom || elu.title.replace(/^.*:\s*/, '').trim();
+      return {
+        status: 'ELU',
+        nom: `Cabinet ${nomAutre}`,
+        nomCourt: `cabinet ${nomAutre}`,
+        resNum: elu.number,
+        badgeHtml: '<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:3px 9px; border-radius:999px; font-weight:800; font-size:0.75rem;">🏢 SYNDIC DÉSIGNÉ</span>',
+        titreBloc: `🏢 Désignation du syndic : Cabinet ${nomAutre}`,
+        descBloc: `La gestion de la résidence a été confiée au <strong>cabinet ${nomAutre}</strong>. Le Conseil Syndical supervisera l'exécution de ses missions.`,
+        phraseCS: `Ont été élus pour vous représenter et contrôler la gestion du cabinet ${nomAutre} :`,
+        footerPV: `Le procès-verbal officiel vous sera adressé par le syndic désigné (${nomAutre}). En attendant, vos conseillers syndicaux restent à votre disposition.`
+      };
+    }
+  }
+
+  // Vérifier si toutes les candidatures ont été rejetées
+  const rejets = candidatures.filter(r => r.status === 'REJETEE');
+  if (candidatures.length > 0 && rejets.length === candidatures.length) {
+    return {
+      status: 'REJET_TOTAL',
+      nom: 'Aucun syndic élu (Rejet)',
+      nomCourt: 'futur syndic / administrateur',
+      badgeHtml: '<span style="background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:3px 9px; border-radius:999px; font-weight:800; font-size:0.75rem;">⚠️ REJET DES CANDIDATURES</span>',
+      titreBloc: '⚠️ Situation de la gérance : Aucun syndic élu en séance',
+      descBloc: 'Aucun cabinet candidat n\'a recueilli la majorité légale requise. Le Conseil Syndical engage immédiatement les démarches d\'urgence pour assurer la continuité de la gestion (désignation d\'un administrateur judiciaire ou convocation d\'une nouvelle assemblée).',
+      phraseCS: 'Ont été élus pour représenter la copropriété et piloter cette situation d\'urgence :',
+      footerPV: 'Le Conseil Syndical vous tiendra informés sans délai des démarches de désignation du gestionnaire légal de la résidence.'
+    };
+  }
+
+  // Si pas encore voté ou en attente
+  return {
+    status: 'EN_ATTENTE',
+    nom: 'En cours de désignation (Vote en attente)',
+    nomCourt: 'le syndic de la copropriété',
+    badgeHtml: '<span style="background:#fffbeb; color:#92400e; border:1px solid #fde68a; padding:3px 9px; border-radius:999px; font-weight:800; font-size:0.75rem;">⏳ VOTE SYNDIC EN ATTENTE</span>',
+    titreBloc: '🏢 Désignation du syndic pour l\'exercice 2027',
+    descBloc: 'Les candidatures des cabinets Citya Agence Henry et Trenta Immobilier sont soumises à la décision souveraine de l\'Assemblée Générale.',
+    phraseCS: 'Ont été élus pour vous représenter et contrôler scrupuleusement la gestion de la copropriété :',
+    footerPV: 'Le procès-verbal officiel vous sera notifié par le syndic conformément aux dispositions légales. Vos conseillers syndicaux restent à votre disposition dans vos montées.'
+  };
+}
+
+// Détection intelligente des membres du CS élus lors des résolutions 08
+function getConseillersElusInfo(resolutions) {
+  const list = resolutions || appData.resolutions || [];
+  const csRes = list.filter(r => 
+    r.number && r.number.startsWith('08') && 
+    r.number !== '08' && 
+    r.majorite !== 'article sans vote'
+  );
+
+  const adoptes = csRes.filter(r => r.status === 'ADOPTEE');
+  
+  if (adoptes.length > 0) {
+    return adoptes.map(r => {
+      let nom = r.eluNom;
+      if (!nom) {
+        nom = r.title
+          .replace(/Élection au Conseil Syndical\s*:\s*/i, '')
+          .replace(/Election au Conseil Syndical\s*:\s*/i, '')
+          .trim();
+      }
+      return {
+        name: nom,
+        isEluDirect: true,
+        resNumber: r.number
+      };
+    });
+  }
+
+  // Fallback si scrutin non encore tenu
+  return (appData.members || [])
+    .filter(m => m.statut !== 'DEMISSIONNAIRE')
+    .map(m => ({
+      name: m.name,
+      isEluDirect: false
+    }));
+}
+
 function openClotureModal() {
   renderFicheCloture();
   openModal('clotureModal');
@@ -3387,6 +3507,7 @@ function renderFicheCloture() {
   const copros = appData.coproprietaires || [];
   const partis = copros.filter(c => c.statut === 'PARTI');
   const totalEnSalleFin = appData.config.presentTantiemes || 0;
+  const syndicInfo = getSyndicEluInfo(resolutions);
 
   const allReserves = [];
   resolutions.forEach(r => {
@@ -3422,11 +3543,23 @@ function renderFicheCloture() {
       </div>
 
       <!-- HORODATAGE & QUORUM DE SÉANCE -->
-      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.6rem; margin-bottom:1rem; background:#f1f5f9; padding:0.75rem; border-radius:6px; font-size:0.83rem;">
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.6rem; margin-bottom:0.75rem; background:#f1f5f9; padding:0.75rem; border-radius:6px; font-size:0.83rem;">
         <div><strong>Ouverture de séance :</strong> 18h00</div>
         <div><strong>Clôture officielle :</strong> ${heureCloture}</div>
         <div><strong>Quorum final en salle :</strong> ${totalEnSalleFin.toLocaleString('fr-FR')} t. (${((totalEnSalleFin/totalCopro)*100).toFixed(1)}%)</div>
         <div><strong>Syndic en séance :</strong> ${escapeHtml(appData.config.syndic || 'Citya Agence Henry')}</div>
+      </div>
+
+      <!-- SYNDIC DÉSIGNÉ POUR LE MANDAT 2027 -->
+      <div style="background:${syndicInfo.status === 'NOUVEAU' ? '#ecfdf5' : '#f8fafc'}; border:1px solid ${syndicInfo.status === 'NOUVEAU' ? '#10b981' : '#cbd5e1'}; border-radius:6px; padding:0.55rem 0.85rem; font-size:0.83rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong>🏢 Mandat de syndic pour l'exercice 2027 :</strong>
+          <span style="font-weight:800; color:${syndicInfo.status === 'NOUVEAU' ? '#15803d' : '#1e3a8a'}; margin-left:0.3rem;">
+            ${syndicInfo.nom}
+          </span>
+          <span style="color:#64748b; font-size:0.78rem; margin-left:0.4rem;">(${syndicInfo.status === 'NOUVEAU' ? 'Nouveau syndic élu par l\'AG' : (syndicInfo.status === 'RECONDUIT' ? 'Cabinet reconduit' : 'Statut séance')})</span>
+        </div>
+        ${syndicInfo.badgeHtml}
       </div>
 
       <!-- SYNTHÈSE DES SCRUTINS -->
@@ -3590,7 +3723,8 @@ function renderFlashInfo() {
   const totalEnSalle = appData.config.presentTantiemes || 0;
   const pctRepresente = totalCopro > 0 ? ((totalEnSalle / totalCopro) * 100).toFixed(1) : 0;
 
-  const activeMembersCS = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const syndicInfo = getSyndicEluInfo(resolutions);
+  const conseillersElus = getConseillersElusInfo(resolutions);
 
   container.innerHTML = `
     <div class="flash-info-card" id="flashInfoFlyerContent">
@@ -3609,6 +3743,19 @@ function renderFlashInfo() {
       <div style="background:#ecfdf5; border-left:4px solid #10b981; padding:0.85rem 1rem; border-radius:4px; font-size:0.92rem; color:#065f46; margin-bottom:1.2rem; line-height:1.5;">
         <strong>Chers voisins, chers copropriétaires,</strong><br>
         Le Conseil Syndical vous remercie très chaleureusement pour votre mobilisation record lors de notre Assemblée Générale annuelle. Avec plus de <strong>${pctRepresente}% des tantièmes de la résidence représentés</strong>, notre communauté a fait entendre sa voix pour la défense de notre cadre de vie et la maîtrise stricte de nos charges !
+      </div>
+
+      <!-- BLOC INTELLIGENT DE DÉSIGNATION DU SYNDIC -->
+      <div style="background:${syndicInfo.status === 'NOUVEAU' ? '#ecfdf5' : '#f8fafc'}; border:1px solid ${syndicInfo.status === 'NOUVEAU' ? '#a7f3d0' : '#cbd5e1'}; border-radius:6px; padding:0.85rem 1rem; margin-bottom:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
+          <h3 style="margin:0; font-size:0.95rem; color:${syndicInfo.status === 'NOUVEAU' ? '#065f46' : '#1e3a8a'}; font-weight:800; display:flex; align-items:center; gap:0.4rem;">
+            ${syndicInfo.titreBloc}
+          </h3>
+          ${syndicInfo.badgeHtml}
+        </div>
+        <div style="font-size:0.84rem; color:#334155; line-height:1.5;">
+          ${syndicInfo.descBloc}
+        </div>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:1rem; margin-bottom:1.25rem;">
@@ -3638,9 +3785,9 @@ function renderFlashInfo() {
 
       <div style="background:#f1f5f9; border-radius:6px; padding:0.85rem; margin-bottom:1.25rem; font-size:0.86rem; color:#1e293b;">
         <strong style="color:#1e3a8a;">👥 Votre Conseil Syndical pour l'année 2026-2027 :</strong><br>
-        Ont été élus pour vous représenter et contrôler scrupuleusement la gestion du cabinet Citya :<br>
+        ${syndicInfo.phraseCS}<br>
         <div style="margin-top:0.4rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
-          ${activeMembersCS.map(m => `
+          ${conseillersElus.map(m => `
             <span style="background:white; border:1px solid #cbd5e1; padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.8rem; color:#1e3a8a;">
               👤 ${escapeHtml(m.name)}
             </span>
@@ -3649,7 +3796,7 @@ function renderFlashInfo() {
       </div>
 
       <div style="border-top:1px solid #e2e8f0; padding-top:0.75rem; text-align:center; font-size:0.78rem; color:#64748b; line-height:1.5;">
-        Le procès-verbal officiel vous sera envoyé par le cabinet Citya. En attendant, vos conseillers syndicaux restent à votre disposition dans vos montées pour toute précision.<br>
+        ${syndicInfo.footerPV}<br>
         <strong>Bien cordialement, Votre Conseil Syndical • Résidence Le Floréal</strong>
       </div>
     </div>
