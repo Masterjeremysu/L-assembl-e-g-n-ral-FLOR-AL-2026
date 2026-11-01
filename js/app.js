@@ -3173,13 +3173,45 @@ function initAutoBackup() {
   }, 60000);
 }
 
+// Dropdown moderne Header (Documents & PV)
+function toggleHeaderDropdown(menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+  const parentDropdown = menu.closest('.header-dropdown');
+  const wasActive = menu.classList.contains('active');
+  closeHeaderDropdowns();
+  if (!wasActive) {
+    menu.classList.add('active');
+    if (parentDropdown) parentDropdown.classList.add('active');
+  }
+}
+
+function closeHeaderDropdowns() {
+  document.querySelectorAll('.dropdown-menu-pro.active').forEach(m => m.classList.remove('active'));
+  document.querySelectorAll('.header-dropdown.active').forEach(d => d.classList.remove('active'));
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.header-dropdown')) {
+    closeHeaderDropdowns();
+  }
+});
+
 // Raccourcis clavier (Mode AG Turbo)
 window.addEventListener('keydown', (e) => {
   const tag = document.activeElement?.tagName;
   const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
 
   if (e.key === 'Escape') {
+    closeHeaderDropdowns();
     ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal'].forEach(id => closeModal(id));
+    return;
+  }
+
+  // Ctrl+K ou Cmd+K pour Spotlight même si un champ est actif
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    openSpotlightModal();
     return;
   }
 

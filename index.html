@@ -33,58 +33,97 @@
   <!-- Header -->
   <header>
     <div class="header-container">
-      <div class="header-title">
-        <h1>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
-          Suivi AG & Votes CS
-        </h1>
-        <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL - AG du 25/11/2026</p>
+      <div class="header-brand">
+        <div class="header-logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+        </div>
+        <div class="header-title">
+          <h1>Suivi AG & Pointage CS</h1>
+          <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL • AG DU 25/11/2026</p>
+        </div>
       </div>
+
+      <!-- Recherche universelle style Spotlight (Ctrl+K / /) -->
+      <div class="header-search-pill no-print" onclick="openSpotlightModal()" title="Recherche universelle (Copropriétaire, lot, mandat, résolution) - Raccourci '/' ou 'Ctrl+K'">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span class="search-placeholder">Rechercher copro, lot, résolution...</span>
+        <kbd class="search-kbd">/</kbd>
+      </div>
+
       <div class="header-actions no-print">
-        <button class="btn btn-warning-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
-          ✉️ + Pouvoir
+        <!-- Direct Multi-écrans -->
+        <button class="btn btn-header-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones / tablettes en direct">
+          <span class="live-pulse-dot"></span>
+          <span>Multi-écrans</span>
         </button>
 
-        <button class="btn btn-outline" onclick="openOuvertureModal()" title="Fiche de présence & discours officiel d'ouverture de séance (Prêt à lire à 18h00)">
-          🎙️ Ouverture AG
+        <!-- Menu groupé déroulant : Documents & PV -->
+        <div class="header-dropdown" id="dropdownDocs">
+          <button class="btn btn-header-subtle dropdown-trigger" onclick="toggleHeaderDropdown('dropdownDocsMenu')" title="Procès-verbaux, Attestation officielle et Flash-Info">
+            <span>📑 Documents & PV</span>
+            <span class="dropdown-chevron">▾</span>
+          </button>
+          <div class="dropdown-menu-pro" id="dropdownDocsMenu">
+            <div class="dropdown-group-title">Documents de Séance</div>
+            <button class="dropdown-item-pro" onclick="openOuvertureModal(); closeHeaderDropdowns();">
+              <span class="item-icon">🎙️</span>
+              <div class="item-text">
+                <span class="item-title">Ouverture AG & Quorum (18h)</span>
+                <span class="item-desc">Feuille de présence et discours officiel</span>
+              </div>
+            </button>
+            <button class="dropdown-item-pro" onclick="openPvMiroirModal(); closeHeaderDropdowns();">
+              <span class="item-icon">📄</span>
+              <div class="item-text">
+                <span class="item-title">Relevé PV Contradictoire CS</span>
+                <span class="item-desc">Synthèse et pointage miroir des votes</span>
+              </div>
+            </button>
+            <button class="dropdown-item-pro" onclick="openClotureModal(); closeHeaderDropdowns();">
+              <span class="item-icon">📑</span>
+              <div class="item-text">
+                <span class="item-title">Attestation de Clôture & Signatures</span>
+                <span class="item-desc">Bilan officiel certifié par les scrutateurs</span>
+              </div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-group-title">Communication & Export</div>
+            <button class="dropdown-item-pro" onclick="openFlashInfoModal(); closeHeaderDropdowns();">
+              <span class="item-icon">📢</span>
+              <div class="item-text">
+                <span class="item-title">Flash-Info Résidents (4 halls)</span>
+                <span class="item-desc">Flyer imprimable & message WhatsApp</span>
+              </div>
+            </button>
+            <button class="dropdown-item-pro" onclick="openExportModal(); closeHeaderDropdowns();">
+              <span class="item-icon">💾</span>
+              <div class="item-text">
+                <span class="item-title">Export ERP & Sauvegarde</span>
+                <span class="item-desc">Fichiers CSV UTF-8 & JSON</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- + Pouvoir -->
+        <button class="btn btn-header-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
+          <span>✉️ + Pouvoir</span>
         </button>
 
-        <button class="btn btn-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
-          ▶ Mode Séance
+        <!-- ▶ Mode Séance -->
+        <button class="btn btn-header-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
+          <span>▶ Mode Séance</span>
         </button>
 
-        <button class="btn btn-outline" onclick="openSpotlightModal()" title="Recherche universelle (Copropriétaire, lot, mandat, résolution) - Raccourci '/'">
-          🔍 Chercher
-        </button>
-
-        <button class="btn btn-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones/tablettes">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-          Direct Multi-écrans
-        </button>
-
-        <button class="btn btn-outline" onclick="openPvMiroirModal()" title="Générer le relevé officiel et synthèse des votes du CS en fin d'AG">
-          📄 Relevé PV CS
-        </button>
-
-        <button class="btn btn-outline" onclick="openClotureModal()" title="Attestation officielle de clôture de séance et signatures scrutateurs">
-          📑 Clôture AG
-        </button>
-
-        <button class="btn btn-outline" onclick="openFlashInfoModal()" title="Générateur de Flash-Info pour affichage dans les halls et envoi aux copropriétaires">
-          📢 Flash-Info
-        </button>
-
-        <button class="btn btn-outline" onclick="openExportModal()" title="Exporter les résultats pour ERP ou sauvegarde (JSON / CSV)">
-          💾 Exporter
-        </button>
-
-        <button class="btn btn-outline" onclick="openShortcutsModal()" title="Raccourcis Clavier Mode Turbo (Touche ?)">
-          ⌨️
-        </button>
-
-        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre / Éco-Batterie">
-          🌙
-        </button>
+        <!-- Groupe Utilitaires -->
+        <div class="header-util-group">
+          <button class="btn-icon-subtle" onclick="openShortcutsModal()" title="Raccourcis Clavier Mode Turbo (Touche ?)">
+            ⌨️
+          </button>
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre / Éco-Batterie">
+            🌙
+          </button>
+        </div>
       </div>
     </div>
   </header>
