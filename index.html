@@ -66,7 +66,7 @@
           📄 Relevé PV CS
         </button>
 
-        <button class="btn btn-outline" onclick="exportDataJson()" title="Télécharger la sauvegarde complète de secours (JSON)">
+        <button class="btn btn-outline" onclick="openExportModal()" title="Exporter les résultats pour ERP ou sauvegarde (JSON / CSV)">
           💾 Exporter
         </button>
 
@@ -1229,6 +1229,65 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           <button type="submit" class="btn btn-primary" id="mouvementSubmitBtn">Confirmer et recalculer le quorum</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL EXPORT RÉSULTATS & ERP -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">💾 Exporter les Données & Intégration ERP</h3>
+        <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="gap:1rem;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.8rem; font-size:0.84rem; color:#334155;">
+          Exportez les résultats officiels de l'AG dans le format adapté à vos besoins (intégration dans votre ERP de copropriété ou sauvegarde de secours).
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <!-- 1. CSV ERP Votes -->
+          <div style="border:1px solid #cbd5e1; border-radius:8px; padding:0.9rem; background:white; display:flex; justify-content:space-between; align-items:center; gap:0.8rem;">
+            <div>
+              <strong style="color:#0f172a; font-size:0.92rem;">📊 Export CSV Décisions & Votes (ERP / Excel)</strong>
+              <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+                Toutes les résolutions, statuts (Adoptée/Rejetée), tantièmes Pour/Contre/Abs, heures de vote, élus et réserves PV.
+              </div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="exportResolutionsCsv()" style="white-space:nowrap;">
+              Télécharger CSV
+            </button>
+          </div>
+
+          <!-- 2. CSV ERP Présences -->
+          <div style="border:1px solid #cbd5e1; border-radius:8px; padding:0.9rem; background:white; display:flex; justify-content:space-between; align-items:center; gap:0.8rem;">
+            <div>
+              <strong style="color:#0f172a; font-size:0.92rem;">📋 Export CSV Émargement & Présences (ERP)</strong>
+              <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+                Liste nominative des 259 copropriétaires, statuts (Présent, Pouvoir, VPC, Parti), heures d'arrivée/départ et mandataires.
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" onclick="exportPresenceCsv()" style="white-space:nowrap;">
+              Télécharger CSV
+            </button>
+          </div>
+
+          <!-- 3. JSON Sauvegarde -->
+          <div style="border:1px solid #cbd5e1; border-radius:8px; padding:0.9rem; background:white; display:flex; justify-content:space-between; align-items:center; gap:0.8rem;">
+            <div>
+              <strong style="color:#0f172a; font-size:0.92rem;">💾 Sauvegarde Intégrale JSON (Secours & Réimport)</strong>
+              <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+                Fichier brut JSON contenant l'état exact complet de l'application réimportable à tout moment.
+              </div>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="exportDataJson()" style="white-space:nowrap;">
+              Télécharger JSON
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('exportModal')">Fermer</button>
+      </div>
     </div>
   </div>
 

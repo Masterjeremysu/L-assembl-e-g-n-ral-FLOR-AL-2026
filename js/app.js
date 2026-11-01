@@ -545,14 +545,29 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
   document.getElementById('footPresentTantiemes').innerText = `${totalEnSalle} / ${effectiveTotal} tantièmes en salle (${((totalEnSalle / effectiveTotal) * 100).toFixed(1)}%)`;
 }
 
+// Horodatage officiel Garanti Heure de Paris (Europe/Paris)
+function getHeureParis() {
+  try {
+    const formatter = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    return formatter.format(new Date()).replace(':', 'h');
+  } catch (e) {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+}
+
 // Pointage express à l'accueil
 function setCoproStatut(id, newStatut) {
   const c = appData.coproprietaires.find(x => x.id === id);
   if (c) {
     c.statut = newStatut;
     if (newStatut === 'PRESENT') {
-      const now = new Date();
-      c.heureArrivee = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+      c.heureArrivee = getHeureParis();
       delete c.heureDepart;
     }
     persistData();
@@ -564,8 +579,7 @@ function promptDepartCopro(id) {
   const c = appData.coproprietaires.find(x => x.id === id);
   if (!c) return;
 
-  const now = new Date();
-  const defaultHour = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  const defaultHour = getHeureParis();
   const heure = prompt(`Heure de départ de ${c.nom} (obligatoire sur feuille de présence) :`, defaultHour);
   if (heure !== null) {
     c.statut = 'PARTI';
@@ -637,8 +651,7 @@ function setQuickVote(id, newStatus) {
     res.status = newStatus;
     const totalEnSalle = appData.config.presentTantiemes || 0;
     if (newStatus !== 'EN_ATTENTE') {
-      const now = new Date();
-      res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+      res.heureVote = getHeureParis();
       if (newStatus === 'ADOPTEE' && (!res.tantiemesPour || res.tantiemesPour === 0)) {
         res.tantiemesPour = totalEnSalle;
         res.tantiemesContre = res.tantiemesContre || 0;
@@ -1004,9 +1017,8 @@ function saveScrutin(e) {
     res.status = (res.tantiemesPour >= seuil25) ? 'ADOPTEE' : 'REJETEE';
   }
 
-  // Horodatage officiel du vote
-  const now = new Date();
-  res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  // Horodatage officiel du vote (Heure de Paris)
+  res.heureVote = getHeureParis();
 
   closeModal('scrutinModal');
   persistData();
@@ -1328,6 +1340,10 @@ function resetFilters() {
 }
 
 // Export / Import
+function openExportModal() {
+  openModal('exportModal');
+}
+
 function exportDataJson() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
   const downloadAnchor = document.createElement('a');
@@ -1337,6 +1353,68 @@ function exportDataJson() {
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
+  showToast("💾 Sauvegarde JSON téléchargée !", "success");
+}
+
+function exportResolutionsCsv() {
+  const resolutions = appData.resolutions || [];
+  let csv = "Numero;Titre;Majorite;Statut;Voix_Pour;Voix_Contre;Voix_Abstention;Heure_Vote;Elu_Designee;Opposants_Consignes;Reserves_PV\n";
+
+  resolutions.forEach(r => {
+    const num = `"${r.number || ''}"`;
+    const titre = `"${(r.title || '').replace(/"/g, '""')}"`;
+    const maj = `"${(r.majorite || '').replace(/"/g, '""')}"`;
+    const statut = `"${r.status || ''}"`;
+    const pour = r.tantiemesPour || 0;
+    const contre = r.tantiemesContre || 0;
+    const abs = r.tantiemesAbs || 0;
+    const heure = `"${r.heureVote || ''}"`;
+    const elu = `"${(r.eluNom || '').replace(/"/g, '""')}"`;
+    const opposants = `"${(r.opponentsText || (r.opponentsList ? r.opponentsList.join(', ') : '')).replace(/"/g, '""')}"`;
+    const reserves = `"${((r.reservesPV || []).map(rv => rv.texte)).join(' | ').replace(/"/g, '""')}"`;
+
+    csv += `${num};${titre};${maj};${statut};${pour};${contre};${abs};${heure};${elu};${opposants};${reserves}\n`;
+  });
+
+  const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Resultats_Votes_AG_FLOREAL_2026.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("📊 Export CSV Résolutions pour ERP téléchargé !", "success");
+}
+
+function exportPresenceCsv() {
+  const copros = appData.coproprietaires || [];
+  let csv = "Nom;Lots;Tantiemes;Statut;Mandataire;Heure_Arrivee;Heure_Depart;Notes\n";
+
+  copros.forEach(c => {
+    const nom = `"${(c.nom || '').replace(/"/g, '""')}"`;
+    const lots = `"${(c.lots || '').replace(/"/g, '""')}"`;
+    const tant = c.tantiemes || 0;
+    const statut = `"${c.statut || 'ABSENT'}"`;
+    const mandataire = `"${(c.mandataire || '').replace(/"/g, '""')}"`;
+    const arr = `"${c.heureArrivee || ''}"`;
+    const dep = `"${c.heureDepart || ''}"`;
+    const notes = `"${(c.notes || '').replace(/"/g, '""')}"`;
+
+    csv += `${nom};${lots};${tant};${statut};${mandataire};${arr};${dep};${notes}\n`;
+  });
+
+  const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Feuille_Presence_AG_FLOREAL_2026.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("📋 Export CSV Feuille de Présence pour ERP téléchargé !", "success");
 }
 
 function importDataJson(event) {
@@ -2396,8 +2474,7 @@ function setSeanceUnanimite() {
   res.syndicClaimStatus = 'ADOPTEE';
   res.syndicClaimVoix = totalEnSalle;
 
-  const now = new Date();
-  res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  res.heureVote = getHeureParis();
 
   const inputEl = document.getElementById('seanceEluInput');
   if (inputEl && inputEl.value.trim() && !res.eluNom) {
@@ -2423,8 +2500,7 @@ function ouvrirDepartSeanceModal() {
   document.getElementById('mouvementSubmitBtn').innerText = "Consigner le départ (- tantièmes)";
   document.getElementById('mouvementSubmitBtn').className = "btn btn-danger";
 
-  const now = new Date();
-  document.getElementById('mouvementHeureInput').value = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('mouvementHeureInput').value = getHeureParis();
   document.getElementById('mouvementSearchInput').value = '';
 
   peuplerMouvementOptions('DEPART');
@@ -2439,8 +2515,7 @@ function ouvrirArriveeTardiveModal() {
   document.getElementById('mouvementSubmitBtn').innerText = "Consigner l'arrivée (+ tantièmes)";
   document.getElementById('mouvementSubmitBtn').className = "btn btn-success";
 
-  const now = new Date();
-  document.getElementById('mouvementHeureInput').value = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('mouvementHeureInput').value = getHeureParis();
   document.getElementById('mouvementSearchInput').value = '';
 
   peuplerMouvementOptions('ARRIVEE');
@@ -3007,8 +3082,7 @@ function enregistrerReserveResolution() {
   }
 
   res.reservesPV = res.reservesPV || [];
-  const now = new Date();
-  const heure = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  const heure = getHeureParis();
   res.reservesPV.push({
     heure,
     texte: text,
@@ -3060,7 +3134,7 @@ window.addEventListener('keydown', (e) => {
   const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
 
   if (e.key === 'Escape') {
-    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal'].forEach(id => closeModal(id));
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal'].forEach(id => closeModal(id));
     return;
   }
 
