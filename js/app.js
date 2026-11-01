@@ -2234,15 +2234,23 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
       <div class="gauge-bar-wrapper">
         <div class="gauge-track">
           <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
-          ${isArt25 ? `<div class="gauge-pin pin-passerelle" style="left: 33.33%;" title="Passerelle 25-1 (33.3%)"></div>` : ''}
-          <div class="gauge-pin pin-seuil" style="left: ${seuilPct}%;" title="Seuil d'adoption (${seuilPct}%)"></div>
+          ${isArt25 ? `
+            <div class="gauge-marker-pin pin-passerelle" style="left: 33.33%;" title="Passerelle Art. 25-1 (33.3% - ${passerelleSeuil.toLocaleString('fr-FR')} voix)">
+              <span class="marker-flag">⚡ Passerelle 1/3</span>
+              <span class="marker-needle"></span>
+            </div>
+          ` : ''}
+          <div class="gauge-marker-pin pin-seuil" style="left: ${seuilPct}%;" title="Seuil d'adoption (${seuilPct}% - ${targetSeuil.toLocaleString('fr-FR')} voix)">
+            <span class="marker-flag">🎯 Seuil ${seuilPct}%</span>
+            <span class="marker-needle"></span>
+          </div>
         </div>
 
         <div class="gauge-scale-row">
           <span class="scale-point p-start">0%</span>
           ${isArt25 ? `
             <span class="scale-point p-passerelle" style="left: 33.33%;">
-              <span class="scale-tick">▲</span> 33% <em>(Passerelle : ${passerelleSeuil.toLocaleString('fr-FR')})</em>
+              <span class="scale-tick">▲</span> 33.3% <em>(${passerelleSeuil.toLocaleString('fr-FR')} voix)</em>
             </span>
           ` : ''}
           <span class="scale-point p-seuil" style="left: ${seuilPct}%;">
@@ -2255,7 +2263,7 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
       <div class="tactique-card ${isAdoptable ? 'tactique-card-success' : 'tactique-card-warning'}">
         <div class="tactique-card-icon">${isAdoptable ? '🟢' : '⚠️'}</div>
         <div class="tactique-card-content">
-          <strong>${isAdoptable ? 'Force CS suffisante :' : 'Force CS à compléter :'}</strong> ${messageTactiquePro}
+          <strong>${isAdoptable ? 'Majorité garantie pour le CS :' : 'Majorité à consolider :'}</strong> ${messageTactiquePro}
         </div>
       </div>
 
@@ -2318,6 +2326,7 @@ function toggleModeSeance() {
 
 function ouvrirSeanceSurRes(resId) {
   activeSeanceResId = resId;
+  seanceResSeconds = 0;
   if (!isModeSeanceActive) {
     toggleModeSeance();
   } else {
@@ -2341,6 +2350,7 @@ function naviguerSeance(dir) {
   if (nextIndex >= appData.resolutions.length) nextIndex = appData.resolutions.length - 1;
 
   activeSeanceResId = appData.resolutions[nextIndex].id;
+  seanceResSeconds = 0;
   renderModeSeance();
 
   if (isLiveActive) {
@@ -2419,6 +2429,41 @@ function renderModeSeance() {
   const totalEnSalleTantEl = document.getElementById('seanceTotalSalleTant');
   if (totalEnSalleTantEl) {
     totalEnSalleTantEl.innerText = (appData.config.presentTantiemes || 0).toLocaleString('fr-FR');
+  }
+
+  // Alerte Stratégique d'Épuisement de Quorum
+  const alertBanner = document.getElementById('seanceQuorumAlertBanner');
+  if (alertBanner) {
+    const isArt25 = res.majorite && res.majorite.includes('Article 25');
+    const isArt26 = res.majorite && res.majorite.includes('Article 26');
+    const seuil25 = Math.floor(totalCopro / 2) + 1; // 48 740
+    const seuilPasserelle = Math.ceil(totalCopro / 3); // 32 493
+
+    if (isArt25 && totalEnSalle < seuil25) {
+      alertBanner.style.display = 'block';
+      alertBanner.style.background = '#fef2f2';
+      alertBanner.style.border = '2px solid #ef4444';
+      alertBanner.style.color = '#991b1b';
+      alertBanner.innerHTML = `
+        <strong>⚠️ ALERTE QUORUM CRITIQUE (DÉPARTS CONSTATÉS) :</strong><br>
+        Il ne reste plus que <strong>${totalEnSalle.toLocaleString('fr-FR')} voix en salle</strong> (sur 97 478). Le seuil de majorité absolue de 48 740 voix est désormais <u>physiquement impossible à atteindre</u> au 1er vote !<br>
+        👉 <strong>Consigne impérative :</strong> Exigez de plein droit le second vote immédiat à la majorité simple via la <strong>passerelle Article 25-1</strong> (seuil de 32 493 voix dépassé) !
+      `;
+    } else if (totalEnSalle < seuilPasserelle && (isArt25 || isArt26)) {
+      alertBanner.style.display = 'block';
+      alertBanner.style.background = '#fef2f2';
+      alertBanner.style.border = '2px solid #b91c1c';
+      alertBanner.style.color = '#991b1b';
+      alertBanner.innerHTML = `
+        <strong>🚨 ALERTE QUORUM MINIMUM FRANCHI :</strong> Le nombre de voix en salle (${totalEnSalle.toLocaleString('fr-FR')}) est inférieur au tiers de la copropriété (32 493). La passerelle de vote 25-1 n'est plus accessible !
+      `;
+    } else {
+      alertBanner.style.display = 'none';
+    }
+  }
+
+  if (typeof isCostSimOpen !== 'undefined' && isCostSimOpen) {
+    calculerImpactCharges();
   }
 }
 
@@ -3134,7 +3179,7 @@ window.addEventListener('keydown', (e) => {
   const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
 
   if (e.key === 'Escape') {
-    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal'].forEach(id => closeModal(id));
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal'].forEach(id => closeModal(id));
     return;
   }
 
@@ -3173,6 +3218,480 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// =======================================================
+// CHRONOMÈTRE DE SÉANCE & DÉBATS (MODE FOCUS)
+// =======================================================
+
+let seanceGlobalSeconds = 0;
+let seanceResSeconds = 0;
+let isResTimerPaused = false;
+let seanceTimerInterval = null;
+
+function initSeanceTimers() {
+  if (seanceTimerInterval) clearInterval(seanceTimerInterval);
+  seanceTimerInterval = setInterval(() => {
+    if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive) {
+      seanceGlobalSeconds++;
+      if (!isResTimerPaused) {
+        seanceResSeconds++;
+      }
+      updateTimerDisplays();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplays() {
+  const resEl = document.getElementById('seanceResTimerText');
+  const globEl = document.getElementById('seanceGlobalTimerText');
+
+  if (resEl) {
+    const m = Math.floor(seanceResSeconds / 60);
+    const s = seanceResSeconds % 60;
+    resEl.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  if (globEl) {
+    const h = Math.floor(seanceGlobalSeconds / 3600);
+    const m = Math.floor((seanceGlobalSeconds % 3600) / 60);
+    const s = seanceGlobalSeconds % 60;
+    globEl.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+}
+
+function toggleResTimer() {
+  isResTimerPaused = !isResTimerPaused;
+  const badge = document.getElementById('seanceResTimerBadge');
+  if (badge) {
+    badge.style.opacity = isResTimerPaused ? '0.45' : '1';
+  }
+  showToast(isResTimerPaused ? "⏱️ Chrono débat mis en pause" : "⏱️ Chrono débat relancé", "info");
+}
+
+// =======================================================
+// SIMULATEUR DE CHARGES & QUOTE-PART (« COMBIEN ÇA COÛTE AU VOISIN ? »)
+// =======================================================
+
+let isCostSimOpen = false;
+
+function toggleCostSimulator() {
+  isCostSimOpen = !isCostSimOpen;
+  const content = document.getElementById('costSimContent');
+  const icon = document.getElementById('costSimToggleIcon');
+  if (content) content.style.display = isCostSimOpen ? 'block' : 'none';
+  if (icon) icon.innerText = isCostSimOpen ? '[ ▲ Masquer le simulateur ]' : '[ + Ouvrir le simulateur ]';
+  if (isCostSimOpen) {
+    calculerImpactCharges();
+  }
+}
+
+function calculerImpactCharges() {
+  const budgetInput = document.getElementById('costSimBudgetInput');
+  const grid = document.getElementById('costSimResultsGrid');
+  if (!grid) return;
+
+  let totalBudget = Number(budgetInput?.value) || 0;
+  if (totalBudget <= 0 && activeSeanceResId) {
+    const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+    if (res) {
+      const match = (res.title + ' ' + (res.description || '')).match(/(\d+[\s\d]*)\s*€/);
+      if (match) {
+        totalBudget = Number(match[1].replace(/\s/g, '')) || 0;
+        if (budgetInput && totalBudget > 0) budgetInput.value = totalBudget;
+      }
+    }
+  }
+
+  if (totalBudget <= 0) totalBudget = 25000;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+
+  const types = [
+    { label: "🅿️ Parking", tantiemes: 5, desc: "Place extérieure" },
+    { label: "🚗 Box / Garage", tantiemes: 44, desc: "Box sous-sol" },
+    { label: "🏠 Appart. T4", tantiemes: 350, desc: "Grand 4 pièces" },
+    { label: "🏠 Appart. T5", tantiemes: 430, desc: "Grand 5 pièces" },
+  ];
+
+  grid.innerHTML = types.map(t => {
+    const part = (totalBudget * t.tantiemes / totalCopro);
+    const parMois = part / 12;
+    return `
+      <div class="quote-part-pill">
+        <div style="font-weight:700; font-size:0.82rem; color:#fde047;">${t.label}</div>
+        <div style="font-size:0.7rem; color:#cbd5e1;">${t.tantiemes} tant. • ${t.desc}</div>
+        <div style="font-size:1.1rem; font-weight:800; color:white; margin-top:3px;">
+          ${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+        </div>
+        <div style="font-size:0.72rem; color:#a7f3d0;">
+          (~${parMois.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/mois sur 1 an)
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  calculerQuotePartVoisin();
+}
+
+function calculerQuotePartVoisin() {
+  const query = (document.getElementById('costSimNeighborInput')?.value || '').trim();
+  const resEl = document.getElementById('costSimNeighborResult');
+  const budgetInput = document.getElementById('costSimBudgetInput');
+  if (!resEl) return;
+
+  if (!query) {
+    resEl.innerHTML = '';
+    return;
+  }
+
+  const budget = Number(budgetInput?.value) || 25000;
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+
+  const found = (appData.coproprietaires || []).find(c =>
+    fuzzyMatch(query, `${c.nom} ${c.lots || ''}`)
+  );
+
+  if (found) {
+    const part = (budget * (found.tantiemes || 0) / totalCopro);
+    const mois = part / 12;
+    resEl.innerHTML = `
+      👉 <strong>${escapeHtml(found.nom)}</strong> (${found.tantiemes} t.) : 
+      <strong>${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong> 
+      <span style="font-size:0.75rem; color:#cbd5e1;">(~${mois.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/mois)</span>
+    `;
+  } else {
+    resEl.innerHTML = `<span style="color:#f87171; font-size:0.75rem;">Copropriétaire non trouvé</span>`;
+  }
+}
+
+// =======================================================
+// FICHE DE CLÔTURE & ATTESTATION CONTRADICTOIRE SCRUTATEURS
+// =======================================================
+
+function openClotureModal() {
+  renderFicheCloture();
+  openModal('clotureModal');
+}
+
+function renderFicheCloture() {
+  const container = document.getElementById('cloturePrintZone');
+  if (!container) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const resolutions = appData.resolutions || [];
+  const voteRes = resolutions.filter(r => r.majorite !== 'article sans vote');
+  const adopted = voteRes.filter(r => r.status === 'ADOPTEE');
+  const rejected = voteRes.filter(r => r.status === 'REJETEE');
+  const postponed = voteRes.filter(r => r.status === 'REPORTEE');
+
+  const heureCloture = getHeureParis();
+  const copros = appData.coproprietaires || [];
+  const partis = copros.filter(c => c.statut === 'PARTI');
+  const totalEnSalleFin = appData.config.presentTantiemes || 0;
+
+  const allReserves = [];
+  resolutions.forEach(r => {
+    if (r.reservesPV && Array.isArray(r.reservesPV) && r.reservesPV.length > 0) {
+      r.reservesPV.forEach(rv => {
+        allReserves.push({
+          resNum: r.number,
+          resTitle: r.title,
+          heure: rv.heure,
+          texte: rv.texte,
+          type: rv.type
+        });
+      });
+    }
+  });
+
+  container.innerHTML = `
+    <div class="cloture-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0f172a; padding-bottom:0.75rem; margin-bottom:1rem;">
+        <div>
+          <h2 style="margin:0; font-size:1.3rem; color:#0f172a; text-transform:uppercase; letter-spacing:0.5px;">
+            📑 Attestation Officielle de Clôture de Séance & Relevé Contradictoire
+          </h2>
+          <div style="font-size:0.85rem; color:#475569; margin-top:0.25rem;">
+            Assemblée Générale Ordinaire du <strong>25 novembre 2026</strong> • Résidence Le Floréal (Noisy-le-Grand)
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <span style="background:#0f172a; color:white; padding:4px 10px; border-radius:4px; font-weight:800; font-size:0.8rem;">
+            CONSEIL SYNDICAL
+          </span>
+        </div>
+      </div>
+
+      <!-- HORODATAGE & QUORUM DE SÉANCE -->
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.6rem; margin-bottom:1rem; background:#f1f5f9; padding:0.75rem; border-radius:6px; font-size:0.83rem;">
+        <div><strong>Ouverture de séance :</strong> 18h00</div>
+        <div><strong>Clôture officielle :</strong> ${heureCloture}</div>
+        <div><strong>Quorum final en salle :</strong> ${totalEnSalleFin.toLocaleString('fr-FR')} t. (${((totalEnSalleFin/totalCopro)*100).toFixed(1)}%)</div>
+        <div><strong>Syndic en séance :</strong> ${escapeHtml(appData.config.syndic || 'Citya Agence Henry')}</div>
+      </div>
+
+      <!-- SYNTHÈSE DES SCRUTINS -->
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.75rem; margin-bottom:1.25rem; text-align:center;">
+        <div style="background:#ecfdf5; border:1px solid #10b981; border-radius:6px; padding:0.6rem;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#065f46; font-weight:700;">Résolutions Adoptées</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#15803d;">${adopted.length}</div>
+        </div>
+        <div style="background:#fef2f2; border:1px solid #ef4444; border-radius:6px; padding:0.6rem;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#991b1b; font-weight:700;">Résolutions Rejetées</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#dc2626;">${rejected.length}</div>
+        </div>
+        <div style="background:#fffbeb; border:1px solid #f59e0b; border-radius:6px; padding:0.6rem;">
+          <div style="font-size:0.72rem; text-transform:uppercase; color:#92400e; font-weight:700;">Reportées / Retirées</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#d97706;">${postponed.length}</div>
+        </div>
+      </div>
+
+      <!-- TABLEAU CONTRADICTOIRE DES SCRUTINS -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="font-weight:700; font-size:0.88rem; margin-bottom:0.4rem; color:#0f172a;">
+          Détail des votes certifiés conformes aux pointages de séance :
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.78rem;">
+          <thead>
+            <tr style="background:#e2e8f0; border-bottom:1px solid #cbd5e1;">
+              <th style="padding:4px 6px; text-align:left;">N°</th>
+              <th style="padding:4px 6px; text-align:left;">Objet</th>
+              <th style="padding:4px 6px; text-align:center;">Règle</th>
+              <th style="padding:4px 6px; text-align:center;">Décision</th>
+              <th style="padding:4px 6px; text-align:right;">Pour</th>
+              <th style="padding:4px 6px; text-align:right;">Contre</th>
+              <th style="padding:4px 6px; text-align:right;">Abs.</th>
+              <th style="padding:4px 6px; text-align:left;">Élu(e) / Opposants</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${resolutions.map(r => `
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:4px 6px; font-weight:700;">${r.number}</td>
+                <td style="padding:4px 6px;">${escapeHtml(r.title)}</td>
+                <td style="padding:4px 6px; text-align:center; color:#64748b;">${r.majorite}</td>
+                <td style="padding:4px 6px; text-align:center; font-weight:700; color:${r.status === 'ADOPTEE' ? '#15803d' : (r.status === 'REJETEE' ? '#dc2626' : '#d97706')};">${r.status}</td>
+                <td style="padding:4px 6px; text-align:right; font-weight:700; color:#15803d;">${r.tantiemesPour || '-'}</td>
+                <td style="padding:4px 6px; text-align:right; font-weight:700; color:#dc2626;">${r.tantiemesContre || '-'}</td>
+                <td style="padding:4px 6px; text-align:right; color:#d97706;">${r.tantiemesAbs || '-'}</td>
+                <td style="padding:4px 6px; font-size:0.72rem;">${escapeHtml(r.eluNom ? `👑 ${r.eluNom}` : (r.opponentsText || '-'))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- DÉPARTS CONSIGNÉS SUR FEUILLE DE PRÉSENCE -->
+      ${partis.length > 0 ? `
+        <div style="background:#fef2f2; border-left:4px solid #ef4444; padding:0.6rem 0.85rem; font-size:0.8rem; margin-bottom:1rem;">
+          <strong>🚪 Départs officiellement consignés en cours de séance (Art. 14 décret 1967) :</strong><br>
+          ${partis.map(p => `• <strong>${escapeHtml(p.nom)}</strong> (${p.tantiemes} t.) — Départ consigné à <strong>${p.heureDepart || 'en cours d\'AG'}</strong>`).join('<br>')}
+        </div>
+      ` : ''}
+
+      <!-- RÉSERVES FORMELLES DÉPOSÉES AU PV -->
+      ${allReserves.length > 0 ? `
+        <div style="background:#fffbeb; border-left:4px solid #f59e0b; padding:0.6rem 0.85rem; font-size:0.8rem; margin-bottom:1.25rem;">
+          <strong style="color:#92400e;">⚠️ Réserves formelles au Procès-Verbal consignées contradictoirement (Art. 17 décret 1967) :</strong><br>
+          ${allReserves.map(rv => `
+            <div style="margin-top:0.4rem; padding-top:0.3rem; border-top:1px dashed #fde68a;">
+              <strong>Résolution n° ${rv.resNum}</strong> (${rv.heure}) : <em>${escapeHtml(rv.texte.replace(/\n/g, ' '))}</em>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:0.5rem 0.8rem; font-size:0.8rem; color:#64748b; margin-bottom:1.25rem;">
+          ✓ Aucune réserve formelle n'a été déposée en séance (déroulement régulier).
+        </div>
+      `}
+
+      <!-- DÉCLARATION SOLENNELLE ET SIGNATURES -->
+      <div style="font-size:0.8rem; color:#334155; line-height:1.45; margin-bottom:1rem; font-style:italic; border-top:1px solid #cbd5e1; padding-top:0.75rem;">
+        « Les soussignés, membres du bureau de l'assemblée générale et scrutateurs désignés du Conseil Syndical, certifient sur l'honneur que le présent relevé contradictoire est conforme aux résultats proclamés et aux déclarations exprimées en séance ce 25 novembre 2026 à Noisy-le-Grand. »
+      </div>
+
+      <div class="signatures-grid">
+        <div class="signature-box">
+          <div style="font-weight:700; font-size:0.8rem; color:#0f172a;">Président(e) de séance :</div>
+          <div style="font-size:0.72rem; color:#64748b;">Signature :</div>
+        </div>
+        <div class="signature-box">
+          <div style="font-weight:700; font-size:0.8rem; color:#0f172a;">Scrutateur n° 1 (Conseil Syndical) :</div>
+          <div style="font-size:0.72rem; color:#64748b;">Signature :</div>
+        </div>
+        <div class="signature-box">
+          <div style="font-weight:700; font-size:0.8rem; color:#0f172a;">Scrutateur n° 2 (Conseil Syndical) :</div>
+          <div style="font-size:0.72rem; color:#64748b;">Signature :</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function copierResumeCloture() {
+  const el = document.getElementById('cloturePrintZone');
+  if (!el) return;
+  const rawText = el.innerText || el.textContent;
+  navigator.clipboard.writeText(rawText).then(() => {
+    showToast("📋 Relevé de clôture copié dans le presse-papier !", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement.", "error");
+  });
+}
+
+function imprimerAttestationCloture() {
+  const content = document.getElementById('cloturePrintZone')?.innerHTML;
+  if (!content) return;
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Attestation de Clôture Contradictoire AG 2026 - Le Floréal</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f172a; line-height: 1.4; font-size: 10pt; }
+        .cloture-card { border: none !important; padding: 0 !important; }
+        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; }
+        th { background: #f1f5f9; }
+        .signatures-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 25px; border-top: 2px dashed #0f172a; padding-top: 10px; }
+        .signature-box { border: 1px solid #94a3b8; height: 90px; padding: 8px; }
+        @media print { button { display: none !important; } }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// =======================================================
+// FLASH-INFO RÉSIDENTS POUR HALLS D'IMMEUBLES (LENDEMAIN MATIN)
+// =======================================================
+
+function openFlashInfoModal() {
+  renderFlashInfo();
+  openModal('flashInfoModal');
+}
+
+function renderFlashInfo() {
+  const container = document.getElementById('flashInfoPrintZone');
+  if (!container) return;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const resolutions = appData.resolutions || [];
+  const voteRes = resolutions.filter(r => r.majorite !== 'article sans vote');
+  const adopted = voteRes.filter(r => r.status === 'ADOPTEE');
+  const rejected = voteRes.filter(r => r.status === 'REJETEE');
+
+  const totalEnSalle = appData.config.presentTantiemes || 0;
+  const pctRepresente = totalCopro > 0 ? ((totalEnSalle / totalCopro) * 100).toFixed(1) : 0;
+
+  const activeMembersCS = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+
+  container.innerHTML = `
+    <div class="flash-info-card" id="flashInfoFlyerContent">
+      <div style="background:#1e3a8a; color:white; border-radius:8px; padding:1.25rem; text-align:center; margin-bottom:1.25rem;">
+        <div style="font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; font-weight:700; color:#93c5fd;">
+          Conseil Syndical • Résidence Le Floréal
+        </div>
+        <h1 style="margin:0.4rem 0 0.2rem; font-size:1.4rem; font-weight:800; color:white;">
+          📢 FLASH-INFO : RÉSULTATS DE L'ASSEMBLÉE GÉNÉRALE 2026
+        </h1>
+        <div style="font-size:0.85rem; color:#bfdbfe;">
+          Séance du 25 novembre 2026 • Salle Jacques Prévert, Noisy-le-Grand
+        </div>
+      </div>
+
+      <div style="background:#ecfdf5; border-left:4px solid #10b981; padding:0.85rem 1rem; border-radius:4px; font-size:0.92rem; color:#065f46; margin-bottom:1.2rem; line-height:1.5;">
+        <strong>Chers voisins, chers copropriétaires,</strong><br>
+        Le Conseil Syndical vous remercie très chaleureusement pour votre mobilisation record lors de notre Assemblée Générale annuelle. Avec plus de <strong>${pctRepresente}% des tantièmes de la résidence représentés</strong>, notre communauté a fait entendre sa voix pour la défense de notre cadre de vie et la maîtrise stricte de nos charges !
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:1rem; margin-bottom:1.25rem;">
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.85rem;">
+          <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#15803d; display:flex; align-items:center; gap:0.4rem;">
+            ✅ Les Décisions Majeures Adoptées (${adopted.length})
+          </h3>
+          <ul style="margin:0; padding-left:1.1rem; font-size:0.83rem; color:#334155; line-height:1.5;">
+            ${adopted.slice(0, 6).map(r => `<li><strong>N° ${r.number}</strong> : ${escapeHtml(r.title)}</li>`).join('')}
+            ${adopted.length > 6 ? `<li style="color:#64748b; font-style:italic;">... et ${adopted.length - 6} autres résolutions approuvées.</li>` : ''}
+          </ul>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.85rem;">
+          <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#dc2626; display:flex; align-items:center; gap:0.4rem;">
+            ❌ Projets Rejetés ou Ajournés (${rejected.length})
+          </h3>
+          ${rejected.length > 0 ? `
+            <ul style="margin:0; padding-left:1.1rem; font-size:0.83rem; color:#334155; line-height:1.5;">
+              ${rejected.map(r => `<li><strong>N° ${r.number}</strong> : ${escapeHtml(r.title)}</li>`).join('')}
+            </ul>
+          ` : `
+            <div style="font-size:0.83rem; color:#64748b;">Aucun rejet bloquant constaté lors de cette séance.</div>
+          `}
+        </div>
+      </div>
+
+      <div style="background:#f1f5f9; border-radius:6px; padding:0.85rem; margin-bottom:1.25rem; font-size:0.86rem; color:#1e293b;">
+        <strong style="color:#1e3a8a;">👥 Votre Conseil Syndical pour l'année 2026-2027 :</strong><br>
+        Ont été élus pour vous représenter et contrôler scrupuleusement la gestion du cabinet Citya :<br>
+        <div style="margin-top:0.4rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+          ${activeMembersCS.map(m => `
+            <span style="background:white; border:1px solid #cbd5e1; padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.8rem; color:#1e3a8a;">
+              👤 ${escapeHtml(m.name)}
+            </span>
+          `).join('')}
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #e2e8f0; padding-top:0.75rem; text-align:center; font-size:0.78rem; color:#64748b; line-height:1.5;">
+        Le procès-verbal officiel vous sera envoyé par le cabinet Citya. En attendant, vos conseillers syndicaux restent à votre disposition dans vos montées pour toute précision.<br>
+        <strong>Bien cordialement, Votre Conseil Syndical • Résidence Le Floréal</strong>
+      </div>
+    </div>
+  `;
+}
+
+function copierFlashInfoTexte() {
+  const el = document.getElementById('flashInfoFlyerContent');
+  if (!el) return;
+  const rawText = el.innerText || el.textContent;
+  navigator.clipboard.writeText(rawText).then(() => {
+    showToast("📋 Texte du Flash-Info copié ! Prêt pour email ou WhatsApp.", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement.", "error");
+  });
+}
+
+function imprimerFlashInfoFlyer() {
+  const content = document.getElementById('flashInfoPrintZone')?.innerHTML;
+  if (!content) return;
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Flash-Info AG 2026 - Conseil Syndical Le Floréal</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 25px; color: #0f172a; line-height: 1.5; font-size: 11pt; }
+        .flash-info-card { border: none !important; box-shadow: none !important; }
+        @media print { button { display: none !important; } }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 // Formatting helpers
 function formatDate(dStr) {
   if (!dStr) return '';
@@ -3194,5 +3713,6 @@ function escapeHtml(text) {
 document.addEventListener('DOMContentLoaded', () => {
   initDarkMode();
   initAutoBackup();
+  initSeanceTimers();
   updateUI();
 });

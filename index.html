@@ -66,6 +66,14 @@
           📄 Relevé PV CS
         </button>
 
+        <button class="btn btn-outline" onclick="openClotureModal()" title="Attestation officielle de clôture de séance et signatures scrutateurs">
+          📑 Clôture AG
+        </button>
+
+        <button class="btn btn-outline" onclick="openFlashInfoModal()" title="Générateur de Flash-Info pour affichage dans les halls et envoi aux copropriétaires">
+          📢 Flash-Info
+        </button>
+
         <button class="btn btn-outline" onclick="openExportModal()" title="Exporter les résultats pour ERP ou sauvegarde (JSON / CSV)">
           💾 Exporter
         </button>
@@ -115,9 +123,15 @@
       <!-- MODE SÉANCE FOCUS EN DIRECT (SPÉCIAL AG & SMARTPHONE) -->
       <div id="seanceFocusPanel" class="seance-focus-bar no-print" style="display:none;">
         <div class="seance-nav-controls">
-          <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
             <span style="background:rgba(255,255,255,0.2); padding:0.25rem 0.6rem; border-radius:9999px; font-weight:800; font-size:0.85rem;" id="seanceResNumberBadge">01</span>
             <span style="font-size:0.82rem; color:#bfdbfe;" id="seanceResProgress">Résolution 1 sur 28</span>
+            <span class="timer-pill" id="seanceResTimerBadge" title="Temps de débat sur cette résolution (Cliquer pour pause/reprise)" onclick="toggleResTimer()" style="cursor:pointer;">
+              ⏱️ <span id="seanceResTimerText">00:00</span>
+            </span>
+            <span class="timer-pill" id="seanceGlobalTimerBadge" style="color:#93c5fd;" title="Durée totale de la séance">
+              ⏳ <span id="seanceGlobalTimerText">00:00:00</span>
+            </span>
           </div>
           <div style="display:flex; gap:0.4rem; align-items:center;">
             <button class="btn btn-sm btn-white" onclick="naviguerSeance(-1)" title="Résolution précédente (Flèche Gauche)">⬅ Précédente</button>
@@ -156,6 +170,38 @@
           <div id="seanceEluBadge" style="display:none; font-size:0.82rem; font-weight:700; color:#4ade80;"></div>
         </div>
 
+        <!-- 💶 CALCULATEUR D'IMPACT SUR LES CHARGES (« COMBIEN ÇA COÛTE AU VOISIN ? ») -->
+        <div id="seanceCostSimulator" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.6rem 0.85rem; margin-bottom:0.9rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCostSimulator()">
+            <div style="font-weight:700; font-size:0.85rem; color:#fde047; display:flex; align-items:center; gap:0.4rem;">
+              💶 Simulateur Quote-Part Travaux & Devis (Combien ça coûte à mon voisin ?)
+            </div>
+            <span id="costSimToggleIcon" style="font-size:0.8rem; color:#cbd5e1; font-weight:bold;">[ + Ouvrir le simulateur ]</span>
+          </div>
+          <div id="costSimContent" style="margin-top:0.75rem; display:none; border-top:1px solid rgba(255,255,255,0.15); padding-top:0.65rem;">
+            <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; margin-bottom:0.6rem;">
+              <label style="font-size:0.82rem; color:#e2e8f0; font-weight:600;">Montant total du devis / résolution :</label>
+              <div style="display:flex; align-items:center; gap:0.35rem;">
+                <input type="number" id="costSimBudgetInput" class="form-control" style="width:130px; font-weight:700; background:white; color:#0f172a;" placeholder="Ex: 50000" oninput="calculerImpactCharges()">
+                <span style="font-weight:800; color:white;">€</span>
+              </div>
+              <button type="button" class="btn btn-sm btn-white" onclick="calculerImpactCharges()">Calculer les quotes-parts</button>
+            </div>
+
+            <!-- Grille des types de lots Le Floréal -->
+            <div id="costSimResultsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.5rem; margin-bottom:0.6rem;">
+              <!-- Rendu dynamique par calculerImpactCharges() -->
+            </div>
+
+            <!-- Recherche ciblée pour un voisin qui pose la question en direct -->
+            <div style="background:rgba(255,255,255,0.08); border-radius:6px; padding:0.4rem 0.6rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+              <span style="font-size:0.78rem; color:#cbd5e1;">🔎 Question directe d'un voisin :</span>
+              <input type="text" id="costSimNeighborInput" class="form-control" style="font-size:0.78rem; width:180px; height:28px;" placeholder="Taper le nom du copropriétaire..." oninput="calculerQuotePartVoisin()">
+              <div id="costSimNeighborResult" style="font-size:0.82rem; font-weight:700; color:#4ade80;"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Simulateur Tactique de Majorité -->
         <div id="seanceTactiqueZone">
           <!-- Dynamique -->
@@ -174,6 +220,11 @@
               👋 Arrivée tardive
             </button>
           </div>
+        </div>
+
+        <!-- Alerte Stratégique d'Épuisement de Quorum -->
+        <div id="seanceQuorumAlertBanner" style="display:none; padding:0.6rem 0.9rem; border-radius:6px; margin-bottom:0.85rem; font-size:0.84rem; line-height:1.45;">
+          <!-- Dynamique -->
         </div>
 
         <!-- Boutons de Vote Rapide Séance -->
@@ -1287,6 +1338,48 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('exportModal')">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FICHE DE CLÔTURE & ATTESTATION SCRUTATEURS (FIN D'AG) -->
+  <div class="modal-overlay" id="clotureModal">
+    <div class="modal-box" style="max-width: 860px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📑 Fiche de Clôture & Attestation Scrutateurs CS</h3>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-sm btn-outline-primary" onclick="copierResumeCloture()">📋 Copier la synthèse</button>
+          <button class="btn btn-sm btn-primary" onclick="imprimerAttestationCloture()">🖨️ Imprimer l'Attestation A4</button>
+          <button class="modal-close" onclick="closeModal('clotureModal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="background:#f8fafc; padding:1.25rem;" id="cloturePrintZone">
+        <!-- Rendu dynamique par renderFicheCloture() -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('clotureModal')">Fermer</button>
+        <button type="button" class="btn btn-primary" onclick="imprimerAttestationCloture()">🖨️ Imprimer pour signature contradictoire</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FLASH-INFO RÉSIDENTS POUR HALLS D'IMMEUBLES -->
+  <div class="modal-overlay" id="flashInfoModal">
+    <div class="modal-box" style="max-width: 800px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📢 Flash-Info Résidents (Compte-rendu du Conseil Syndical)</h3>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-sm btn-outline-primary" onclick="copierFlashInfoTexte()">📋 Copier (Email / WhatsApp)</button>
+          <button class="btn btn-sm btn-primary" onclick="imprimerFlashInfoFlyer()">🖨️ Imprimer Flyer A4 (Halls)</button>
+          <button class="modal-close" onclick="closeModal('flashInfoModal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="background:#f8fafc; padding:1.25rem;" id="flashInfoPrintZone">
+        <!-- Rendu dynamique par renderFlashInfo() -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('flashInfoModal')">Fermer</button>
+        <button type="button" class="btn btn-primary" onclick="copierFlashInfoTexte()">📋 Copier pour diffusion immédiate</button>
       </div>
     </div>
   </div>

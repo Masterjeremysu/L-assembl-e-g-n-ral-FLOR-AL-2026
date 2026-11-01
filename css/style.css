@@ -1535,70 +1535,138 @@ body.dark-mode .score-label {
   color: #94a3b8;
 }
 
-/* Piste de jauge */
+/* Piste de jauge haute précision */
 .gauge-bar-wrapper {
-  margin: 0.4rem 0 0.2rem 0;
+  position: relative;
+  margin: 1.55rem 0 0.5rem 0;
 }
 
 .gauge-track {
   width: 100%;
-  height: 16px;
-  background: #e2e8f0;
+  height: 20px;
+  background: #f1f5f9;
   border-radius: 9999px;
   position: relative;
   overflow: visible;
+  border: 1px solid #cbd5e1;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 body.dark-mode .gauge-track {
-  background: #334155;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .gauge-bar-fill {
   height: 100%;
   border-radius: 9999px;
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
   position: relative;
 }
 
 .gauge-bar-fill.success {
   background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
 
 .gauge-bar-fill.warning {
   background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
 }
 
 .gauge-bar-fill.primary {
   background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
 }
 
-/* Marqueurs physiques sur la barre */
-.gauge-pin {
+/* Balises / Aiguilles de seuil ultra-clean */
+.gauge-marker-pin {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: #ffffff;
-  border-radius: 2px;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
-  z-index: 3;
+  top: -4px;
+  bottom: -4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 5;
+  transform: translateX(-50%);
 }
 
-.gauge-pin.pin-passerelle {
-  background: #fef08a;
+.gauge-marker-pin .marker-flag {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.gauge-marker-pin .marker-needle {
+  width: 2.5px;
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* Flag & Needle pour le SEUIL MAJORITÉ */
+.gauge-marker-pin.pin-seuil .marker-flag {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #b91c1c;
+}
+
+.gauge-marker-pin.pin-seuil .marker-needle {
+  background: #dc2626;
+  box-shadow: 0 0 4px rgba(220, 38, 38, 0.6);
+}
+
+body.dark-mode .gauge-marker-pin.pin-seuil .marker-flag {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #b91c1c;
+}
+
+body.dark-mode .gauge-marker-pin.pin-seuil .marker-needle {
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.8);
+}
+
+/* Flag & Needle pour la PASSERELLE 25-1 */
+.gauge-marker-pin.pin-passerelle .marker-flag {
+  background: #d97706;
+  color: #ffffff;
+  border: 1px solid #b45309;
+}
+
+.gauge-marker-pin.pin-passerelle .marker-needle {
+  background: #d97706;
+  box-shadow: 0 0 4px rgba(217, 119, 6, 0.5);
+}
+
+body.dark-mode .gauge-marker-pin.pin-passerelle .marker-flag {
+  background: #f59e0b;
+  color: #ffffff;
+  border-color: #d97706;
+}
+
+body.dark-mode .gauge-marker-pin.pin-passerelle .marker-needle {
+  background: #f59e0b;
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.8);
 }
 
 /* Échelle de graduation sous la barre */
 .gauge-scale-row {
   position: relative;
-  height: 20px;
-  margin-top: 5px;
-  font-size: 0.7rem;
-  color: var(--gray-500);
+  height: 22px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--gray-600);
   font-weight: 600;
 }
 
@@ -1623,7 +1691,10 @@ body.dark-mode .gauge-scale-row {
 .scale-point.p-seuil {
   transform: translateX(-50%);
   color: #dc2626;
-  font-weight: 700;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
 body.dark-mode .scale-point.p-seuil {
@@ -1633,7 +1704,10 @@ body.dark-mode .scale-point.p-seuil {
 .scale-point.p-passerelle {
   transform: translateX(-50%);
   color: #d97706;
-  font-weight: 700;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
 body.dark-mode .scale-point.p-passerelle {
@@ -1641,7 +1715,7 @@ body.dark-mode .scale-point.p-passerelle {
 }
 
 .scale-tick {
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   display: inline-block;
   margin-right: 2px;
 }
@@ -2316,5 +2390,72 @@ body.dark-mode .speech-box {
     display: none !important;
   }
 }
+
+/* ==========================================
+   MODULES : SIMULATEUR CHARGES, CHRONO & CLÔTURE / FLASH-INFO
+   ========================================== */
+
+.timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fde047;
+}
+
+.cloture-card, .flash-info-card {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 1.5rem;
+  color: #0f172a;
+  line-height: 1.5;
+}
+
+body.dark-mode .cloture-card, body.dark-mode .flash-info-card {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.signatures-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 2px dashed #cbd5e1;
+}
+
+.signature-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #f8fafc;
+}
+
+body.dark-mode .signature-box {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.quote-part-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  text-align: center;
+}
+
 
 
