@@ -1820,78 +1820,121 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
   const hasNumbers = (pour > 0 || contre > 0 || abs > 0);
 
   let targetSeuil = 0;
-  let targetLabel = '';
+  let ruleTag = '';
+  let ruleSubtext = '';
+  let seuilPct = 50;
   let passerelleSeuil = 0;
   let currentVal = hasNumbers ? pour : csTotalVoix;
   let percent = 0;
-  let messageTactique = '';
+  let isAdoptable = false;
+  let messageTactiquePro = '';
   let alertPasserelleHtml = '';
 
   if (isArt24) {
-    // Art 24 : Majorité des voix exprimées en salle
+    // Art 24 : Majorité simple des voix exprimées en salle
     const exprimesActuels = hasNumbers ? (pour + contre) : (totalEnSalle || 1);
     targetSeuil = Math.floor(exprimesActuels / 2) + 1;
-    targetLabel = `Art. 24 (Majorité simple) : > 50% des exprimés en salle (~${targetSeuil} voix)`;
+    seuilPct = 50;
+    ruleTag = 'Article 24 • Majorité simple';
+    ruleSubtext = `Seuil : > 50% des exprimés en salle (~${targetSeuil.toLocaleString('fr-FR')} voix)`;
     percent = exprimesActuels > 0 ? Math.min(100, Math.round((currentVal / exprimesActuels) * 100)) : 0;
+    isAdoptable = currentVal >= targetSeuil;
 
-    if (csTotalVoix >= targetSeuil) {
-      messageTactique = `<span class="badge-force-cs-ok">🟢 Force CS suffisante :</span> <span class="tactique-desc">Le CS détient <strong>${csTotalVoix}</strong> voix, soit plus que les <strong>${targetSeuil}</strong> nécessaires pour l'adopter !</span>`;
+    if (isAdoptable) {
+      const surplus = currentVal - targetSeuil;
+      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix, soit <strong>+${surplus.toLocaleString('fr-FR')} voix d'avance</strong> sur les ${targetSeuil.toLocaleString('fr-FR')} nécessaires pour l'adopter.`;
     } else {
-      const besoin = Math.max(0, targetSeuil - csTotalVoix);
-      messageTactique = `<span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin}</strong> voix parmi les présents pour l'emporter.</span>`;
+      const besoin = Math.max(0, targetSeuil - currentVal);
+      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin.toLocaleString('fr-FR')} voix</strong> parmi les présents en séance pour emporter la décision.`;
     }
   } else if (isArt25) {
-    // Art 25 : Majorité de tous les copropriétaires (50% de totalCopro)
+    // Art 25 : Majorité de tous les copropriétaires
     targetSeuil = Math.floor(totalCopro / 2) + 1; // 48 740
     passerelleSeuil = Math.ceil(totalCopro / 3); // 32 493
-    targetLabel = `Art. 25 (Majorité absolue) : ${targetSeuil} voix requises (>50% de l'immeuble)`;
+    seuilPct = 50;
+    ruleTag = 'Article 25 • Majorité absolue';
+    ruleSubtext = `Seuil : ${targetSeuil.toLocaleString('fr-FR')} voix (> 50% de l'immeuble)`;
     percent = totalCopro > 0 ? Math.min(100, Math.round((currentVal / totalCopro) * 100)) : 0;
-    const besoin25 = Math.max(0, targetSeuil - csTotalVoix);
-    const besoinPasserelle = Math.max(0, passerelleSeuil - csTotalVoix);
+    isAdoptable = currentVal >= targetSeuil;
+    const besoin25 = Math.max(0, targetSeuil - currentVal);
+    const besoinPasserelle = Math.max(0, passerelleSeuil - currentVal);
 
     if (hasNumbers && pour >= passerelleSeuil && pour < targetSeuil) {
       alertPasserelleHtml = `
         <div class="passerelle-alert-badge">
-          🚨 PASSERELLE ART. 25-1 DE DROIT : ${pour} voix >= ${passerelleSeuil} (1/3 atteint). Le syndic DOIT organiser un 2nd vote immédiat à l'Art. 24 !
+          🚨 PASSERELLE ART. 25-1 DE DROIT : ${pour.toLocaleString('fr-FR')} voix >= ${passerelleSeuil.toLocaleString('fr-FR')} (1/3 atteint). Le syndic DOIT organiser un second vote immédiat à l'Article 24 !
         </div>
       `;
     }
 
-    messageTactique = `
-      <span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin25}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle}</strong> voix pour déclencher la passerelle 25-1).</span>
-    `;
+    if (isAdoptable) {
+      messageTactiquePro = `Majorité absolue atteinte avec <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix ! L'adoption directe à l'Article 25 est acquise.`;
+    } else if (currentVal >= passerelleSeuil) {
+      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix : seuil de passerelle 25-1 franchi ! Un second vote immédiat à l'Art. 24 peut être déclenché.`;
+    } else {
+      messageTactiquePro = `Force CS : <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin25.toLocaleString('fr-FR')}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle.toLocaleString('fr-FR')}</strong> voix pour la passerelle 25-1).`;
+    }
   } else if (isArt26) {
-    targetSeuil = Math.ceil((totalCopro * 2) / 3); // 2/3
-    targetLabel = `Art. 26 (Double majorité) : ~${targetSeuil} voix requises (2/3 de l'immeuble)`;
+    // Art 26 : Double majorité (2/3 de l'immeuble)
+    targetSeuil = Math.ceil((totalCopro * 2) / 3);
+    seuilPct = 67;
+    ruleTag = 'Article 26 • Double majorité';
+    ruleSubtext = `Seuil : ~${targetSeuil.toLocaleString('fr-FR')} voix (2/3 de l'immeuble)`;
     percent = totalCopro > 0 ? Math.min(100, Math.round((currentVal / totalCopro) * 100)) : 0;
-    const besoin26 = Math.max(0, targetSeuil - csTotalVoix);
-    messageTactique = `<span class="tactique-desc">Force CS : <strong>${csTotalVoix}</strong> voix. Il manque <strong>${besoin26}</strong> voix pour atteindre les 2/3.</span>`;
+    isAdoptable = currentVal >= targetSeuil;
+    const besoin26 = Math.max(0, targetSeuil - currentVal);
+
+    if (isAdoptable) {
+      messageTactiquePro = `Double majorité acquise avec <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix ! Seuil des 2/3 franchi.`;
+    } else {
+      messageTactiquePro = `Force CS : <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin26.toLocaleString('fr-FR')}</strong> voix pour atteindre les 2/3 de l'immeuble.`;
+    }
   }
 
-  const fillClass = percent >= 50 ? 'success' : (percent >= 33 ? 'warning' : '');
+  const fillClass = isAdoptable ? 'success' : (percent >= 33 ? 'warning' : 'primary');
 
   return `
     <div class="majority-gauge-container">
-      <div class="gauge-info-row">
-        <span class="gauge-target-label">🎯 ${targetLabel}</span>
-        <span class="gauge-force-label">${hasNumbers ? `Scrutin : ${pour} POUR` : `Force CS : ${csTotalVoix}`} (${percent}%)</span>
-      </div>
-
-      <div class="gauge-track">
-        <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
-        ${isArt25 ? `
-          <div class="gauge-marker" style="left: 33.3%; background:#f59e0b;" title="Seuil 1/3 Passerelle Art. 25-1">
-            <span class="gauge-marker-label passerelle-label">1/3 (Passerelle)</span>
-          </div>
-        ` : ''}
-        <div class="gauge-marker" style="left: 50%;" title="Seuil d'adoption (50%)">
-          <span class="gauge-marker-label">Seuil 50%</span>
+      <div class="gauge-header-pro">
+        <div class="gauge-rule-badge">
+          <span class="gauge-rule-tag">${escapeHtml(ruleTag)}</span>
+          <span class="gauge-rule-desc">${escapeHtml(ruleSubtext)}</span>
+        </div>
+        <div class="gauge-score-pill ${isAdoptable ? 'score-adopted' : ''}">
+          <span class="score-label">${hasNumbers ? 'Scrutin' : 'Force CS'} :</span>
+          <span class="score-val"><strong>${currentVal.toLocaleString('fr-FR')}</strong> voix</span>
+          <span class="score-percent">(${percent}%)</span>
         </div>
       </div>
 
-      <div class="tactique-msg-row">
-        ${messageTactique}
+      <div class="gauge-bar-wrapper">
+        <div class="gauge-track">
+          <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
+          ${isArt25 ? `<div class="gauge-pin pin-passerelle" style="left: 33.33%;" title="Passerelle 25-1 (33.3%)"></div>` : ''}
+          <div class="gauge-pin pin-seuil" style="left: ${seuilPct}%;" title="Seuil d'adoption (${seuilPct}%)"></div>
+        </div>
+
+        <div class="gauge-scale-row">
+          <span class="scale-point p-start">0%</span>
+          ${isArt25 ? `
+            <span class="scale-point p-passerelle" style="left: 33.33%;">
+              <span class="scale-tick">▲</span> 33% <em>(Passerelle : ${passerelleSeuil.toLocaleString('fr-FR')})</em>
+            </span>
+          ` : ''}
+          <span class="scale-point p-seuil" style="left: ${seuilPct}%;">
+            <span class="scale-tick">▲</span> Seuil ${seuilPct}% <em>(${targetSeuil.toLocaleString('fr-FR')} voix)</em>
+          </span>
+          <span class="scale-point p-end">100%</span>
+        </div>
       </div>
+
+      <div class="tactique-card ${isAdoptable ? 'tactique-card-success' : 'tactique-card-warning'}">
+        <div class="tactique-card-icon">${isAdoptable ? '🟢' : '⚠️'}</div>
+        <div class="tactique-card-content">
+          <strong>${isAdoptable ? 'Force CS suffisante :' : 'Force CS à compléter :'}</strong> ${messageTactiquePro}
+        </div>
+      </div>
+
       ${alertPasserelleHtml}
     </div>
   `;
