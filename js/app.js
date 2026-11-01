@@ -10,12 +10,23 @@ function loadData() {
     try {
       const parsed = JSON.parse(stored);
       if (!parsed.coproprietaires) parsed.coproprietaires = [];
+      if (!parsed.members) parsed.members = [];
+      // Rétrocompatibilité statut des membres CS
+      parsed.members.forEach(m => {
+        if (!m.statut) m.statut = 'ACTIF';
+      });
       return parsed;
     } catch (e) {
       console.error("Erreur parsing localStorage", e);
     }
   }
-  return JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
+  const initial = JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
+  if (initial.members) {
+    initial.members.forEach(m => {
+      if (!m.statut) m.statut = 'ACTIF';
+    });
+  }
+  return initial;
 }
 
 function persistData(broadcast = true) {
@@ -101,9 +112,10 @@ function updateUI() {
   document.getElementById('statRejected').innerText = rejected;
   document.getElementById('statPercent').innerText = total > 0 ? Math.round((voted / total) * 100) + '% voté' : '0%';
 
-  // Voix du CS
-  const csPerso = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0), 0);
-  const csMandats = appData.members.reduce((acc, m) => acc + (Number(m.mandatTantiemes) || 0), 0);
+  // Voix du CS (Membres ACTIFS uniquement)
+  const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const csPerso = activeMembers.reduce((acc, m) => acc + (Number(m.tantiemes) || 0), 0);
+  const csMandats = activeMembers.reduce((acc, m) => acc + (Number(m.mandatTantiemes) || 0), 0);
   const csTotal = csPerso + csMandats;
   const csPct = totalTant > 0 ? ((csTotal / totalTant) * 100).toFixed(1) : '0';
 
@@ -502,30 +514,44 @@ function renderMembers(csPerso, csMandats, csTotal, totalTant) {
   const tbody = document.getElementById('membersTableBody');
 
   if (appData.members.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun membre du Conseil Syndical renseigné.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun membre du Conseil Syndical renseigné.</td></tr>`;
   } else {
     tbody.innerHTML = appData.members.map(m => {
+      const isDemissionnaire = m.statut === 'DEMISSIONNAIRE';
       const perso = Number(m.tantiemes) || 0;
       const mand = Number(m.mandatTantiemes) || 0;
       const tot = perso + mand;
       const pct = totalTant > 0 ? ((tot / totalTant) * 100).toFixed(1) : 0;
-      const isOverTenPct = totalTant > 0 && (tot / totalTant) > 0.10;
+      const isOverTenPct = !isDemissionnaire && totalTant > 0 && (tot / totalTant) > 0.10;
+
+      const statutBadge = isDemissionnaire
+        ? `<span class="badge-cs-demission" title="${escapeHtml(m.dateDemission || 'Démission en cours d\'exercice')}">🚪 Démissionnaire</span>`
+        : `<span class="badge-cs-actif">🟢 En fonction</span>`;
 
       return `
-        <tr>
-          <td><strong>${escapeHtml(m.name)}</strong></td>
-          <td>${escapeHtml(m.lots || '-')}</td>
-          <td><span class="tantieme-pill">${perso}</span></td>
-          <td>${escapeHtml(m.mandats || 'Aucun')}</td>
-          <td><span class="tantieme-pill">${mand}</span></td>
+        <tr class="${isDemissionnaire ? 'tr-demissionnaire' : ''}">
           <td>
-            <strong>${tot}</strong> (${pct}%)
+            <strong>${escapeHtml(m.name)}</strong>
+            ${isDemissionnaire && m.dateDemission ? `<div style="font-size:0.73rem; color:#dc2626; font-style:italic;">${escapeHtml(m.dateDemission)}</div>` : ''}
+          </td>
+          <td>${statutBadge}</td>
+          <td>${escapeHtml(m.lots || '-')}</td>
+          <td><span class="tantieme-pill" style="${isDemissionnaire ? 'opacity:0.6;' : ''}">${perso}</span></td>
+          <td>${escapeHtml(m.mandats || 'Aucun')}</td>
+          <td><span class="tantieme-pill" style="${isDemissionnaire ? 'opacity:0.6;' : ''}">${mand}</span></td>
+          <td>
+            <strong>${tot}</strong> ${isDemissionnaire ? '<span style="font-size:0.75rem; color:var(--gray-500);">(Hors CS)</span>' : `(${pct}%)`}
             ${isOverTenPct ? `<span title="Attention: dépasse 10% des voix totales de l'immeuble" style="color:var(--danger); font-size:0.75rem; font-weight:700;"> ⚠️ &gt;10%</span>` : ''}
           </td>
           <td class="no-print" style="text-align:right;">
-            <button class="btn btn-warning-gold btn-sm" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ce membre du CS">✉️ + Pouvoir</button>
-            <button class="btn btn-secondary btn-sm" onclick="editMember('${m.id}')">✏️ Saisir tantièmes</button>
-            <button class="btn btn-secondary btn-sm" onclick="deleteMember('${m.id}')" style="color:var(--danger)">🗑️</button>
+            ${!isDemissionnaire ? `
+              <button class="btn btn-warning-gold btn-sm" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ce membre du CS">✉️ + Pouvoir</button>
+              <button class="btn btn-outline-danger btn-sm" onclick="toggleMemberDemission('${m.id}')" title="Déclarer démissionnaire en cours d'exercice">🚪 Démission</button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" onclick="toggleMemberDemission('${m.id}')" title="Réintégrer parmi les membres actifs du CS">🔄 Réactiver</button>
+            `}
+            <button class="btn btn-secondary btn-sm" onclick="editMember('${m.id}')" title="Modifier fiche et tantièmes">✏️</button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteMember('${m.id}')" style="color:var(--danger)" title="Supprimer définitivement">🗑️</button>
           </td>
         </tr>
       `;
@@ -830,6 +856,8 @@ function openNewMemberModal() {
   document.getElementById('memFormTantiemes').value = '';
   document.getElementById('memFormMandats').value = '';
   document.getElementById('memFormMandatTantiemes').value = '';
+  document.getElementById('memFormStatut').value = 'ACTIF';
+  document.getElementById('memFormDateDemission').value = '';
   openModal('memberModal');
 }
 
@@ -843,6 +871,8 @@ function editMember(id) {
   document.getElementById('memFormTantiemes').value = m.tantiemes || '';
   document.getElementById('memFormMandats').value = m.mandats || '';
   document.getElementById('memFormMandatTantiemes').value = m.mandatTantiemes || '';
+  document.getElementById('memFormStatut').value = m.statut || 'ACTIF';
+  document.getElementById('memFormDateDemission').value = m.dateDemission || '';
   openModal('memberModal');
 }
 
@@ -854,12 +884,20 @@ function saveMember(e) {
     lots: document.getElementById('memFormLots').value.trim(),
     tantiemes: Number(document.getElementById('memFormTantiemes').value) || 0,
     mandats: document.getElementById('memFormMandats').value.trim(),
-    mandatTantiemes: Number(document.getElementById('memFormMandatTantiemes').value) || 0
+    mandatTantiemes: Number(document.getElementById('memFormMandatTantiemes').value) || 0,
+    statut: document.getElementById('memFormStatut').value || 'ACTIF',
+    dateDemission: document.getElementById('memFormDateDemission').value.trim()
   };
 
   if (id) {
     const index = appData.members.findIndex(m => m.id === id);
-    if (index !== -1) appData.members[index] = { ...appData.members[index], ...memData };
+    if (index !== -1) {
+      const prevStatut = appData.members[index].statut || 'ACTIF';
+      appData.members[index] = { ...appData.members[index], ...memData };
+      if (prevStatut === 'ACTIF' && memData.statut === 'DEMISSIONNAIRE') {
+        libererPouvoirsMembreDemissionnaire(appData.members[index]);
+      }
+    }
   } else {
     appData.members.push({ id: 'mem_' + Date.now(), ...memData });
   }
@@ -868,13 +906,97 @@ function saveMember(e) {
   persistData();
 }
 
+function toggleMemberDemission(id) {
+  const m = appData.members.find(x => x.id === id);
+  if (!m) return;
+
+  if (m.statut === 'DEMISSIONNAIRE') {
+    m.statut = 'ACTIF';
+    persistData();
+    showToast(`✅ ${m.name} est à nouveau actif au sein du Conseil Syndical.`, "success");
+  } else {
+    // Vérifier les pouvoirs rattachés
+    const assigned = (appData.coproprietaires || []).filter(c =>
+      c.statut === 'POUVOIR' && (c.mandataireMemberId === m.id || (c.mandataire && c.mandataire.toLowerCase().includes(m.name.toLowerCase())))
+    );
+
+    let msg = `Déclarer "${m.name}" démissionnaire en cours d'exercice ?\n\nSes voix personnelles (${m.tantiemes} tant.) ne seront plus comptabilisées dans la force du CS.`;
+    if (assigned.length > 0) {
+      msg += `\n\n⚠️ ATTENTION : ${assigned.length} pouvoir(s) lui sont actuellement confiés. Ils seront automatiquement convertis en 'Pouvoirs en blanc' afin d'être redistribués équitablement aux membres CS actifs.`;
+    }
+
+    if (!confirm(msg)) return;
+
+    m.statut = 'DEMISSIONNAIRE';
+    if (!m.dateDemission) {
+      const now = new Date();
+      m.dateDemission = `Démission en cours d'exercice (${now.toLocaleDateString('fr-FR')})`;
+    }
+
+    if (assigned.length > 0) {
+      assigned.forEach(c => {
+        c.mandataireMemberId = 'BLANC';
+        c.mandataire = 'POUVOIR EN BLANC';
+        c.notes = (c.notes ? c.notes + ' | ' : '') + `Pouvoir libéré suite à la démission de ${m.name}`;
+      });
+      showToast(`🚪 ${m.name} marqué démissionnaire. ${assigned.length} pouvoir(s) convertis en blanc.`, "warning");
+    } else {
+      showToast(`🚪 ${m.name} est maintenant marqué démissionnaire du CS.`, "info");
+    }
+
+    persistData();
+  }
+}
+
+function libererPouvoirsMembreDemissionnaire(m) {
+  const assigned = (appData.coproprietaires || []).filter(c =>
+    c.statut === 'POUVOIR' && (c.mandataireMemberId === m.id || (c.mandataire && c.mandataire.toLowerCase().includes(m.name.toLowerCase())))
+  );
+  if (assigned.length > 0) {
+    if (confirm(`Ce membre détient ${assigned.length} pouvoir(s). Voulez-vous les basculer automatiquement en pouvoirs en blanc pour le CS restant ?`)) {
+      assigned.forEach(c => {
+        c.mandataireMemberId = 'BLANC';
+        c.mandataire = 'POUVOIR EN BLANC';
+        c.notes = (c.notes ? c.notes + ' | ' : '') + `Pouvoir libéré suite à démission de ${m.name}`;
+      });
+    }
+  }
+}
+
 function deleteMember(id) {
   const m = appData.members.find(x => x.id === id);
   if (!m) return;
-  if (confirm(`Supprimer "${m.name}" ?`)) {
+  if (confirm(`Supprimer définitivement "${m.name}" de la base ?`)) {
+    // Si des pouvoirs lui étaient rattachés, les passer en blanc
+    (appData.coproprietaires || []).forEach(c => {
+      if (c.mandataireMemberId === id) {
+        c.mandataireMemberId = 'BLANC';
+        c.mandataire = 'POUVOIR EN BLANC';
+      }
+    });
     appData.members = appData.members.filter(x => x.id !== id);
     persistData();
+    showToast(`Membre supprimé`, "info");
   }
+}
+
+function syncMembersFromDefaultData() {
+  if (!confirm("Voulez-vous synchroniser les membres du Conseil Syndical avec les données officielles de la convocation (statuts et tantièmes à jour) ? Vos votes et présences actuels seront conservés.")) {
+    return;
+  }
+  const defaultMembers = DEFAULT_AG_DATA.members || [];
+  defaultMembers.forEach(defM => {
+    const existing = appData.members.find(m => m.id === defM.id || m.name.toLowerCase() === defM.name.toLowerCase());
+    if (existing) {
+      existing.statut = defM.statut || existing.statut || 'ACTIF';
+      if (defM.dateDemission) existing.dateDemission = defM.dateDemission;
+      if (defM.tantiemes && !existing.tantiemes) existing.tantiemes = defM.tantiemes;
+    } else {
+      appData.members.push({ ...defM });
+    }
+  });
+  persistData();
+  showToast("Composition du CS synchronisée avec les données officielles !", "success");
 }
 
 // Copropriétaire Handlers
@@ -1098,7 +1220,8 @@ function renderPouvoirsTab() {
   const blancsCount = blancsPouvoirs.length;
   const blancsTant = blancsPouvoirs.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
 
-  const csPerso = appData.members.reduce((sum, m) => sum + (Number(m.tantiemes) || 0), 0);
+  const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const csPerso = activeMembers.reduce((sum, m) => sum + (Number(m.tantiemes) || 0), 0);
   const csTotalVoix = csPerso + csPouvoirsTant;
   const csTotalPct = totalCopro > 0 ? ((csTotalVoix / totalCopro) * 100).toFixed(1) : '0';
 
@@ -1124,19 +1247,22 @@ function renderPouvoirsTab() {
     }
   }
 
-  // 1. Grille des Membres CS
-  if (appData.members.length === 0) {
+  // 1. Grille des Membres CS (Membres actifs en priorité, alertes démissionnaires si pouvoirs orphelins)
+  const displayMembers = appData.members.filter(m => m.statut !== 'DEMISSIONNAIRE' || (m._assignedCopros && m._assignedCopros.length > 0));
+
+  if (displayMembers.length === 0) {
     pouvoirsGrid.innerHTML = `<div style="grid-column: 1/-1; padding:1.5rem; text-align:center; color:var(--gray-500); background:white; border-radius:8px;">Aucun membre du Conseil Syndical enregistré.</div>`;
   } else {
-    pouvoirsGrid.innerHTML = appData.members.map(m => {
+    pouvoirsGrid.innerHTML = displayMembers.map(m => {
+      const isDemissionnaire = m.statut === 'DEMISSIONNAIRE';
       const assigned = m._assignedCopros || [];
       const perso = Number(m.tantiemes) || 0;
       const mand = m.mandatTantiemes || 0;
       const tot = m._totalVoix || (perso + mand);
       const isSafe = m._isLegalSafe !== false;
-      const cardClass = assigned.length === 0 ? 'no-mandat' : (isSafe ? 'legal-safe' : 'legal-warning');
-      const badgeClass = assigned.length === 0 ? 'neutral' : (isSafe ? 'safe' : 'warning');
-      const badgeText = assigned.length === 0 ? '0 mandat' : (isSafe ? `🟢 ${m._nbMandats} mandat(s) : Conforme` : `🔴 Alerte Art. 22`);
+      const cardClass = isDemissionnaire ? 'legal-warning' : (assigned.length === 0 ? 'no-mandat' : (isSafe ? 'legal-safe' : 'legal-warning'));
+      const badgeClass = isDemissionnaire ? 'warning' : (assigned.length === 0 ? 'neutral' : (isSafe ? 'safe' : 'warning'));
+      const badgeText = isDemissionnaire ? '🚪 Démissionnaire' : (assigned.length === 0 ? '0 mandat' : (isSafe ? `🟢 ${m._nbMandats} mandat(s) : Conforme` : `🔴 Alerte Art. 22`));
 
       return `
         <div class="cs-pouvoir-card ${cardClass}">
@@ -1344,7 +1470,10 @@ function populateCsMemberSelect(targetMemberId = null) {
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
   const max10Pct = totalCopro * 0.10;
 
-  select.innerHTML = appData.members.map(m => {
+  // Uniquement les membres actifs du CS
+  const activeMembers = appData.members.filter(m => m.statut !== 'DEMISSIONNAIRE');
+
+  select.innerHTML = activeMembers.map(m => {
     const nb = m._nbMandats || 0;
     const tot = m._totalVoix || ((Number(m.tantiemes) || 0) + (m.mandatTantiemes || 0));
     let statusText = '🟢 Disponible';
@@ -1443,7 +1572,8 @@ function suggererMeilleurMembreCS() {
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
   const max10Pct = totalCopro * 0.10;
 
-  const sorted = appData.members.slice().sort((a, b) => {
+  const activeMembers = appData.members.filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const sorted = activeMembers.slice().sort((a, b) => {
     const aNb = a._nbMandats || 0;
     const bNb = b._nbMandats || 0;
     const aSafe = (aNb + 1 <= 3) || (((a._totalVoix || 0) + tantToAdd) <= max10Pct);
@@ -1543,7 +1673,7 @@ function openTransfertModal(coproId) {
   document.getElementById('transfertAncienMandataire').innerText = c.mandataire || 'Non défini';
 
   const select = document.getElementById('transfertNouveauMembreSelect');
-  const otherMembers = appData.members.filter(m => m.id !== c.mandataireMemberId);
+  const otherMembers = appData.members.filter(m => m.id !== c.mandataireMemberId && m.statut !== 'DEMISSIONNAIRE');
 
   select.innerHTML = otherMembers.map(m => {
     const nb = m._nbMandats || 0;
@@ -1565,7 +1695,7 @@ function suggererTransfertCS() {
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
   const max10Pct = totalCopro * 0.10;
 
-  const candidates = appData.members.filter(m => m.id !== c?.mandataireMemberId);
+  const candidates = appData.members.filter(m => m.id !== c?.mandataireMemberId && m.statut !== 'DEMISSIONNAIRE');
   candidates.sort((a, b) => {
     const aNb = a._nbMandats || 0;
     const bNb = b._nbMandats || 0;
@@ -1622,7 +1752,8 @@ function repartirPouvoirsBlancsAuto() {
 
   blancs.forEach(c => {
     const tant = Number(c.tantiemes) || 0;
-    const candidates = appData.members.slice().sort((a, b) => {
+    const activeCandidates = appData.members.filter(m => m.statut !== 'DEMISSIONNAIRE');
+    const candidates = activeCandidates.slice().sort((a, b) => {
       const aNb = a._nbMandats || 0;
       const bNb = b._nbMandats || 0;
       const aSafe = (aNb + 1 <= 3) || (((a._totalVoix || 0) + tant) <= max10Pct);
@@ -1877,7 +2008,7 @@ function renderModeSeance() {
   if (eluZone && eluInput && eluDatalist) {
     let optionsHtml = '';
     optionsHtml += '<optgroup label="Membres du CS">';
-    (appData.members || []).forEach(m => {
+    (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE').forEach(m => {
       optionsHtml += `<option value="${escapeHtml(m.name)}">Conseil Syndical</option>`;
     });
     optionsHtml += '</optgroup>';
@@ -1901,8 +2032,9 @@ function renderModeSeance() {
     }
   }
 
-  // Simulateur tactique
-  const csTotalVoix = appData.members.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
+  // Simulateur tactique (Membres ACTIFS uniquement)
+  const activeMembersSeance = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const csTotalVoix = activeMembersSeance.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
   const totalEnSalle = appData.config.presentTantiemes || 0;
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
 

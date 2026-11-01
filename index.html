@@ -428,9 +428,14 @@
         <div style="font-weight: 700; color: var(--gray-800);">
           Membres du Conseil Syndical (RÉSIDENCE LE FLORÉAL)
         </div>
-        <button class="btn btn-primary" onclick="openNewMemberModal()">
-          + Ajouter un membre CS
-        </button>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="syncMembersFromDefaultData()" title="Mettre à jour la composition officielle depuis les données de convocation">
+            🔄 Synchroniser avec la convocation
+          </button>
+          <button class="btn btn-primary" onclick="openNewMemberModal()">
+            + Ajouter un membre CS
+          </button>
+        </div>
       </div>
 
       <div class="table-container">
@@ -438,6 +443,7 @@
           <thead>
             <tr>
               <th>Membre CS</th>
+              <th>Statut Mandat</th>
               <th>Lot(s)</th>
               <th>Tantièmes Perso</th>
               <th>Pouvoirs / Mandats reçus</th>
@@ -451,7 +457,7 @@
           </tbody>
           <tfoot>
             <tr style="background:#f8fafc; font-weight:700;">
-              <td colspan="2">TOTAL DÉTENU PAR LE CS</td>
+              <td colspan="3">TOTAL DÉTENU PAR LE CS (Membres Actifs)</td>
               <td id="footPersoTantiemes">0</td>
               <td>-</td>
               <td id="footMandatTantiemes">0</td>
@@ -758,6 +764,19 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           <div class="form-group">
             <label>Nom et Prénom du membre CS *</label>
             <input type="text" id="memFormName" class="form-control" placeholder="Ex: M. DUCHEZ" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Statut du mandat CS *</label>
+              <select id="memFormStatut" class="form-control">
+                <option value="ACTIF">🟢 En fonction (Actif)</option>
+                <option value="DEMISSIONNAIRE">🚪 Démissionnaire en cours d'exercice</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Date / Note démission</label>
+              <input type="text" id="memFormDateDemission" class="form-control" placeholder="Ex: Démission mars 2026">
+            </div>
           </div>
           <div class="form-row">
             <div class="form-group">

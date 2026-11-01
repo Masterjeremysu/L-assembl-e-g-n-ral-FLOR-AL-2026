@@ -25,6 +25,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. SUZET Jérémy & Mme FALCON Laura",
     "lots": "",
     "tantiemes": 802,
+    "statut": "ACTIF",
     "mandats": "DI TOMMASO Giuseppina (360), PARRINELLO Frédéric / Virginie (417)",
     "mandatTantiemes": 777
   },
@@ -33,7 +34,7 @@ const DEFAULT_AG_DATA = {
     "name": "Mme GUERRE Sylvie & M. GUERRE Joël",
     "lots": "",
     "tantiemes": 461,
-    "mandats": "AZIMI Galina (464), BRUN Robert (395), GARCIA F.-OSIOL F (409), GARCIA Rémy (88), KIBARDINA Anastasia (417), RUSSO Anna (427), VOILQUE (378)",
+    "statut": "ACTIF",    "mandats": "AZIMI Galina (464), BRUN Robert (395), GARCIA F.-OSIOL F (409), GARCIA Rémy (88), KIBARDINA Anastasia (417), RUSSO Anna (427), VOILQUE (378)",
     "mandatTantiemes": 2578
   },
   {
@@ -41,7 +42,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. BRUN Éric",
     "lots": "",
     "tantiemes": 478,
-    "mandats": "BRUN Ludovic / Jennifer (441), FILECCIA V. (378), TRAJILOVIC Olga (413)",
+    "statut": "ACTIF",    "mandats": "BRUN Ludovic / Jennifer (441), FILECCIA V. (378), TRAJILOVIC Olga (413)",
     "mandatTantiemes": 1232
   },
   {
@@ -49,7 +50,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. CASARI Jean-Paul",
     "lots": "",
     "tantiemes": 358,
-    "mandats": "GOMEZ Corinne (436), KECK Joséphine (425)",
+    "statut": "ACTIF",    "mandats": "GOMEZ Corinne (436), KECK Joséphine (425)",
     "mandatTantiemes": 861
   },
   {
@@ -57,7 +58,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. & Mme ARMONIA Frédéric / Diane",
     "lots": "",
     "tantiemes": 415,
-    "mandats": "BORGHIN Serge (417)",
+    "statut": "ACTIF",    "mandats": "BORGHIN Serge (417)",
     "mandatTantiemes": 417
   },
   {
@@ -65,7 +66,7 @@ const DEFAULT_AG_DATA = {
     "name": "Mme GANET Chantal",
     "lots": "",
     "tantiemes": 464,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -73,7 +74,7 @@ const DEFAULT_AG_DATA = {
     "name": "Mlle PIGOIS Véronique",
     "lots": "",
     "tantiemes": 363,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -81,7 +82,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. DUCHEZ & Mme DABOIN SOTO Kévin / Risobel",
     "lots": "",
     "tantiemes": 417,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -89,7 +90,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. BEZY David",
     "lots": "",
     "tantiemes": 464,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -97,7 +98,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. BONSIGNORE Alexis",
     "lots": "",
     "tantiemes": 358,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -105,7 +106,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. COURANT Daniel",
     "lots": "",
     "tantiemes": 466,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -113,7 +114,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. LEGRAND David",
     "lots": "",
     "tantiemes": 432,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -121,7 +122,7 @@ const DEFAULT_AG_DATA = {
     "name": "M. LOUIS Janick & Justin",
     "lots": "",
     "tantiemes": 439,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -129,7 +130,7 @@ const DEFAULT_AG_DATA = {
     "name": "Mme FANTINI",
     "lots": "",
     "tantiemes": 0,
-    "mandats": "",
+    "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   }
 ],
