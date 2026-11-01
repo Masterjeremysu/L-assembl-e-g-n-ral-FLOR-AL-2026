@@ -635,9 +635,21 @@ function setQuickVote(id, newStatus) {
   const res = appData.resolutions.find(r => r.id === id);
   if (res) {
     res.status = newStatus;
+    const totalEnSalle = appData.config.presentTantiemes || 0;
     if (newStatus !== 'EN_ATTENTE') {
       const now = new Date();
       res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+      if (newStatus === 'ADOPTEE' && (!res.tantiemesPour || res.tantiemesPour === 0)) {
+        res.tantiemesPour = totalEnSalle;
+        res.tantiemesContre = res.tantiemesContre || 0;
+        res.tantiemesAbs = res.tantiemesAbs || 0;
+        res.syndicClaimStatus = res.syndicClaimStatus || 'ADOPTEE';
+      } else if (newStatus === 'REJETEE' && (!res.tantiemesContre || res.tantiemesContre === 0)) {
+        res.tantiemesContre = totalEnSalle;
+        res.tantiemesPour = res.tantiemesPour || 0;
+        res.tantiemesAbs = res.tantiemesAbs || 0;
+        res.syndicClaimStatus = res.syndicClaimStatus || 'REJETEE';
+      }
     } else {
       delete res.heureVote;
     }
@@ -679,6 +691,9 @@ function openScrutinModal(resId) {
   const eluInput = document.getElementById('scrutinEluNomInput');
   if (eluInput) eluInput.value = res.eluNom || '';
 
+  const searchInput = document.getElementById('scrutinChecklistSearch');
+  if (searchInput) searchInput.value = '';
+
   // Calcul instantané des opposants cochés
   renderScrutinChecklist();
   computeScrutinTotals();
@@ -706,17 +721,20 @@ function renderScrutinChecklist() {
 
   container.innerHTML = `
     <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:0.4rem;">
-      Appel des opposants (Cochez les copropriétaires qui lèvent la main) :
+      Mains levées en salle (Cochez uniquement CONTRE ou ABSTENTION — Le reste vote POUR automatiquement) :
     </div>
     <div class="scrutin-checklist-box">
       ${presents.map(c => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.25rem 0; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
-          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
-            <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeOpponents.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange()">
-            <span>${escapeHtml(c.nom)} (<strong>${c.tantiemes}</strong> tant.)</span>
+        <div class="scrutin-item-row" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes}" style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.4rem; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
+          <label style="display:flex; align-items:center; gap:0.45rem; cursor:pointer; flex:1; min-width:0; margin-right:0.5rem;">
+            <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeOpponents.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'CONTRE')">
+            <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.nom)}</span>
+            <span class="tantieme-pill" style="font-size:0.75rem;">${c.tantiemes} t.</span>
+            ${c.statut === 'POUVOIR' ? `<span style="font-size:0.72rem; color:#2563eb;">(➔ ${escapeHtml(c.mandataire || 'CS')})</span>` : ''}
+            ${c.statut === 'VPC' ? `<span style="font-size:0.72rem; color:#7c3aed;">(VPC)</span>` : ''}
           </label>
-          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:var(--warning); cursor:pointer;">
-            <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeAbs.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange()">
+          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:#d97706; cursor:pointer; white-space:nowrap;">
+            <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeAbs.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'ABS')">
             Abstention
           </label>
         </div>
@@ -725,7 +743,63 @@ function renderScrutinChecklist() {
   `;
 }
 
-function onScrutinCheckboxChange() {
+function filtrerScrutinChecklist() {
+  const q = document.getElementById('scrutinChecklistSearch')?.value || '';
+  const rows = document.querySelectorAll('#scrutinCoproChecklist .scrutin-item-row');
+  rows.forEach(row => {
+    const text = row.getAttribute('data-search') || '';
+    if (fuzzyMatch(q, text)) {
+      row.style.display = 'flex';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+function scrutinValiderUnanimite() {
+  const totalSalle = Number(document.getElementById('scrutinTotalSalle').innerText) || appData.config.presentTantiemes || 0;
+
+  // Décocher toutes les cases de la checklist
+  document.querySelectorAll('.chk-contre').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.chk-abs').forEach(cb => cb.checked = false);
+
+  document.getElementById('scrutinContreInput').value = 0;
+  document.getElementById('scrutinAbsInput').value = 0;
+  document.getElementById('scrutinPourInput').value = totalSalle;
+  document.getElementById('scrutinOpponentsList').value = "Aucun opposant (Unanimité)";
+  document.getElementById('scrutinSyndicClaim').value = 'ADOPTEE';
+  document.getElementById('scrutinSyndicVoixInput').value = totalSalle;
+
+  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  if (res) {
+    res.opponentsIds = [];
+    res.absenteeIds = [];
+    res.opponentsList = [];
+    res.opponentsText = "Adoptée à l'unanimité (0 contre, 0 abstention)";
+    res.tantiemesPour = totalSalle;
+    res.tantiemesContre = 0;
+    res.tantiemesAbs = 0;
+  }
+
+  computeScrutinTotals();
+  verifierDiscordanceScrutin();
+  showToast("⚡ Scrutin pré-rempli à l'UNANIMITÉ (100% POUR) !", "success");
+}
+
+function onScrutinCheckboxChange(el, type) {
+  if (el) {
+    const id = el.getAttribute('data-id');
+    if (type === 'CONTRE' && el.checked) {
+      // Exclusivité mutuelle : si on coche Contre, on décoche Abstention
+      const absCb = document.querySelector(`.chk-abs[data-id="${id}"]`);
+      if (absCb) absCb.checked = false;
+    } else if (type === 'ABS' && el.checked) {
+      // Exclusivité mutuelle : si on coche Abstention, on décoche Contre
+      const contreCb = document.querySelector(`.chk-contre[data-id="${id}"]`);
+      if (contreCb) contreCb.checked = false;
+    }
+  }
+
   let contreTotal = 0;
   let absTotal = 0;
   const contreNoms = [];
@@ -2262,6 +2336,12 @@ function renderModeSeance() {
   if (zone) {
     zone.innerHTML = renderTacticalMajorityGauge(res, totalEnSalle, totalCopro, csTotalVoix);
   }
+
+  // Quorum en salle temps réel
+  const totalEnSalleTantEl = document.getElementById('seanceTotalSalleTant');
+  if (totalEnSalleTantEl) {
+    totalEnSalleTantEl.innerText = (appData.config.presentTantiemes || 0).toLocaleString('fr-FR');
+  }
 }
 
 function onSeanceEluChange() {
@@ -2296,6 +2376,170 @@ function setSeanceVote(status) {
   setQuickVote(activeSeanceResId, status);
   renderModeSeance();
   showToast(`Résolution enregistrée : ${status}`, "success");
+}
+
+function setSeanceUnanimite() {
+  if (!activeSeanceResId) return;
+  const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+  if (!res) return;
+
+  const totalEnSalle = appData.config.presentTantiemes || 0;
+
+  res.status = 'ADOPTEE';
+  res.tantiemesPour = totalEnSalle;
+  res.tantiemesContre = 0;
+  res.tantiemesAbs = 0;
+  res.opponentsIds = [];
+  res.absenteeIds = [];
+  res.opponentsList = [];
+  res.opponentsText = "Adoptée à l'unanimité (0 contre, 0 abstention)";
+  res.syndicClaimStatus = 'ADOPTEE';
+  res.syndicClaimVoix = totalEnSalle;
+
+  const now = new Date();
+  res.heureVote = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const inputEl = document.getElementById('seanceEluInput');
+  if (inputEl && inputEl.value.trim() && !res.eluNom) {
+    res.eluNom = inputEl.value.trim();
+  }
+
+  persistData();
+  renderModeSeance();
+  showToast(`⚡ Résolution n° ${res.number} adoptée à l'UNANIMITÉ (${totalEnSalle.toLocaleString('fr-FR')} voix POUR) !`, "success");
+}
+
+// ==========================================
+// MOUVEMENTS EN SÉANCE (DÉPARTS ET ARRIVÉES TARDIVES)
+// ==========================================
+
+let currentMouvementMode = 'DEPART';
+
+function ouvrirDepartSeanceModal() {
+  currentMouvementMode = 'DEPART';
+  const rDep = document.getElementById('mouvementRadioDepart');
+  if (rDep) rDep.checked = true;
+  document.getElementById('mouvementModalTitle').innerText = "🚪 Consigner un départ en séance";
+  document.getElementById('mouvementSubmitBtn').innerText = "Consigner le départ (- tantièmes)";
+  document.getElementById('mouvementSubmitBtn').className = "btn btn-danger";
+
+  const now = new Date();
+  document.getElementById('mouvementHeureInput').value = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('mouvementSearchInput').value = '';
+
+  peuplerMouvementOptions('DEPART');
+  openModal('mouvementSeanceModal');
+}
+
+function ouvrirArriveeTardiveModal() {
+  currentMouvementMode = 'ARRIVEE';
+  const rArr = document.getElementById('mouvementRadioArrivee');
+  if (rArr) rArr.checked = true;
+  document.getElementById('mouvementModalTitle').innerText = "👋 Consigner une arrivée tardive";
+  document.getElementById('mouvementSubmitBtn').innerText = "Consigner l'arrivée (+ tantièmes)";
+  document.getElementById('mouvementSubmitBtn').className = "btn btn-success";
+
+  const now = new Date();
+  document.getElementById('mouvementHeureInput').value = `${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('mouvementSearchInput').value = '';
+
+  peuplerMouvementOptions('ARRIVEE');
+  openModal('mouvementSeanceModal');
+}
+
+function onMouvementTypeChanged() {
+  const isDepart = document.getElementById('mouvementRadioDepart')?.checked;
+  currentMouvementMode = isDepart ? 'DEPART' : 'ARRIVEE';
+  if (isDepart) {
+    document.getElementById('mouvementModalTitle').innerText = "🚪 Consigner un départ en séance";
+    document.getElementById('mouvementSubmitBtn').innerText = "Consigner le départ (- tantièmes)";
+    document.getElementById('mouvementSubmitBtn').className = "btn btn-danger";
+  } else {
+    document.getElementById('mouvementModalTitle').innerText = "👋 Consigner une arrivée tardive";
+    document.getElementById('mouvementSubmitBtn').innerText = "Consigner l'arrivée (+ tantièmes)";
+    document.getElementById('mouvementSubmitBtn').className = "btn btn-success";
+  }
+  peuplerMouvementOptions(currentMouvementMode);
+}
+
+function peuplerMouvementOptions(mode) {
+  const select = document.getElementById('mouvementCoproSelect');
+  if (!select) return;
+
+  const copros = (appData.coproprietaires || []).slice().sort((a, b) => a.nom.localeCompare(b.nom));
+  let list = [];
+
+  if (mode === 'DEPART') {
+    // Uniquement ceux actuellement en salle (Présents ou Pouvoirs)
+    list = copros.filter(c => c.statut === 'PRESENT' || c.statut === 'POUVOIR');
+  } else {
+    // Uniquement ceux absents ou déjà partis
+    list = copros.filter(c => c.statut === 'ABSENT' || c.statut === 'PARTI' || !c.statut);
+  }
+
+  select.innerHTML = list.map(c => `
+    <option value="${c.id}" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes}">
+      ${escapeHtml(c.nom)} — ${c.tantiemes} tant. [${escapeHtml(c.lots || 'Sans lot')}] (${c.statut})
+    </option>
+  `).join('');
+
+  if (select.options.length > 0) {
+    select.selectedIndex = 0;
+  }
+}
+
+function filtrerMouvementOptions() {
+  const q = document.getElementById('mouvementSearchInput')?.value || '';
+  const select = document.getElementById('mouvementCoproSelect');
+  if (!select) return;
+
+  Array.from(select.options).forEach(opt => {
+    const text = opt.getAttribute('data-search') || opt.text;
+    if (fuzzyMatch(q, text)) {
+      opt.style.display = '';
+    } else {
+      opt.style.display = 'none';
+    }
+  });
+
+  const firstVisible = Array.from(select.options).find(opt => opt.style.display !== 'none');
+  if (firstVisible) select.value = firstVisible.value;
+}
+
+function validerMouvementSeance(e) {
+  e.preventDefault();
+  const coproId = document.getElementById('mouvementCoproSelect')?.value;
+  const heure = document.getElementById('mouvementHeureInput')?.value.trim();
+  const c = appData.coproprietaires.find(x => x.id === coproId);
+
+  if (!c) {
+    alert("Veuillez sélectionner un copropriétaire.");
+    return;
+  }
+
+  if (!heure) {
+    alert("Veuillez renseigner l'heure officielle.");
+    return;
+  }
+
+  if (currentMouvementMode === 'DEPART') {
+    c.statut = 'PARTI';
+    c.heureDepart = heure;
+    c.notes = (c.notes ? c.notes + ' | ' : '') + `Parti en séance à ${heure}`;
+    closeModal('mouvementSeanceModal');
+    persistData();
+    if (isModeSeanceActive) renderModeSeance();
+    showToast(`🚪 Départ de ${c.nom} (${c.tantiemes} voix) consigné à ${heure}. Nouveau quorum : ${appData.config.presentTantiemes} voix.`, "warning");
+  } else {
+    c.statut = 'PRESENT';
+    c.heureArrivee = heure;
+    delete c.heureDepart;
+    c.notes = (c.notes ? c.notes + ' | ' : '') + `Arrivé en séance à ${heure}`;
+    closeModal('mouvementSeanceModal');
+    persistData();
+    if (isModeSeanceActive) renderModeSeance();
+    showToast(`👋 Arrivée de ${c.nom} (${c.tantiemes} voix) consignée à ${heure}. Nouveau quorum : ${appData.config.presentTantiemes} voix.`, "success");
+  }
 }
 
 // ==========================================
@@ -2816,7 +3060,7 @@ window.addEventListener('keydown', (e) => {
   const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
 
   if (e.key === 'Escape') {
-    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal'].forEach(id => closeModal(id));
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal'].forEach(id => closeModal(id));
     return;
   }
 
@@ -2840,6 +3084,9 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowLeft' && isModeSeanceActive) {
     e.preventDefault();
     naviguerSeance(-1);
+  } else if ((e.key === 'u' || e.key === 'U') && isModeSeanceActive) {
+    e.preventDefault();
+    setSeanceUnanimite();
   } else if ((e.key === 'a' || e.key === 'A') && isModeSeanceActive) {
     e.preventDefault();
     setSeanceVote('ADOPTEE');

@@ -1904,7 +1904,7 @@ body.dark-mode .btn-outline-danger:hover {
 
 .seance-quick-votes {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 0.6rem;
   margin-top: 1rem;
 }

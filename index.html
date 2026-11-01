@@ -161,19 +161,38 @@
           <!-- Dynamique -->
         </div>
 
+        <!-- Suivi dynamique du quorum en séance & Mouvements -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.45rem 0.8rem; margin-bottom:0.85rem; font-size:0.82rem; color:#e2e8f0; flex-wrap:wrap; gap:0.5rem;">
+          <div>
+            👥 <strong>Quorum en salle actuellement :</strong> <span id="seanceTotalSalleTant" style="font-weight:800; color:#4ade80; font-size:0.95rem;">-</span> tantièmes
+          </div>
+          <div style="display:flex; gap:0.4rem;">
+            <button type="button" class="btn btn-sm" style="background:#f59e0b; color:#1e293b; font-weight:700; padding:2px 8px; font-size:0.75rem; border:none;" onclick="ouvrirDepartSeanceModal()" title="Consigner le départ d'un copropriétaire en cours d'AG (Art. 14 et 17 décret 1967)">
+              🚪 Départ en séance
+            </button>
+            <button type="button" class="btn btn-sm" style="background:#38bdf8; color:#0f172a; font-weight:700; padding:2px 8px; font-size:0.75rem; border:none;" onclick="ouvrirArriveeTardiveModal()" title="Consigner l'arrivée tardive d'un copropriétaire en cours d'AG">
+              👋 Arrivée tardive
+            </button>
+          </div>
+        </div>
+
         <!-- Boutons de Vote Rapide Séance -->
         <div class="seance-quick-votes">
-          <button class="seance-btn-vote" style="background:#15803d; color:white;" onclick="setSeanceVote('ADOPTEE')">
-            <span>✅ Adoptée</span>
-            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Conforme à la majorité</span>
+          <button class="seance-btn-vote" style="background:#15803d; color:white;" onclick="setSeanceUnanimite()" title="Aucun opposant ni abstentionniste : 100% des voix en salle votent POUR">
+            <span>⚡ Unanimité (100% Pour)</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">0 contre, 0 abstention</span>
           </button>
-          <button class="seance-btn-vote" style="background:#dc2626; color:white;" onclick="setSeanceVote('REJETEE')">
+          <button class="seance-btn-vote" style="background:#16a34a; color:white;" onclick="setSeanceVote('ADOPTEE')" title="Adoptée selon les voix constatées">
+            <span>✅ Adoptée</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">À la majorité</span>
+          </button>
+          <button class="seance-btn-vote" style="background:#dc2626; color:white;" onclick="setSeanceVote('REJETEE')" title="Rejetée par l'AG">
             <span>❌ Rejetée</span>
             <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Rejetée par l'AG</span>
           </button>
-          <button class="seance-btn-vote" style="background:#0284c7; color:white;" onclick="openScrutinModal(activeSeanceResId)">
+          <button class="seance-btn-vote" style="background:#0284c7; color:white;" onclick="openScrutinModal(activeSeanceResId)" title="Cocher nominativement les mains levées pour Contre et Abstention">
             <span>🎯 Dépouillement Miroir</span>
-            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Contrôle anti-fraude</span>
+            <span style="font-size:0.7rem; font-weight:normal; opacity:0.9;">Cocher opposants</span>
           </button>
         </div>
       </div>
@@ -830,6 +849,21 @@ M. LEROY Jacques	Lot 8	85"></textarea>
             </div>
           </div>
 
+          <!-- Règle d'or légale & Bouton Unanimité 1-clic -->
+          <div style="display:flex; justify-content:space-between; align-items:center; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:0.5rem 0.8rem; margin:0.6rem 0; flex-wrap:wrap; gap:0.5rem;">
+            <div style="font-size:0.82rem; color:#065f46; flex:1; min-width:240px; line-height:1.4;">
+              💡 <strong>Règle légale :</strong> Par défaut, tous les copropriétaires présents en salle votent <strong>POUR</strong>. Ne cochez ci-dessous <u>QUE</u> les mains levées pour <strong>CONTRE</strong> ou <strong>ABSTENTION</strong>.
+            </div>
+            <button type="button" class="btn btn-sm btn-success" onclick="scrutinValiderUnanimite()" style="white-space:nowrap; font-weight:700;">
+              ⚡ Unanimité (0 Contre, 0 Abs)
+            </button>
+          </div>
+
+          <!-- Filtre rapide d'opposant -->
+          <div style="margin-bottom:0.4rem;">
+            <input type="text" id="scrutinChecklistSearch" class="form-control" placeholder="🔍 Filtrer les mains levées (tapez 2 lettres pour cocher en 1 sec)..." oninput="filtrerScrutinChecklist()">
+          </div>
+
           <!-- Checklist d'appel des opposants -->
           <div id="scrutinCoproChecklist">
             <!-- Rendered dynamically -->
@@ -1150,6 +1184,54 @@ M. LEROY Jacques	Lot 8	85"></textarea>
     </div>
   </div>
 
+  <!-- MODAL MOUVEMENT EN SÉANCE (DÉPART ANTICIPÉ / ARRIVÉE TARDIVE) -->
+  <div class="modal-overlay" id="mouvementSeanceModal">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="mouvementModalTitle">🚪 Mouvement en séance (Quorum en direct)</h3>
+        <button class="modal-close" onclick="closeModal('mouvementSeanceModal')">&times;</button>
+      </div>
+      <form id="mouvementForm" onsubmit="validerMouvementSeance(event)">
+        <div class="modal-body">
+          <div style="background:#eff6ff; border-left:4px solid #3b82f6; padding:0.65rem 0.9rem; border-radius:0 6px 6px 0; font-size:0.83rem; color:#1e40af; margin-bottom:0.75rem;">
+            <strong>⚖️ Art. 14 & 17 Décret 17 mars 1967 :</strong> Tout départ ou arrivée en cours d'AG modifie immédiatement le nombre de voix en salle pour les résolutions suivantes et doit être consigné avec son horodatage sur la feuille de présence.
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight:700;">Type d'événement :</label>
+            <div style="display:flex; gap:1.2rem; margin-top:0.3rem;">
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.88rem;">
+                <input type="radio" name="mouvementTypeRadio" id="mouvementRadioDepart" value="DEPART" checked onchange="onMouvementTypeChanged()">
+                <strong style="color:#dc2626;">🚪 Départ anticipé (quitte l'AG)</strong>
+              </label>
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.88rem;">
+                <input type="radio" name="mouvementTypeRadio" id="mouvementRadioArrivee" value="ARRIVEE" onchange="onMouvementTypeChanged()">
+                <strong style="color:#15803d;">👋 Arrivée tardive (rejoint l'AG)</strong>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight:700;">Copropriétaire concerné :</label>
+            <input type="text" id="mouvementSearchInput" class="form-control" placeholder="🔍 Taper un nom pour filtrer..." oninput="filtrerMouvementOptions()" autocomplete="off">
+            <select id="mouvementCoproSelect" class="form-control" style="margin-top:0.35rem;" size="6" required>
+              <!-- Dynamique -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight:700;">Heure officielle (obligatoire sur feuille de présence) :</label>
+            <input type="text" id="mouvementHeureInput" class="form-control" placeholder="Ex: 19h15" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('mouvementSeanceModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary" id="mouvementSubmitBtn">Confirmer et recalculer le quorum</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL RACCOURCIS CLAVIER MODE TURBO -->
   <div class="modal-overlay" id="shortcutsModal">
     <div class="modal-box" style="max-width: 540px;">
@@ -1162,6 +1244,7 @@ M. LEROY Jacques	Lot 8	85"></textarea>
         <table class="shortcuts-table" style="width:100%; border-collapse:collapse;">
           <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">→</kbd></td><td>Résolution <strong>Suivante</strong> en Mode Séance</td></tr>
           <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">←</kbd></td><td>Résolution <strong>Précédente</strong> en Mode Séance</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">U</kbd></td><td>Valider à l'<strong>Unanimité ⚡ (100% Pour)</strong></td></tr>
           <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">A</kbd></td><td>Valider la résolution comme <strong>Adoptée ✅</strong></td></tr>
           <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">R</kbd></td><td>Valider la résolution comme <strong>Rejetée ❌</strong></td></tr>
           <tr style="border-bottom:1px solid #f1f5f9; height:32px;"><td><kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700;">D</kbd></td><td>Ouvrir le <strong>Dépouillement Miroir</strong> (comptage opposants)</td></tr>
