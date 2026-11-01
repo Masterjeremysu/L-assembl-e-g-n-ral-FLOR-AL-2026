@@ -82,7 +82,8 @@ const DEFAULT_AG_DATA = {
     "name": "M. DUCHEZ & Mme DABOIN SOTO Kévin / Risobel",
     "lots": "",
     "tantiemes": 417,
-    "statut": "ACTIF",    "mandats": "",
+    "statut": "DEMISSIONNAIRE",
+    "dateDemission": "Démission en cours d'exercice",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -106,7 +107,8 @@ const DEFAULT_AG_DATA = {
     "name": "M. COURANT Daniel",
     "lots": "",
     "tantiemes": 466,
-    "statut": "ACTIF",    "mandats": "",
+    "statut": "DEMISSIONNAIRE",
+    "dateDemission": "Démission en cours d'exercice",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -114,7 +116,8 @@ const DEFAULT_AG_DATA = {
     "name": "M. LEGRAND David",
     "lots": "",
     "tantiemes": 432,
-    "statut": "ACTIF",    "mandats": "",
+    "statut": "DEMISSIONNAIRE",
+    "dateDemission": "Démission en cours d'exercice",    "mandats": "",
     "mandatTantiemes": 0
   },
   {
@@ -122,14 +125,6 @@ const DEFAULT_AG_DATA = {
     "name": "M. LOUIS Janick & Justin",
     "lots": "",
     "tantiemes": 439,
-    "statut": "ACTIF",    "mandats": "",
-    "mandatTantiemes": 0
-  },
-  {
-    "id": "m_fantini",
-    "name": "Mme FANTINI",
-    "lots": "",
-    "tantiemes": 0,
     "statut": "ACTIF",    "mandats": "",
     "mandatTantiemes": 0
   }
@@ -2877,8 +2872,8 @@ const DEFAULT_AG_DATA = {
       title: "Élection au Conseil Syndical : M. DUCHEZ",
       description: "Élection de M. DUCHEZ. Majorité de l'Article 25 ou à défaut article 25-1.",
       majorite: "Article 25 ou à défaut article 25-1",
-      csConsigne: "POUR",
-      csNotes: "",
+      csConsigne: "LIBRE",
+      csNotes: "Démissionnaire en cours d'exercice.",
       status: "EN_ATTENTE"
     },
     {
@@ -2927,8 +2922,8 @@ const DEFAULT_AG_DATA = {
       title: "Élection au Conseil Syndical : M. LEGRAND",
       description: "Élection de M. LEGRAND. Majorité de l'Article 25 ou à défaut article 25-1.",
       majorite: "Article 25 ou à défaut article 25-1",
-      csConsigne: "POUR",
-      csNotes: "",
+      csConsigne: "LIBRE",
+      csNotes: "Démissionnaire en cours d'exercice.",
       status: "EN_ATTENTE"
     },
     {
@@ -2957,8 +2952,8 @@ const DEFAULT_AG_DATA = {
       title: "Élection au Conseil Syndical : MME FANTINI",
       description: "Élection de MME FANTINI. Majorité de l'Article 25 ou à défaut article 25-1.",
       majorite: "Article 25 ou à défaut article 25-1",
-      csConsigne: "POUR",
-      csNotes: "",
+      csConsigne: "CONTRE",
+      csNotes: "Erreur syndic : n'a jamais été membre du Conseil Syndical.",
       status: "EN_ATTENTE"
     },
     {

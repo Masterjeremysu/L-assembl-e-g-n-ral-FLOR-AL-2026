@@ -11,22 +11,27 @@ function loadData() {
       const parsed = JSON.parse(stored);
       if (!parsed.coproprietaires) parsed.coproprietaires = [];
       if (!parsed.members) parsed.members = [];
-      // Rétrocompatibilité statut des membres CS
+
+      // Nettoyage automatique : Mme FANTINI n'a jamais été membre CS
+      parsed.members = parsed.members.filter(m => m.id !== 'm_fantini' && !m.name.toLowerCase().includes('fantini'));
+
+      // Démissions officielles en cours d'exercice
+      const demissionnairesNoms = ['courant', 'legrand', 'duchez'];
       parsed.members.forEach(m => {
-        if (!m.statut) m.statut = 'ACTIF';
+        const isDem = demissionnairesNoms.some(n => m.name.toLowerCase().includes(n) || (m.id && m.id.toLowerCase().includes(n)));
+        if (isDem && m.statut !== 'ACTIF_FORCE') {
+          m.statut = 'DEMISSIONNAIRE';
+          if (!m.dateDemission) m.dateDemission = "Démission en cours d'exercice";
+        } else if (!m.statut) {
+          m.statut = 'ACTIF';
+        }
       });
       return parsed;
     } catch (e) {
       console.error("Erreur parsing localStorage", e);
     }
   }
-  const initial = JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
-  if (initial.members) {
-    initial.members.forEach(m => {
-      if (!m.statut) m.statut = 'ACTIF';
-    });
-  }
-  return initial;
+  return JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
 }
 
 function persistData(broadcast = true) {
