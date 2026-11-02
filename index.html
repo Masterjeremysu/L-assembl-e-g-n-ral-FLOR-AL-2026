@@ -1614,6 +1614,52 @@ M. LEROY Jacques	Lot 8	85"></textarea>
     </div>
   </div>
 
+  <!-- MODAL ONBOARDING / INCITATION CODE PIN PERSONNEL -->
+  <div class="modal-overlay" id="onboardingPinModal">
+    <div class="modal-box" style="max-width:460px; text-align:center;">
+      <div style="width:64px; height:64px; margin:0.5rem auto 1rem; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:2rem; box-shadow:0 8px 20px rgba(245, 158, 11, 0.35);">
+        🛡️
+      </div>
+      <h3 style="font-size:1.35rem; font-weight:800; color:#0f172a; margin-bottom:0.3rem;" id="onboardingMemberTitle">Bienvenue dans l'équipe CS !</h3>
+      <div style="display:inline-block; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; font-size:0.8rem; font-weight:700; padding:0.25rem 0.75rem; border-radius:20px; margin-bottom:1.1rem;" id="onboardingMemberMission">
+        🎯 Votre mission ce soir
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:1rem; text-align:left; font-size:0.86rem; color:#334155; line-height:1.5; margin-bottom:1.2rem;">
+        <p style="margin-bottom:0.5rem;">
+          👋 <strong>Bravo, votre poste est ouvert !</strong> Vous vous êtes connecté avec le code initial temporaire <code>2026</code>.
+        </p>
+        <p style="margin:0; color:#475569;">
+          Pour que vos votes et émargements soient <strong>certifiés sous votre responsabilité</strong> et que personne d'autre ne puisse agir en votre nom, veuillez créer votre <strong>code PIN personnel secret</strong> (4 à 8 chiffres de votre choix).
+        </p>
+      </div>
+
+      <form onsubmit="saveOnboardingPinForm(event)" style="text-align:left;">
+        <div class="pin-form-group">
+          <label for="onboardingPinInput">Votre nouveau code PIN personnel (4 à 8 chiffres)</label>
+          <input type="password" id="onboardingPinInput" class="pin-input-secure" maxlength="8" placeholder="••••" required autofocus>
+        </div>
+
+        <div class="pin-form-group">
+          <label for="onboardingPinConfirmInput">Confirmez votre code PIN</label>
+          <input type="password" id="onboardingPinConfirmInput" class="pin-input-secure" maxlength="8" placeholder="••••" required>
+        </div>
+
+        <div id="onboardingPinErrorMsg" style="color:#ef4444; font-size:0.82rem; font-weight:700; min-height:1rem; margin-bottom:0.6rem; text-align:center;"></div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:0.75rem; font-size:0.95rem; font-weight:700; justify-content:center;">
+          ✨ Activer mon code secret & Démarrer
+        </button>
+
+        <div style="text-align:center; margin-top:0.8rem;">
+          <button type="button" class="btn-link" style="font-size:0.78rem; color:#94a3b8; text-decoration:underline; cursor:pointer; background:none; border:none;" onclick="closeModal('onboardingPinModal')">
+            Garder 2026 temporairement (Non recommandé)
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL CHANGEMENT DE CODE PIN -->
   <div class="modal-overlay" id="changePinModal">
     <div class="modal-box" style="max-width:420px;">

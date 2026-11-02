@@ -257,6 +257,13 @@ function verifyEnteredPin() {
     updateAuthUI();
     showToast(`Bienvenue ${selectedName} ! Poste : ${selectedMission}`, "success");
     currentEnteredPin = "";
+
+    // Si le membre se connecte avec le code initial (2026), l'accompagner pour créer son PIN personnel
+    if (activePin === DEFAULT_PIN) {
+      setTimeout(() => {
+        openOnboardingPinModal(selectedName, selectedMission);
+      }, 500);
+    }
   } else {
     // Échec : secousse et message d'erreur
     const card = document.querySelector(".auth-card");
@@ -450,4 +457,72 @@ function saveNewPinForm(e) {
 
   closeModal("changePinModal");
   showToast(`✅ Votre code PIN personnel a été enregistré avec succès !`, "success");
+}
+
+/**
+ * Ouvre le modal d'accompagnement pour la création du 1er PIN personnel
+ */
+function openOnboardingPinModal(memberName, missionName) {
+  const titleEl = document.getElementById("onboardingMemberTitle");
+  const missionEl = document.getElementById("onboardingMemberMission");
+  const pinInput = document.getElementById("onboardingPinInput");
+  const confirmInput = document.getElementById("onboardingPinConfirmInput");
+  const errEl = document.getElementById("onboardingPinErrorMsg");
+
+  if (titleEl) titleEl.innerText = `Bienvenue, ${memberName} !`;
+  if (missionEl) missionEl.innerText = `🎯 Votre mission : ${missionName || 'Membre du Conseil Syndical'}`;
+  if (pinInput) pinInput.value = "";
+  if (confirmInput) confirmInput.value = "";
+  if (errEl) errEl.innerText = "";
+
+  openModal("onboardingPinModal");
+}
+
+/**
+ * Enregistre le code PIN personnel lors de la première connexion
+ */
+function saveOnboardingPinForm(e) {
+  e.preventDefault();
+  const newPin = document.getElementById("onboardingPinInput").value.trim();
+  const confirmPin = document.getElementById("onboardingPinConfirmInput").value.trim();
+  const errEl = document.getElementById("onboardingPinErrorMsg");
+
+  if (newPin.length < 4 || newPin.length > 8) {
+    errEl.innerText = "Le code doit comporter entre 4 et 8 chiffres.";
+    return;
+  }
+
+  if (!/^\d+$/.test(newPin)) {
+    errEl.innerText = "Le code PIN ne doit contenir que des chiffres.";
+    return;
+  }
+
+  if (newPin !== confirmPin) {
+    errEl.innerText = "Les deux codes saisis ne correspondent pas.";
+    return;
+  }
+
+  const u = getCurrentUser();
+
+  // Enregistrer le PIN individuel
+  if (typeof appData !== "undefined") {
+    if (!appData.memberPins) appData.memberPins = {};
+    appData.memberPins[u.name] = newPin;
+
+    const m = (appData.members || []).find(x => x.name === u.name || (x.name && x.name.includes(u.name)));
+    if (m) {
+      appData.memberPins[m.id] = newPin;
+    }
+
+    if (typeof logAuditAction === "function") {
+      logAuditAction("SECURITE", "Code PIN personnel activé", `${u.name} a activé son code PIN personnel lors de sa 1ère connexion`);
+    }
+
+    if (typeof persistData === "function") {
+      persistData();
+    }
+  }
+
+  closeModal("onboardingPinModal");
+  showToast(`🎉 Félicitations ${u.name} ! Votre code PIN secret est actif. Bon courage pour l'AG !`, "success");
 }
