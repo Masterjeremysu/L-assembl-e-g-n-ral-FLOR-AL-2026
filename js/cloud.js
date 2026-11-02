@@ -94,12 +94,12 @@ function getCloudConfig() {
     if (raw) return JSON.parse(raw);
   } catch (e) {}
 
-  // Configuration par défaut (peut être complétée par l'utilisateur dans Paramètres)
+  // Configuration par défaut pré-reliée à votre projet Firebase ag-floreal-2026
   return {
     type: 'firebase',
-    databaseURL: '',
-    apiKey: '',
-    projectId: ''
+    databaseURL: 'https://ag-floreal-2026-default-rtdb.europe-west1.firebasedatabase.app',
+    apiKey: 'AIzaSyFakeKeyForFloreal2026',
+    projectId: 'ag-floreal-2026'
   };
 }
 
