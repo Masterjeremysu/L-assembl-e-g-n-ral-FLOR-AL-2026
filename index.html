@@ -5,11 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Suivi AG & Votes - RÉSIDENCE LE FLORÉAL 2026</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <!-- Firebase SDK Compat (Temps réel Cloud sécurisé) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- Bibliothèques gratuites WebRTC & QR Code -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
+
+  <!-- ==========================================
+       ÉCRAN DE VERROUILLAGE SÉCURISÉ (CODE PIN CS)
+       ========================================== -->
+  <div id="authLockscreen">
+    <div class="auth-card">
+      <div class="auth-icon-wrap">🔒</div>
+      <h2 class="auth-title">Accès Sécurisé CS</h2>
+      <p class="auth-subtitle">RÉSIDENCE LE FLORÉAL • AG 2026</p>
+
+      <!-- Choix du membre connecté -->
+      <div class="auth-profile-group">
+        <label for="authProfileSelect">👤 Membre du Conseil Syndical :</label>
+        <select id="authProfileSelect" class="auth-select"></select>
+      </div>
+
+      <!-- Affichage des points PIN -->
+      <div class="auth-pin-display">
+        <div class="auth-pin-dot"></div>
+        <div class="auth-pin-dot"></div>
+        <div class="auth-pin-dot"></div>
+        <div class="auth-pin-dot"></div>
+      </div>
+
+      <!-- Message d'erreur -->
+      <div id="authErrorMsg" class="auth-error-msg"></div>
+
+      <!-- Clavier Numérique (Keypad tactile & souris) -->
+      <div class="auth-keypad">
+        <button type="button" class="auth-key" onclick="onKeypadPress('1')">1<span class="sub-letters">&nbsp;</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('2')">2<span class="sub-letters">ABC</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('3')">3<span class="sub-letters">DEF</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('4')">4<span class="sub-letters">GHI</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('5')">5<span class="sub-letters">JKL</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('6')">6<span class="sub-letters">MNO</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('7')">7<span class="sub-letters">PQRS</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('8')">8<span class="sub-letters">TUV</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('9')">9<span class="sub-letters">WXYZ</span></button>
+        <button type="button" class="auth-key key-util" onclick="onKeypadClear()" title="Effacer tout">C</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('0')">0<span class="sub-letters">+</span></button>
+        <button type="button" class="auth-key key-util" onclick="onKeypadDelete()" title="Effacer un chiffre">⌫</button>
+      </div>
+
+      <p class="auth-hint">💡 Code PIN par défaut : <code>2026</code> (modifiable une fois connecté)</p>
+    </div>
+  </div>
 
   <!-- Print Header -->
   <div class="print-header">
@@ -115,8 +165,26 @@
           <span>▶ Mode Séance</span>
         </button>
 
+        <!-- Groupe Sécurité & Cloud Hébergé -->
+        <div class="header-auth-group">
+          <!-- Indicateur Cloud Sync -->
+          <div class="cloud-status-pill" id="cloudStatusPill" onclick="openCloudConfigModal()" title="État de la synchronisation Cloud (Cliquez pour configurer)">
+            <span class="cloud-dot"></span>
+            <span id="cloudStatusLabel">Cloud Actif</span>
+          </div>
+
+          <!-- Profil Utilisateur & PIN -->
+          <div class="auth-user-pill" id="authUserPill" onclick="openChangePinModal()" title="Connecté au CS - Cliquez pour modifier le code PIN">
+            <span class="auth-user-avatar" id="authUserAvatar">CS</span>
+            <span id="authUserName">Membre CS</span>
+          </div>
+        </div>
+
         <!-- Groupe Utilitaires -->
         <div class="header-util-group">
+          <button class="btn-icon-subtle" onclick="logoutUser()" title="Verrouiller l'application (Code PIN requis)">
+            🔒
+          </button>
           <button class="btn-icon-subtle" onclick="openShortcutsModal()" title="Raccourcis Clavier Mode Turbo (Touche ?)">
             ⌨️
           </button>
@@ -146,6 +214,10 @@
       <button class="tab-btn" onclick="switchTab('members')">
         👥 Membres Conseil Syndical
         <span class="badge-count" id="badgeMembersCount">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('audit')">
+        📜 Journal d'Audit & Traçabilité
+        <span class="badge-count" id="badgeAuditCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('settings')">
         ⚙️ Paramètres & Sauvegarde
@@ -614,6 +686,28 @@
       </div>
 
       <div class="config-card">
+        <h3>🔒 Sécurité & Code PIN du Conseil Syndical</h3>
+        <p style="font-size:0.85rem; color:var(--gray-500); margin-bottom:1rem;">
+          L'accès aux votes, pouvoirs et données de la copropriété est verrouillé par un code PIN. Vous pouvez modifier ce code à tout moment pour toute l'équipe du CS.
+        </p>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-primary" onclick="openChangePinModal()">🔑 Modifier le Code PIN CS</button>
+          <button class="btn btn-secondary" onclick="logoutUser()">🔒 Verrouiller l'application maintenant</button>
+        </div>
+      </div>
+
+      <div class="config-card">
+        <h3>☁️ Synchronisation Cloud Hébergée (Temps Réel)</h3>
+        <p style="font-size:0.85rem; color:var(--gray-500); margin-bottom:1rem;">
+          Connectez l'application à une base Cloud sécurisée (Firebase Realtime Database) pour que tous les smartphones et ordinateurs soient synchronisés en direct de n'importe où.
+        </p>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-primary" onclick="openCloudConfigModal()">⚙️ Configurer la base Cloud Firebase</button>
+          <span style="font-size:0.82rem; color:var(--success); font-weight:700;">🟢 Sauvegarde locale active en continu</span>
+        </div>
+      </div>
+
+      <div class="config-card">
         <h3>💾 Sauvegardes & Données</h3>
         <p style="font-size:0.85rem; color:var(--gray-500); margin-bottom:1rem;">
           Toutes vos modifications sont automatiquement conservées en continu dans ce navigateur. Vous pouvez exporter votre fichier pour le partager avec vos collègues du CS :
@@ -635,6 +729,64 @@
           <p style="margin-top:0.3rem;"><strong>• Article 26 (Double majorité) :</strong> Deux tiers (2/3) des voix de l'ensemble des copropriétaires.</p>
         </div>
       </div>
+    </section>
+
+    <!-- SECTION 6: JOURNAL D'AUDIT & HISTORIQUE -->
+    <section id="section-audit" style="display:none;">
+      <div class="audit-stats-grid">
+        <div class="audit-stat-card">
+          <div class="audit-stat-icon" style="background:#eff6ff; color:#2563eb;">📋</div>
+          <div>
+            <div class="audit-stat-val" id="auditStatTotal">0</div>
+            <div class="audit-stat-lbl">Actions enregistrées</div>
+          </div>
+        </div>
+        <div class="audit-stat-card">
+          <div class="audit-stat-icon" style="background:#fef3c7; color:#d97706;">✉️</div>
+          <div>
+            <div class="audit-stat-val" id="auditStatPouvoir">0</div>
+            <div class="audit-stat-lbl">Pouvoirs & Mandats</div>
+          </div>
+        </div>
+        <div class="audit-stat-card">
+          <div class="audit-stat-icon" style="background:#d1fae5; color:#059669;">🗳️</div>
+          <div>
+            <div class="audit-stat-val" id="auditStatVote">0</div>
+            <div class="audit-stat-lbl">Votes consignés</div>
+          </div>
+        </div>
+        <div class="audit-stat-card">
+          <div class="audit-stat-icon" style="background:#e0e7ff; color:#4f46e5;">🚪</div>
+          <div>
+            <div class="audit-stat-val" id="auditStatPresence">0</div>
+            <div class="audit-stat-lbl">Émargements</div>
+          </div>
+        </div>
+        <div class="audit-stat-card">
+          <div class="audit-stat-icon" style="background:#fee2e2; color:#dc2626;">🔒</div>
+          <div>
+            <div class="audit-stat-val" id="auditStatSecurite">0</div>
+            <div class="audit-stat-lbl">Sécurité / PIN</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="audit-toolbar">
+        <div class="audit-filters">
+          <button class="audit-filter-btn active" onclick="setAuditFilter('ALL', this)">Tous</button>
+          <button class="audit-filter-btn" onclick="setAuditFilter('POUVOIR', this)">✉️ Pouvoirs</button>
+          <button class="audit-filter-btn" onclick="setAuditFilter('VOTE', this)">🗳️ Votes</button>
+          <button class="audit-filter-btn" onclick="setAuditFilter('PRESENCE', this)">🚪 Émargement</button>
+          <button class="audit-filter-btn" onclick="setAuditFilter('SECURITE', this)">🔒 Sécurité</button>
+        </div>
+        <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+          <input type="text" class="audit-search-input" placeholder="🔍 Filtrer les logs par nom, heure, action..." oninput="onAuditSearch(this.value)">
+          <button class="btn btn-secondary btn-sm" onclick="exportAuditLogsCsv()" title="Télécharger le fichier Excel/CSV du journal">💾 Export CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearAuditLogs()" title="Effacer l'historique">🗑️ Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="audit-timeline" id="auditTimelineContainer"></div>
     </section>
 
   </main>
@@ -1451,11 +1603,93 @@ M. LEROY Jacques	Lot 8	85"></textarea>
     </div>
   </div>
 
+  <!-- MODAL CHANGEMENT DE CODE PIN -->
+  <div class="modal-overlay" id="changePinModal">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔒 Modifier le Code PIN CS</h3>
+        <button class="modal-close" onclick="closeModal('changePinModal')">&times;</button>
+      </div>
+      <form onsubmit="saveNewPinForm(event)">
+        <div class="modal-body">
+          <p style="font-size:0.84rem; color:var(--gray-600); margin-bottom:1.1rem;">
+            Le code PIN protège l'application et les données des copropriétaires. Choisissez un code de 4 à 8 chiffres facile à retenir pour les membres du Conseil Syndical.
+          </p>
+
+          <div class="pin-form-group">
+            <label for="pinOldInput">Code PIN actuel</label>
+            <input type="password" id="pinOldInput" class="pin-input-secure" maxlength="8" placeholder="••••" required autofocus>
+          </div>
+
+          <div class="pin-form-group">
+            <label for="pinNewInput">Nouveau Code PIN (4 à 8 chiffres)</label>
+            <input type="password" id="pinNewInput" class="pin-input-secure" maxlength="8" placeholder="••••" required>
+          </div>
+
+          <div class="pin-form-group">
+            <label for="pinConfirmInput">Confirmer le nouveau Code PIN</label>
+            <input type="password" id="pinConfirmInput" class="pin-input-secure" maxlength="8" placeholder="••••" required>
+          </div>
+
+          <div id="changePinErrorMsg" style="color:#ef4444; font-size:0.82rem; font-weight:700; min-height:1rem;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('changePinModal')">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer le nouveau code</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIGURATION CLOUD -->
+  <div class="modal-overlay" id="cloudConfigModal">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">☁️ Synchronisation Cloud Hébergée</h3>
+        <button class="modal-close" onclick="closeModal('cloudConfigModal')">&times;</button>
+      </div>
+      <form onsubmit="saveCloudConfigForm(event)">
+        <div class="modal-body">
+          <p style="font-size:0.85rem; color:var(--gray-600); margin-bottom:1rem; line-height:1.45;">
+            L'application est prête pour la synchronisation Cloud en temps réel. Toutes les modifications effectuées sur un ordinateur ou smartphone sont propagées instantanément aux autres membres du CS.
+          </p>
+
+          <div class="form-group" style="margin-bottom:0.9rem;">
+            <label>URL Firebase Realtime Database (Optionnel)</label>
+            <input type="url" id="cloudDbUrlInput" class="form-control" placeholder="https://votre-projet.firebaseio.com">
+            <small style="color:var(--gray-500); font-size:0.75rem;">Laissez vide pour utiliser le relais automatique gratuit ou PeerJS local.</small>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0.9rem;">
+            <label>Clé API Firebase (Optionnel)</label>
+            <input type="text" id="cloudApiKeyInput" class="form-control" placeholder="AIzaSy...">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0.9rem;">
+            <label>ID de Projet Firebase</label>
+            <input type="text" id="cloudProjectIdInput" class="form-control" placeholder="ag-floreal-2026">
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; font-size:0.8rem; color:#475569;">
+            💡 <strong>Rappel :</strong> Vos données sont systématiquement enregistrées localement dans votre navigateur (<code>localStorage</code>), ce qui vous garantit <strong>zéro coupure même sans connexion Internet</strong> en salle de réunion.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('cloudConfigModal')">Fermer</button>
+          <button type="submit" class="btn btn-primary">Enregistrer la configuration</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Container de notifications toasts -->
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Fichiers modulaires de l'application -->
   <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/audit.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>

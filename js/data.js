@@ -15,8 +15,12 @@ const DEFAULT_AG_DATA = {
     agLocation: "Salle Jacques Prévert, Rue du Moucherotte, 38360 Sassenage",
     syndic: "Citya Agence Henry",
     totalTantiemes: 97478,
-    presentTantiemes: 0
+    presentTantiemes: 0,
+    pinCode: "2026"
   },
+
+  // Journal d'Audit & Traçabilité CS ("Qui a fait quoi ?")
+  auditLogs: [],
 
   // Membres du Conseil Syndical avec tantièmes et mandats réels
   members: [

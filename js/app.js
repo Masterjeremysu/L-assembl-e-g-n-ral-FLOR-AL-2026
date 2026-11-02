@@ -11,6 +11,9 @@ function loadData() {
       const parsed = JSON.parse(stored);
       if (!parsed.coproprietaires) parsed.coproprietaires = [];
       if (!parsed.members) parsed.members = [];
+      if (!parsed.auditLogs) parsed.auditLogs = [];
+      if (!parsed.config) parsed.config = {};
+      if (!parsed.config.pinCode) parsed.config.pinCode = "2026";
 
       // Nettoyage automatique : Mme FANTINI n'a jamais été membre CS
       parsed.members = parsed.members.filter(m => m.id !== 'm_fantini' && !m.name.toLowerCase().includes('fantini'));
@@ -31,7 +34,11 @@ function loadData() {
       console.error("Erreur parsing localStorage", e);
     }
   }
-  return JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
+  const initialData = JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
+  if (!initialData.auditLogs) initialData.auditLogs = [];
+  if (!initialData.config) initialData.config = {};
+  if (!initialData.config.pinCode) initialData.config.pinCode = "2026";
+  return initialData;
 }
 
 function persistData(broadcast = true) {
@@ -39,6 +46,9 @@ function persistData(broadcast = true) {
   updateUI();
   if (broadcast && isLiveActive) {
     broadcastLiveUpdate({ type: 'SYNC_FULL_DATA', data: appData });
+  }
+  if (typeof cloudPushData === 'function') {
+    cloudPushData(appData);
   }
 }
 
@@ -57,12 +67,15 @@ function switchTab(tabId) {
   const targetSec = document.getElementById('section-' + tabId);
   if (targetSec) targetSec.style.display = 'block';
 
-  const buttons = document.querySelectorAll('.tab-btn');
-  if (tabId === 'votes') buttons[0]?.classList.add('active');
-  else if (tabId === 'presence') buttons[1]?.classList.add('active');
-  else if (tabId === 'pouvoirs') buttons[2]?.classList.add('active');
-  else if (tabId === 'members') buttons[3]?.classList.add('active');
-  else if (tabId === 'settings') buttons[4]?.classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabId}'`)) {
+      btn.classList.add('active');
+    }
+  });
+
+  if (tabId === 'audit' && typeof renderAuditTab === 'function') {
+    renderAuditTab();
+  }
 }
 
 // UI Updates
@@ -136,6 +149,9 @@ function updateUI() {
   document.getElementById('badgeVotesCount').innerText = `${voted}/${total}`;
   document.getElementById('badgePresenceCount').innerText = `${presentsPhysiques + representesPouvoir + votesCorresp}/${copros.length}`;
   document.getElementById('badgeMembersCount').innerText = appData.members.length;
+  if (document.getElementById('badgeAuditCount') && appData.auditLogs) {
+    document.getElementById('badgeAuditCount').innerText = appData.auditLogs.length;
+  }
 
   renderResolutions(totalExprimesEnSalle, totalTant);
   renderCoproprietaires(totalExprimesEnSalle, totalTant);
@@ -570,6 +586,9 @@ function setCoproStatut(id, newStatut) {
       c.heureArrivee = getHeureParis();
       delete c.heureDepart;
     }
+    if (typeof logAuditAction === 'function') {
+      logAuditAction('PRESENCE', `Émargement : ${c.nom}`, `Statut défini à ${newStatut} (${c.tantiemes} tantièmes)`);
+    }
     persistData();
     showToast(`${c.nom} pointé comme ${newStatut}`, "success");
   }
@@ -585,6 +604,9 @@ function promptDepartCopro(id) {
     c.statut = 'PARTI';
     c.heureDepart = heure;
     c.notes = (c.notes ? c.notes + ' | ' : '') + `Parti à ${heure}`;
+    if (typeof logAuditAction === 'function') {
+      logAuditAction('PRESENCE', `Départ anticipé : ${c.nom}`, `Départ à ${heure} (${c.tantiemes} tantièmes déduits des votes suivants)`);
+    }
     persistData();
     showToast(`Départ de ${c.nom} enregistré à ${heure}. Ses tantièmes sont retirés des votes suivants.`, "warning");
   }
@@ -1019,6 +1041,10 @@ function saveScrutin(e) {
 
   // Horodatage officiel du vote (Heure de Paris)
   res.heureVote = getHeureParis();
+
+  if (typeof logAuditAction === 'function') {
+    logAuditAction('VOTE', `Scrutin Résolution n° ${res.number} : ${res.status}`, `Résultat : ${res.status} (${res.tantiemesPour} Pour, ${res.tantiemesContre} Contre, ${res.tantiemesAbs} Abs) | ${res.title.substring(0, 45)}...`);
+  }
 
   closeModal('scrutinModal');
   persistData();
@@ -1962,6 +1988,10 @@ function savePouvoirForm(e) {
   c.notes = (consignes ? `Consignes : ${consignes}` : 'Pouvoir') + (source ? ` | ${source}` : '');
   delete c.heureDepart;
 
+  if (typeof logAuditAction === 'function') {
+    logAuditAction('POUVOIR', `Attribution pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes confiés à ${mandataireNom}${consignes ? ' | Consignes: ' + consignes : ''}`);
+  }
+
   closeModal('pouvoirModal');
   persistData();
   showToast(`✉️ Pouvoir de ${c.nom} (${c.tantiemes} tant.) confié à ${mandataireNom} !`, "success");
@@ -1983,6 +2013,11 @@ function revoquerPouvoirDirect(coproId) {
     delete c.mandataireMemberId;
     delete c.consignes;
     delete c.sourceReception;
+
+    if (typeof logAuditAction === 'function') {
+      logAuditAction('POUVOIR', `Révocation pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes retirés. Copropriétaire marqué comme Absent.`);
+    }
+
     persistData();
     showToast(`Pouvoir de ${c.nom} révoqué.`, "warning");
   }
@@ -2057,6 +2092,10 @@ function saveTransfertPouvoir(e) {
   c.mandataire = newMember.name;
   c.notes = (c.notes ? c.notes + ' | ' : '') + `Transféré à ${newMember.name}`;
 
+  if (typeof logAuditAction === 'function') {
+    logAuditAction('POUVOIR', `Transfert de pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes réassignés vers ${newMember.name}`);
+  }
+
   closeModal('transfertPouvoirModal');
   persistData();
   showToast(`Pouvoir de ${c.nom} transféré avec succès à ${newMember.name} !`, "success");
@@ -2103,6 +2142,10 @@ function repartirPouvoirsBlancsAuto() {
       chosen._totalVoix = (chosen._totalVoix || 0) + tant;
     }
   });
+
+  if (typeof logAuditAction === 'function') {
+    logAuditAction('POUVOIR', `Répartition auto des pouvoirs en blanc`, `${blancs.length} pouvoir(s) distribué(s) équitablement sur le Conseil Syndical`);
+  }
 
   persistData();
   showToast(`${blancs.length} pouvoir(s) en blanc réparti(s) équitablement sur le CS !`, "success");

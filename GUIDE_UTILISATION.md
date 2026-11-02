@@ -112,4 +112,43 @@ Sur chaque résolution, une **jauge visuelle animée** calcule en temps réel :
 - **Mode Sombre (Bouton `🌙` dans l'en-tête) :** Économise la batterie de vos smartphones OLED pendant les 3-4 heures de l'assemblée et reste discret dans la salle.
 - **Relevé Officiel PV Miroir (Bouton `📄 Relevé PV CS`) :** À la fin de l'AG, générez en 1 clic le rapport complet officiel du Conseil Syndical (synthèse de quorum, départs horodatés, résultats exacts de chaque scrutin, opposants consignés) imprimable ou enregistrable en PDF pour cadrer le syndic dès le lendemain !
 
+---
+
+## 9. 🔒 Accès Sécurisé par Code PIN & Profils Membres CS
+
+Pour garantir la stricte confidentialité des données des copropriétaires (noms, tantièmes, pouvoirs) :
+1. **Écran de verrouillage automatique :** À chaque ouverture de l'application, un écran moderne sécurisé bloque l'accès aux données.
+2. **Code PIN par défaut :** **`2026`** (Saisie tactile via pavé numérique ou directement au clavier).
+3. **Sélection de votre profil :** Choisissez votre nom dans la liste des membres du Conseil Syndical (Jérémy SUZET, Sylvie GUERRE, Éric BRUN, etc.).
+4. **Modification du Code PIN :** N'importe quel membre connecté peut modifier le code PIN en 1 clic depuis l'onglet **Paramètres** ou en cliquant sur son profil en haut.
+5. **Verrouillage instantané :** Cliquez sur l'icône **`🔒`** dans l'en-tête pour reverrouiller l'écran si vous quittez votre place.
+
+---
+
+## 10. ☁️ Synchronisation Cloud Hébergée & GitHub Pages
+
+L'application reste **100% statique et gratuite à vie** :
+- **Hébergement gratuit sur GitHub Pages :**
+  1. Rendez-vous sur votre dépôt GitHub : `https://github.com/Masterjeremysu/L-assembl-e-g-n-ral-FLOR-AL-2026`.
+  2. Allez dans **Settings** > **Pages**.
+  3. Sous **Branch**, sélectionnez **`main`** et laissez `/ (root)`, puis cliquez sur **Save**.
+  4. Votre application est immédiatement en ligne sous HTTPS (ex: `https://masterjeremysu.github.io/L-assembl-e-g-n-ral-FLOR-AL-2026/`) et accessible depuis n'importe quel smartphone ou PC !
+- **Synchronisation Cloud en temps réel :**
+  - Prête à l'emploi avec **Firebase Realtime Database** (Google Cloud gratuit).
+  - Dès qu'un membre modifie un pouvoir ou un vote sur son téléphone, la modification est propagée instantanément sur tous les écrans connectés.
+  - **Résilience hors-ligne totale :** Si la 4G/Wi-Fi coupe dans la salle de réunion, l'application bascule automatiquement sur la sauvegarde locale du navigateur (`localStorage`) sans jamais bloquer la séance.
+
+---
+
+## 11. 📜 Journal d'Audit & Traçabilité CS ("Qui a fait quoi et à quelle heure ?")
+
+Un onglet dédié **`📜 Journal d'Audit & Traçabilité`** enregistre chronologiquement chaque action réalisée sur l'application :
+- **Attribution, modification ou révocation de pouvoirs** (avec nom du mandant, mandataire et tantièmes).
+- **Votes de chaque résolution** (résultat légal, décompte Pour / Contre / Abstention, unanimité).
+- **Émargement** (pointage des présents, arrivées tardives, départs anticipés horodatés).
+- **Sécurité** (connexions, modifications du code PIN).
+- **Filtrage et recherche instantanée** par membre du CS, heure ou type d'action.
+- **Export Excel / CSV** en un clic pour conserver une archive infalsifiable des décisions du Conseil Syndical.
+
+
 
