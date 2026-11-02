@@ -42,25 +42,45 @@ function populateAuthProfiles() {
   const select = document.getElementById("authProfileSelect");
   if (!select) return;
 
-  const defaultMembers = [
-    "M. SUZET Jérémy",
-    "Mme FALCON Laura",
-    "Mme GUERRE Sylvie",
-    "M. GUERRE Joël",
-    "M. BRUN Éric",
-    "M. CASARI Jean-Paul",
-    "M. ARMONIA Frédéric",
-    "Mme ARMONIA Diane",
-    "Mme GANET Chantal",
-    "Mlle PIGOIS Véronique",
-    "M. BEZY David",
-    "M. BONSIGNORE Alexis",
-    "M. LOUIS Janick",
-    "Scrutateur / Observateur CS",
-    "Autre membre CS"
-  ];
+  let memberList = [];
+  if (typeof appData !== 'undefined' && appData.members && appData.members.length > 0) {
+    memberList = appData.members
+      .filter(m => m.statut !== 'DEMISSIONNAIRE')
+      .map(m => {
+        let n = m.name;
+        // Supprimer Laura FALCON du profil CS
+        n = n.replace(/&?\s*Mme\s+FALCON\s+Laura/gi, '').replace(/\s+/g, ' ').trim();
+        return n;
+      });
+  }
 
-  select.innerHTML = defaultMembers
+  if (memberList.length === 0) {
+    memberList = [
+      "M. SUZET Jérémy",
+      "Mme GUERRE Sylvie",
+      "M. GUERRE Joël",
+      "M. BRUN Éric",
+      "M. CASARI Jean-Paul",
+      "M. ARMONIA Frédéric",
+      "Mme ARMONIA Diane",
+      "Mme GANET Chantal",
+      "Mlle PIGOIS Véronique",
+      "M. BEZY David",
+      "M. BONSIGNORE Alexis",
+      "M. LOUIS Janick"
+    ];
+  }
+
+  // Filtrer pour garantir l'absence totale de Laura FALCON des accès CS
+  memberList = memberList.filter(m => !m.toLowerCase().includes('falcon'));
+
+  // Profils génériques de séance
+  memberList.push("Scrutateur / Observateur CS", "Autre membre CS");
+
+  // Dédupliquer
+  memberList = [...new Set(memberList)];
+
+  select.innerHTML = memberList
     .map((m, idx) => `<option value="${escapeHtml(m)}" ${idx === 0 ? "selected" : ""}>${escapeHtml(m)}</option>`)
     .join("");
 }
@@ -223,6 +243,7 @@ function lockScreen() {
     lockscreen.classList.remove("unlocked");
   }
   document.body.style.overflow = "hidden";
+  populateAuthProfiles();
   onKeypadClear();
 }
 

@@ -26,7 +26,7 @@ const DEFAULT_AG_DATA = {
   members: [
   {
     "id": "m_suzet",
-    "name": "M. SUZET Jérémy & Mme FALCON Laura",
+    "name": "M. SUZET Jérémy",
     "lots": "",
     "tantiemes": 802,
     "statut": "ACTIF",
