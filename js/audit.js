@@ -17,12 +17,13 @@ function logAuditAction(type, description, details = '') {
   const heure = typeof getHeureParis === 'function' ? getHeureParis() : new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const dateStr = new Date().toLocaleDateString('fr-FR');
 
+  const missionLabel = user.mission ? ` [${user.mission.split(' ')[0]}]` : '';
   const logEntry = {
     id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     timestamp: new Date().toISOString(),
     heure: heure,
     date: dateStr,
-    user: user.name || 'Membre CS',
+    user: (user.name || 'Membre CS') + missionLabel,
     type: type, // 'POUVOIR', 'VOTE', 'PRESENCE', 'SECURITE', 'CONFIG'
     description: description,
     details: details

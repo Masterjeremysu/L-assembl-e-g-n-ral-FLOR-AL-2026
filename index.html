@@ -27,7 +27,18 @@
       <!-- Choix du membre connecté -->
       <div class="auth-profile-group">
         <label for="authProfileSelect">👤 Membre du Conseil Syndical :</label>
-        <select id="authProfileSelect" class="auth-select"></select>
+        <select id="authProfileSelect" class="auth-select" onchange="onAuthProfileChanged()"></select>
+      </div>
+
+      <!-- Choix du poste stratégique ce soir -->
+      <div class="auth-profile-group" style="margin-top:-0.4rem; margin-bottom:1.1rem;">
+        <label for="authMissionSelect">🎯 Poste & Mission ce soir :</label>
+        <select id="authMissionSelect" class="auth-select">
+          <option value="👑 Coordination & Tactique CS">👑 Coordination & Stratégie CS</option>
+          <option value="🚪 Émargement & Pouvoirs (Accueil)">🚪 Émargement & Pouvoirs (Accueil)</option>
+          <option value="🗳️ Scrutateur & Votes (Salle)">🗳️ Scrutateur & Dépouillement (Salle)</option>
+          <option value="👁️ Contrôle & Suivi Contradictoire">👁️ Contrôle & Suivi Contradictoire</option>
+        </select>
       </div>
 
       <!-- Affichage des points PIN -->
@@ -57,7 +68,7 @@
         <button type="button" class="auth-key key-util" onclick="onKeypadDelete()" title="Effacer un chiffre">⌫</button>
       </div>
 
-      <p class="auth-hint">💡 Code PIN par défaut : <code>2026</code> (modifiable une fois connecté)</p>
+      <p class="auth-hint" id="authPinHint">💡 Code PIN initial de ce profil : <code>2026</code> (modifiable une fois connecté)</p>
     </div>
   </div>
 

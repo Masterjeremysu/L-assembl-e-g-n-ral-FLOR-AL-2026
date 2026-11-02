@@ -22,6 +22,9 @@ const DEFAULT_AG_DATA = {
   // Journal d'Audit & Traçabilité CS ("Qui a fait quoi ?")
   auditLogs: [],
 
+  // Codes PIN individuels par membre CS
+  memberPins: {},
+
   // Membres du Conseil Syndical avec tantièmes et mandats réels
   members: [
   {

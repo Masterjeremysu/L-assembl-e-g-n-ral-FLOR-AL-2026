@@ -12,6 +12,7 @@ function loadData() {
       if (!parsed.coproprietaires) parsed.coproprietaires = [];
       if (!parsed.members) parsed.members = [];
       if (!parsed.auditLogs) parsed.auditLogs = [];
+      if (!parsed.memberPins) parsed.memberPins = {};
       if (!parsed.config) parsed.config = {};
       if (!parsed.config.pinCode) parsed.config.pinCode = "2026";
 
@@ -36,6 +37,7 @@ function loadData() {
   }
   const initialData = JSON.parse(JSON.stringify(DEFAULT_AG_DATA));
   if (!initialData.auditLogs) initialData.auditLogs = [];
+  if (!initialData.memberPins) initialData.memberPins = {};
   if (!initialData.config) initialData.config = {};
   if (!initialData.config.pinCode) initialData.config.pinCode = "2026";
   return initialData;

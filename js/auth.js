@@ -1,6 +1,7 @@
 /**
- * Module d'Authentification Sécurisée & Code PIN
+ * Module d'Authentification Sécurisée Individuelle & Postes CS
  * Résidence Le Floréal - AG 2026
+ * Chaque membre du Conseil Syndical a son propre profil et son propre code PIN
  */
 
 const DEFAULT_PIN = "2026";
@@ -37,10 +38,13 @@ function initAuth() {
 
 /**
  * Remplit le menu déroulant des profils de membres CS
+ * Exclut formellement les non-membres (ex: Laura FALCON)
  */
 function populateAuthProfiles() {
   const select = document.getElementById("authProfileSelect");
   if (!select) return;
+
+  const currentVal = select.value;
 
   let memberList = [];
   if (typeof appData !== 'undefined' && appData.members && appData.members.length > 0) {
@@ -48,7 +52,7 @@ function populateAuthProfiles() {
       .filter(m => m.statut !== 'DEMISSIONNAIRE')
       .map(m => {
         let n = m.name;
-        // Supprimer Laura FALCON du profil CS
+        // Supprimer Laura FALCON de l'intitulé CS
         n = n.replace(/&?\s*Mme\s+FALCON\s+Laura/gi, '').replace(/\s+/g, ' ').trim();
         return n;
       });
@@ -71,18 +75,47 @@ function populateAuthProfiles() {
     ];
   }
 
-  // Filtrer pour garantir l'absence totale de Laura FALCON des accès CS
+  // Filtrage strict : Laura FALCON n'a jamais accès en tant que CS
   memberList = memberList.filter(m => !m.toLowerCase().includes('falcon'));
 
   // Profils génériques de séance
   memberList.push("Scrutateur / Observateur CS", "Autre membre CS");
 
-  // Dédupliquer
+  // Déduplication
   memberList = [...new Set(memberList)];
 
   select.innerHTML = memberList
-    .map((m, idx) => `<option value="${escapeHtml(m)}" ${idx === 0 ? "selected" : ""}>${escapeHtml(m)}</option>`)
+    .map(m => `<option value="${escapeHtml(m)}" ${m === currentVal ? "selected" : ""}>${escapeHtml(m)}</option>`)
     .join("");
+
+  updateAuthPinHint();
+}
+
+/**
+ * Déclenché lors du changement de membre dans le menu déroulant
+ */
+function onAuthProfileChanged() {
+  onKeypadClear();
+  clearAuthError();
+  updateAuthPinHint();
+}
+
+/**
+ * Met à jour le texte d'aide du PIN selon le membre sélectionné
+ */
+function updateAuthPinHint() {
+  const hintEl = document.getElementById("authPinHint");
+  if (!hintEl) return;
+
+  const select = document.getElementById("authProfileSelect");
+  const memberName = select ? select.value : "";
+  const pin = getActivePinForMember(memberName);
+
+  if (pin === DEFAULT_PIN) {
+    hintEl.innerHTML = `💡 Code PIN initial de ce profil : <code>${DEFAULT_PIN}</code> (modifiable une fois connecté)`;
+  } else {
+    hintEl.innerHTML = `🔒 Ce membre a configuré un <strong>code PIN personnel</strong> secret.`;
+  }
 }
 
 /**
@@ -117,8 +150,7 @@ function onKeypadPress(digit) {
   updatePinDots();
   clearAuthError();
 
-  // Si 4 chiffres atteints (ou longueur du code actuel)
-  const activePin = getActivePin();
+  const activePin = getActivePinForSelectedMember();
   if (currentEnteredPin.length === activePin.length) {
     setTimeout(verifyEnteredPin, 100);
   }
@@ -160,40 +192,70 @@ function updatePinDots() {
 }
 
 /**
- * Récupère le code PIN configuré (dans appData ou défaut 2026)
+ * Récupère le code PIN du membre actuellement sélectionné dans le formulaire
  */
-function getActivePin() {
-  if (typeof appData !== "undefined" && appData.config && appData.config.pinCode) {
-    return String(appData.config.pinCode).trim();
+function getActivePinForSelectedMember() {
+  const select = document.getElementById("authProfileSelect");
+  const memberName = select ? select.value : "";
+  return getActivePinForMember(memberName);
+}
+
+/**
+ * Récupère le code PIN personnel d'un membre (avec fallback 2026)
+ */
+function getActivePinForMember(memberName) {
+  if (!memberName) return DEFAULT_PIN;
+
+  if (typeof appData !== "undefined") {
+    // 1. Recherche dans les PINs personnels
+    if (appData.memberPins && appData.memberPins[memberName]) {
+      return String(appData.memberPins[memberName]).trim();
+    }
+
+    // 2. Recherche par ID de membre
+    const m = (appData.members || []).find(x => x.name === memberName || (x.name && x.name.includes(memberName)));
+    if (m && appData.memberPins && appData.memberPins[m.id]) {
+      return String(appData.memberPins[m.id]).trim();
+    }
+
+    // 3. Fallback sur le PIN global s'il existe
+    if (appData.config && appData.config.pinCode && memberName.includes("SUZET")) {
+      return String(appData.config.pinCode).trim();
+    }
   }
+
   return DEFAULT_PIN;
 }
 
 /**
- * Vérification du code PIN saisi
+ * Vérification du code PIN saisi pour le membre sélectionné
  */
 function verifyEnteredPin() {
-  const activePin = getActivePin();
+  const activePin = getActivePinForSelectedMember();
   const select = document.getElementById("authProfileSelect");
   const selectedName = select ? select.value : "Membre CS";
+
+  const missionSelect = document.getElementById("authMissionSelect");
+  const selectedMission = missionSelect ? missionSelect.value : "Membre CS";
 
   if (currentEnteredPin === activePin) {
     // Succès
     currentUser = {
       name: selectedName,
+      mission: selectedMission,
       role: "CS_ADMIN",
       unlockedAt: new Date().toISOString()
     };
     sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
 
-    // Audit Log de connexion
+    // Audit Log de connexion avec le poste
     if (typeof logAuditAction === "function") {
-      logAuditAction("SECURITE", "Connexion réussie", `Connexion au panneau CS par ${selectedName}`);
+      logAuditAction("SECURITE", "Prise de poste", `${selectedName} a ouvert sa session au poste « ${selectedMission} »`);
     }
 
     unlockScreen(true);
     updateAuthUI();
-    showToast(`Bienvenue, ${selectedName} ! Session déverrouillée.`, "success");
+    showToast(`Bienvenue ${selectedName} ! Poste : ${selectedMission}`, "success");
     currentEnteredPin = "";
   } else {
     // Échec : secousse et message d'erreur
@@ -206,7 +268,7 @@ function verifyEnteredPin() {
     }
     dots.forEach(d => d.classList.add("error"));
 
-    showAuthError(`Code PIN incorrect. (Code par défaut : ${activePin === DEFAULT_PIN ? DEFAULT_PIN : '••••'})`);
+    showAuthError(`Code PIN incorrect pour ${selectedName}.`);
     setTimeout(() => {
       onKeypadClear();
     }, 600);
@@ -251,15 +313,15 @@ function lockScreen() {
  * Déconnexion de l'utilisateur
  */
 function logoutUser() {
-  if (confirm("Voulez-vous verrouiller l'application et vous déconnecter ?")) {
+  if (confirm("Voulez-vous verrouiller l'application et libérer ce poste ?")) {
     if (typeof logAuditAction === "function" && currentUser) {
-      logAuditAction("SECURITE", "Déconnexion", `Déconnexion volontaire de ${currentUser.name}`);
+      logAuditAction("SECURITE", "Fin de session", `Session fermée par ${currentUser.name}`);
     }
     sessionStorage.removeItem(AUTH_SESSION_KEY);
     currentUser = null;
     lockScreen();
     updateAuthUI();
-    showToast("Application verrouillée.", "info");
+    showToast("Session verrouillée.", "info");
   }
 }
 
@@ -275,11 +337,11 @@ function getCurrentUser() {
       return currentUser;
     } catch (e) {}
   }
-  return { name: "Membre CS", role: "CS" };
+  return { name: "Membre CS", mission: "CS", role: "CS" };
 }
 
 /**
- * Met à jour le badge utilisateur dans le Header
+ * Met à jour le badge utilisateur et son poste dans le Header
  */
 function updateAuthUI() {
   const userPill = document.getElementById("authUserPill");
@@ -291,7 +353,11 @@ function updateAuthUI() {
   const u = getCurrentUser();
   if (u && u.name) {
     userPill.style.display = "inline-flex";
-    userNameEl.innerText = u.name;
+    
+    // Afficher Prénom/Nom + Mission courte
+    const missionCourte = u.mission ? u.mission.split(' ')[0] : 'CS';
+    userNameEl.innerHTML = `${escapeHtml(u.name)} <span style="font-weight:400; color:#475569; font-size:0.75rem;">(${missionCourte})</span>`;
+
     if (userAvatarEl) {
       const initials = u.name
         .split(" ")
@@ -308,9 +374,15 @@ function updateAuthUI() {
 }
 
 /**
- * Modal : Changer le code PIN
+ * Modal : Changer SON code PIN personnel
  */
 function openChangePinModal() {
+  const u = getCurrentUser();
+  const titleEl = document.querySelector("#changePinModal .modal-title");
+  if (titleEl) {
+    titleEl.innerText = `🔒 Code PIN personnel de ${u.name || 'Membre'}`;
+  }
+
   document.getElementById("pinOldInput").value = "";
   document.getElementById("pinNewInput").value = "";
   document.getElementById("pinConfirmInput").value = "";
@@ -323,6 +395,9 @@ function clearChangePinError() {
   if (err) err.innerText = "";
 }
 
+/**
+ * Enregistrement du code PIN personnel (chacun son code sans impacter les collègues)
+ */
 function saveNewPinForm(e) {
   e.preventDefault();
   const oldPin = document.getElementById("pinOldInput").value.trim();
@@ -330,7 +405,8 @@ function saveNewPinForm(e) {
   const confirmPin = document.getElementById("pinConfirmInput").value.trim();
   const errEl = document.getElementById("changePinErrorMsg");
 
-  const currentPin = getActivePin();
+  const u = getCurrentUser();
+  const currentPin = getActivePinForMember(u.name);
 
   if (oldPin !== currentPin) {
     errEl.innerText = "L'ancien code PIN est incorrect.";
@@ -352,14 +428,19 @@ function saveNewPinForm(e) {
     return;
   }
 
-  // Enregistrer dans appData
+  // Enregistrer dans appData.memberPins (par nom de membre)
   if (typeof appData !== "undefined") {
-    if (!appData.config) appData.config = {};
-    appData.config.pinCode = newPin;
+    if (!appData.memberPins) appData.memberPins = {};
+    appData.memberPins[u.name] = newPin;
+
+    // Si le membre a un id dans appData.members, l'enregistrer aussi sous cet id
+    const m = (appData.members || []).find(x => x.name === u.name || (x.name && x.name.includes(u.name)));
+    if (m) {
+      appData.memberPins[m.id] = newPin;
+    }
 
     if (typeof logAuditAction === "function") {
-      const u = getCurrentUser();
-      logAuditAction("SECURITE", "Code PIN modifié", `Code PIN mis à jour par ${u.name}`);
+      logAuditAction("SECURITE", "Code PIN personnel modifié", `${u.name} a mis à jour son code PIN personnel`);
     }
 
     if (typeof persistData === "function") {
@@ -368,5 +449,5 @@ function saveNewPinForm(e) {
   }
 
   closeModal("changePinModal");
-  showToast(`✅ Code PIN modifié avec succès ! (Nouveau code : ${newPin})`, "success");
+  showToast(`✅ Votre code PIN personnel a été enregistré avec succès !`, "success");
 }
