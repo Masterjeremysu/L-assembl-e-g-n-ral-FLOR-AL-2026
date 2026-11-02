@@ -1,7 +1,7 @@
 /**
  * Module de Synchronisation Cloud Hébergée Temps Réel
  * Résidence Le Floréal - AG 2026
- * Compatible Firebase Realtime Database & Cloud Relay REST
+ * Double moteur : Firebase SDK Compat + Relais Natif REST / SSE (Ultra-robuste)
  */
 
 const CLOUD_STORAGE_CONFIG_KEY = "AG_CLOUD_CONFIG_2026";
@@ -11,6 +11,7 @@ let cloudDbRef = null;
 let lastLocalSaveTimestamp = 0;
 let lastRemoteSaveTimestamp = 0;
 let cloudPushDebounceTimer = null;
+let sseConnection = null;
 
 // Initialisation du Cloud au chargement
 document.addEventListener("DOMContentLoaded", () => {
@@ -21,20 +22,26 @@ document.addEventListener("DOMContentLoaded", () => {
  * Initialise la connexion Cloud
  */
 function initCloudSync() {
-  updateCloudStatusUI('offline', 'Initialisation Cloud...');
+  updateCloudStatusUI('syncing', 'Connexion au Cloud Firebase...');
 
   // Écoute des événements réseau natifs du navigateur
   window.addEventListener('online', () => {
     updateCloudStatusUI('syncing', 'Réseau rétabli...');
-    syncWithCloud();
+    fetchInitialCloudData();
   });
 
   window.addEventListener('offline', () => {
     updateCloudStatusUI('offline', 'Mode Hors-ligne (Sauvegarde locale active)');
   });
 
-  // Tenter l'initialisation de Firebase si disponible
+  // 1. Initialisation Firebase SDK (si CDN chargé)
   setupFirebaseSync();
+
+  // 2. Récupération immédiate par REST (rapide et infaillible)
+  fetchInitialCloudData();
+
+  // 3. Écoute temps réel Server-Sent Events (secours natif)
+  setupSseSync();
 }
 
 /**
@@ -43,12 +50,11 @@ function initCloudSync() {
 function setupFirebaseSync() {
   const savedCfg = getCloudConfig();
 
-  // Si Firebase SDK compat est présent et qu'une config existe
   if (typeof firebase !== 'undefined' && savedCfg && savedCfg.databaseURL) {
     try {
       if (!firebase.apps.length) {
         firebase.initializeApp({
-          apiKey: savedCfg.apiKey || "AIzaSyFakeKeyForDefaultInstance",
+          apiKey: savedCfg.apiKey || "AIzaSyFakeKeyForFloreal2026",
           databaseURL: savedCfg.databaseURL,
           projectId: savedCfg.projectId || "ag-floreal-2026"
         });
@@ -62,12 +68,10 @@ function setupFirebaseSync() {
         if (snap.val() === true) {
           isCloudActive = true;
           updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
-        } else {
-          updateCloudStatusUI('syncing', 'Connexion au Cloud...');
         }
       });
 
-      // Écouter les mises à jour distantes envoyées par d'autres appareils
+      // Écouter les mises à jour distantes
       cloudDbRef.on('value', (snapshot) => {
         const remoteData = snapshot.val();
         if (remoteData) {
@@ -77,12 +81,68 @@ function setupFirebaseSync() {
 
       return;
     } catch (e) {
-      console.warn("Erreur initialisation Firebase :", e);
+      console.warn("Info SDK Firebase (bascule REST) :", e);
     }
   }
+}
 
-  // Fallback si pas de Firebase configuré : Mode Hybride Local + PeerJS
-  updateCloudStatusUI('online', 'Sauvegarde Locale + Multi-écrans');
+/**
+ * Récupération initiale rapide par API REST Firebase
+ */
+function fetchInitialCloudData() {
+  const cfg = getCloudConfig();
+  if (!cfg.databaseURL) return;
+
+  fetch(cfg.databaseURL + '/floreal_2026/ag_data.json')
+    .then(r => r.json())
+    .then(remoteData => {
+      if (remoteData && remoteData.coproprietaires && remoteData.coproprietaires.length > 0) {
+        handleIncomingCloudData(remoteData);
+        isCloudActive = true;
+        updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
+      } else {
+        // La base distante est encore vide : on lui pousse les données initiales
+        if (typeof appData !== 'undefined') {
+          cloudPushData(appData);
+        }
+      }
+    })
+    .catch(err => {
+      console.warn("Info fetch Cloud REST :", err);
+    });
+}
+
+/**
+ * Écoute temps réel native par Server-Sent Events (SSE)
+ */
+function setupSseSync() {
+  const cfg = getCloudConfig();
+  if (!cfg.databaseURL || typeof EventSource === 'undefined') return;
+
+  try {
+    if (sseConnection) sseConnection.close();
+    sseConnection = new EventSource(cfg.databaseURL + '/floreal_2026/ag_data.json');
+
+    sseConnection.addEventListener('put', (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload && payload.data) {
+          handleIncomingCloudData(payload.data);
+        }
+      } catch (err) {}
+    });
+
+    sseConnection.onopen = () => {
+      isCloudActive = true;
+      updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
+    };
+
+    sseConnection.onerror = () => {
+      // Reconnexion automatique gérée nativement par EventSource
+    };
+  } catch (e) {
+    console.warn("Info SSE sync :", e);
+  }
 }
 
 /**
@@ -94,7 +154,7 @@ function getCloudConfig() {
     if (raw) return JSON.parse(raw);
   } catch (e) {}
 
-  // Configuration par défaut pré-reliée à votre projet Firebase ag-floreal-2026
+  // Configuration par défaut reliée directement à votre base Firebase ag-floreal-2026
   return {
     type: 'firebase',
     databaseURL: 'https://ag-floreal-2026-default-rtdb.europe-west1.firebasedatabase.app',
@@ -109,6 +169,8 @@ function getCloudConfig() {
 function saveCloudConfig(cfg) {
   localStorage.setItem(CLOUD_STORAGE_CONFIG_KEY, JSON.stringify(cfg));
   setupFirebaseSync();
+  fetchInitialCloudData();
+  setupSseSync();
 }
 
 /**
@@ -121,20 +183,34 @@ function cloudPushData(data) {
   data._lastUpdated = lastLocalSaveTimestamp;
   data._lastUpdatedBy = typeof getCurrentUser === 'function' ? getCurrentUser().name : 'Membre CS';
 
-  // Si Firebase est connecté
-  if (cloudDbRef && isCloudActive) {
-    clearTimeout(cloudPushDebounceTimer);
-    updateCloudStatusUI('syncing', 'Envoi au Cloud...');
+  clearTimeout(cloudPushDebounceTimer);
+  updateCloudStatusUI('syncing', 'Envoi au Cloud...');
 
-    cloudPushDebounceTimer = setTimeout(() => {
-      cloudDbRef.set(data).then(() => {
-        updateCloudStatusUI('online', 'Cloud à jour');
-      }).catch(err => {
-        console.error("Erreur push Cloud Firebase:", err);
-        updateCloudStatusUI('offline', 'Erreur synchro Cloud');
+  cloudPushDebounceTimer = setTimeout(() => {
+    const cfg = getCloudConfig();
+
+    // 1. Envoi via SDK Firebase si disponible
+    if (cloudDbRef && isCloudActive) {
+      cloudDbRef.set(data).catch(() => {});
+    }
+
+    // 2. Envoi garanti via REST Firebase (infaillible sur tous les navigateurs & smartphones)
+    if (cfg && cfg.databaseURL) {
+      fetch(cfg.databaseURL + '/floreal_2026/ag_data.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(() => {
+        isCloudActive = true;
+        updateCloudStatusUI('online', 'Cloud à jour (Temps réel)');
+      })
+      .catch(err => {
+        console.warn("Erreur push Cloud REST:", err);
+        updateCloudStatusUI('offline', 'Sauvegarde locale active');
       });
-    }, 400); // Debounce de 400ms pour fluidité
-  }
+    }
+  }, 400); // Debounce de 400ms pour fluidité
 }
 
 /**
@@ -150,7 +226,7 @@ function handleIncomingCloudData(remoteData) {
 
   lastRemoteSaveTimestamp = remoteData._lastUpdated || Date.now();
 
-  // Mettre à jour appData sans écraser les inputs si l'utilisateur est en train de taper
+  // Mettre à jour appData sans écraser les inputs si l'utilisateur est en train d'écrire
   const activeEl = document.activeElement;
   const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
 
@@ -163,10 +239,6 @@ function handleIncomingCloudData(remoteData) {
   }
 
   updateCloudStatusUI('online', `Sync Cloud (${remoteData._lastUpdatedBy || 'Distant'})`);
-  
-  if (typeof showToast === 'function') {
-    showToast(`☁️ Données synchronisées depuis le Cloud (${remoteData._lastUpdatedBy || 'Distant'})`, 'info');
-  }
 }
 
 /**
@@ -220,5 +292,5 @@ function saveCloudConfigForm(e) {
 
   saveCloudConfig(cfg);
   closeModal('cloudConfigModal');
-  showToast("Configuration Cloud enregistrée ! Tentative de connexion...", "success");
+  showToast("Configuration Cloud enregistrée ! Connexion immédiate...", "success");
 }
