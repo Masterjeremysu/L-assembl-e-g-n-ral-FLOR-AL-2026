@@ -2,18 +2,24 @@
  * Module de Synchronisation Cloud Hébergée Temps Réel
  * Résidence Le Floréal - AG 2026
  * Double moteur : Firebase SDK Compat + Relais Natif REST / SSE (Ultra-robuste)
+ * 
+ * RÈGLE D'OR : LA BASE DE DONNÉES CLOUD EST LE MAÎTRE ABSOLU (BDD > LocalStorage)
+ * Dès qu'un appareil se connecte, la base Firebase écrase et rafraîchit le cache local.
  */
 
 const CLOUD_STORAGE_CONFIG_KEY = "AG_CLOUD_CONFIG_2026";
+const CLIENT_SESSION_ID = "client_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+
 let isCloudActive = false;
 let isCloudSyncing = false;
+let hasSyncedInitialCloud = false;
 let cloudDbRef = null;
 let lastLocalSaveTimestamp = 0;
 let lastRemoteSaveTimestamp = 0;
 let cloudPushDebounceTimer = null;
 let sseConnection = null;
 
-// Initialisation du Cloud au chargement
+// Initialisation du Cloud dès le chargement du DOM
 document.addEventListener("DOMContentLoaded", () => {
   initCloudSync();
 });
@@ -22,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
  * Initialise la connexion Cloud
  */
 function initCloudSync() {
-  updateCloudStatusUI('syncing', 'Connexion au Cloud Firebase...');
+  updateCloudStatusUI('syncing', 'Connexion à la BDD Cloud...');
 
   // Écoute des événements réseau natifs du navigateur
   window.addEventListener('online', () => {
@@ -31,13 +37,13 @@ function initCloudSync() {
   });
 
   window.addEventListener('offline', () => {
-    updateCloudStatusUI('offline', 'Mode Hors-ligne (Sauvegarde locale active)');
+    updateCloudStatusUI('offline', 'Mode Hors-ligne (Cache local actif)');
   });
 
-  // 1. Initialisation Firebase SDK (si CDN chargé)
+  // 1. Initialisation SDK Firebase (si CDN disponible)
   setupFirebaseSync();
 
-  // 2. Récupération immédiate par REST (rapide et infaillible)
+  // 2. Récupération immédiate par REST sans cache (garantit d'avoir la vérité BDD en direct)
   fetchInitialCloudData();
 
   // 3. Écoute temps réel Server-Sent Events (secours natif)
@@ -67,11 +73,11 @@ function setupFirebaseSync() {
       db.ref('.info/connected').on('value', (snap) => {
         if (snap.val() === true) {
           isCloudActive = true;
-          updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
+          updateCloudStatusUI('online', 'BDD Connectée (Temps réel)');
         }
       });
 
-      // Écouter les mises à jour distantes
+      // Écouter les mises à jour distantes (instantané quand quelqu'un modifie sur PC ou mobile)
       cloudDbRef.on('value', (snapshot) => {
         const remoteData = snapshot.val();
         if (remoteData) {
@@ -88,28 +94,56 @@ function setupFirebaseSync() {
 
 /**
  * Récupération initiale rapide par API REST Firebase
+ * Le paramètre ?t= assure qu'aucun proxy / cache navigateur ne serve des données périmées
  */
-function fetchInitialCloudData() {
+function fetchInitialCloudData(force = false) {
   const cfg = getCloudConfig();
   if (!cfg.databaseURL) return;
 
-  fetch(cfg.databaseURL + '/floreal_2026/ag_data.json')
-    .then(r => r.json())
+  if (force) {
+    updateCloudStatusUI('syncing', 'Actualisation BDD en cours...');
+  }
+
+  const cacheBuster = `?t=${Date.now()}`;
+  fetch(cfg.databaseURL + '/floreal_2026/ag_data.json' + cacheBuster)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
     .then(remoteData => {
       if (remoteData && remoteData.coproprietaires && remoteData.coproprietaires.length > 0) {
-        handleIncomingCloudData(remoteData);
+        // La BDD distante existe et a des données : elle prend immédiatement le dessus
+        handleIncomingCloudData(remoteData, true);
         isCloudActive = true;
-        updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
+        hasSyncedInitialCloud = true;
+        updateCloudStatusUI('online', `BDD Synchronisée (${remoteData._lastUpdatedBy || 'En direct'})`);
+        if (force && typeof showToast === 'function') {
+          showToast('✅ Base de données Cloud synchronisée en direct !', 'success');
+        }
       } else {
-        // La base distante est encore vide : on lui pousse les données initiales
-        if (typeof appData !== 'undefined') {
+        hasSyncedInitialCloud = true;
+        // La BDD distante est totalement vide : initialisation prudente
+        if (typeof appData !== 'undefined' && appData._hasLocalEdits) {
           cloudPushData(appData);
         }
       }
     })
     .catch(err => {
       console.warn("Info fetch Cloud REST :", err);
+      if (!isCloudActive) {
+        updateCloudStatusUI('offline', 'Mode Hors-ligne (Cache local actif)');
+      }
+      if (force && typeof showToast === 'function') {
+        showToast("⚠️ Impossible de joindre la base distante (Vérifiez la connexion)", "warning");
+      }
     });
+}
+
+/**
+ * Force l'actualisation immédiate depuis la BDD Firebase (appelable via le bouton 🔄)
+ */
+function forceSyncFromCloud() {
+  fetchInitialCloudData(true);
 }
 
 /**
@@ -134,7 +168,7 @@ function setupSseSync() {
 
     sseConnection.onopen = () => {
       isCloudActive = true;
-      updateCloudStatusUI('online', 'Cloud connecté (Temps réel)');
+      updateCloudStatusUI('online', 'BDD Connectée (Temps réel)');
     };
 
     sseConnection.onerror = () => {
@@ -179,9 +213,22 @@ function saveCloudConfig(cfg) {
 function cloudPushData(data) {
   if (!data) return;
 
+  // Sécurité anti-écrasement au démarrage d'un nouvel appareil :
+  // Si le Cloud n'a pas encore répondu au premier chargement, on temporise pour ne pas risquer
+  // d'écraser la base distante avec des données par défaut non synchronisées.
+  if (!hasSyncedInitialCloud && !isCloudActive) {
+    console.warn("Cloud push différé : attente de la synchronisation BDD maître...");
+    setTimeout(() => {
+      cloudPushData(appData);
+    }, 1200);
+    return;
+  }
+
   lastLocalSaveTimestamp = Date.now();
   data._lastUpdated = lastLocalSaveTimestamp;
+  data._lastClientId = CLIENT_SESSION_ID;
   data._lastUpdatedBy = typeof getCurrentUser === 'function' ? getCurrentUser().name : 'Membre CS';
+  data._hasLocalEdits = true;
 
   // Nettoyage impératif des clés pour Firebase (interdiction des points '.' et caractères réservés)
   if (data.memberPins) {
@@ -194,7 +241,7 @@ function cloudPushData(data) {
   }
 
   clearTimeout(cloudPushDebounceTimer);
-  updateCloudStatusUI('syncing', 'Envoi au Cloud...');
+  updateCloudStatusUI('syncing', 'Envoi à la BDD...');
 
   cloudPushDebounceTimer = setTimeout(() => {
     const cfg = getCloudConfig();
@@ -213,46 +260,58 @@ function cloudPushData(data) {
       })
       .then(() => {
         isCloudActive = true;
-        updateCloudStatusUI('online', 'Cloud à jour (Temps réel)');
+        updateCloudStatusUI('online', 'BDD à jour (Temps réel)');
       })
       .catch(err => {
         console.warn("Erreur push Cloud REST:", err);
         updateCloudStatusUI('offline', 'Sauvegarde locale active');
       });
     }
-  }, 400); // Debounce de 400ms pour fluidité
+  }, 350); // Debounce fluide de 350ms
 }
 
 /**
- * Réception et fusion intelligente des données venues du Cloud
+ * Réception et fusion des données venues du Cloud
+ * RÈGLE FONDAMENTALE : LE CLOUD EST LA SOURCE UNIQUE DE VÉRITÉ
  */
-function handleIncomingCloudData(remoteData) {
+function handleIncomingCloudData(remoteData, isInitialOrForced = false) {
   if (!remoteData || typeof appData === 'undefined') return;
 
-  // Éviter de s'écraser soi-même si c'est notre propre modification
-  if (remoteData._lastUpdated && remoteData._lastUpdated <= lastLocalSaveTimestamp) {
+  // Si c'est notre propre modification et qu'on ne force pas, ignorer le retour écho
+  if (!isInitialOrForced && remoteData._lastClientId === CLIENT_SESSION_ID) {
     return;
   }
 
   lastRemoteSaveTimestamp = remoteData._lastUpdated || Date.now();
+  hasSyncedInitialCloud = true;
 
-  // Mettre à jour appData sans écraser les inputs si l'utilisateur est en train d'écrire
+  // Préserver la valeur d'un champ de recherche s'il est en cours de saisie
   const activeEl = document.activeElement;
-  const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+  const isSearchInput = activeEl && (activeEl.id === 'searchCoproprietaire' || activeEl.id === 'searchPouvoir' || activeEl.id === 'searchResolution');
+  const searchVal = isSearchInput ? activeEl.value : null;
 
+  // ÉCRASEMENT DU LOCAL STORAGE AVEC LA VÉRITÉ DE LA BDD
   appData = remoteData;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
 
-  if (!isUserTyping) {
-    if (typeof updateUI === 'function') updateUI();
-    if (typeof renderAuditTab === 'function') renderAuditTab();
-  }
+  // Réactualisation immédiate de l'ensemble de l'interface
+  if (typeof updateUI === 'function') updateUI();
+  if (typeof renderAuditTab === 'function') renderAuditTab();
 
   // Ravitaillement immédiat de l'écran de verrouillage avec les données et PINs Firebase
   if (typeof populateAuthProfiles === 'function') populateAuthProfiles();
   if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
 
-  updateCloudStatusUI('online', `Cloud Connecté (${remoteData._lastUpdatedBy || 'En direct'})`);
+  // Restaurer le champ de filtre si besoin
+  if (isSearchInput && searchVal !== null) {
+    const elAfter = document.getElementById(activeEl.id);
+    if (elAfter) {
+      elAfter.value = searchVal;
+      elAfter.focus();
+    }
+  }
+
+  updateCloudStatusUI('online', `BDD Synchronisée (${remoteData._lastUpdatedBy || 'En direct'})`);
 }
 
 /**
@@ -272,7 +331,7 @@ function updateCloudStatusUI(status, label) {
   }
 
   if (labelEl) {
-    labelEl.innerText = label || (status === 'online' ? 'Cloud Connecté' : 'Hors-ligne');
+    labelEl.innerText = label || (status === 'online' ? 'BDD Connectée' : 'Hors-ligne');
   }
 }
 

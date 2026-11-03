@@ -192,10 +192,15 @@
         <!-- Groupe Sécurité & Cloud Hébergé -->
         <div class="header-auth-group">
           <!-- Indicateur Cloud Sync -->
-          <div class="cloud-status-pill" id="cloudStatusPill" onclick="openCloudConfigModal()" title="État de la synchronisation Cloud (Cliquez pour configurer)">
+          <div class="cloud-status-pill" id="cloudStatusPill" onclick="openCloudConfigModal()" title="État de la BDD Cloud (Cliquez pour options)">
             <span class="cloud-dot"></span>
-            <span id="cloudStatusLabel">Cloud Actif</span>
+            <span id="cloudStatusLabel">BDD Maître</span>
           </div>
+
+          <!-- Bouton Forcer Actualisation BDD directe -->
+          <button class="btn-icon-subtle" onclick="forceSyncFromCloud()" title="Forcer l'actualisation depuis la BDD Cloud (Recharger immédiatement)" style="font-size:0.95rem; padding:0.25rem 0.5rem;">
+            🔄
+          </button>
 
           <!-- Profil Utilisateur & PIN -->
           <div class="auth-user-pill" id="authUserPill" onclick="openChangePinModal()" title="Connecté au CS - Cliquez pour modifier le code PIN">
@@ -1760,9 +1765,14 @@ M. LEROY Jacques	Lot 8	85"></textarea>
             💡 <strong>Rappel :</strong> Vos données sont systématiquement enregistrées localement dans votre navigateur (<code>localStorage</code>), ce qui vous garantit <strong>zéro coupure même sans connexion Internet</strong> en salle de réunion.
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('cloudConfigModal')">Fermer</button>
-          <button type="submit" class="btn btn-primary">Enregistrer la configuration</button>
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="btn btn-warning" onclick="forceSyncFromCloud(); closeModal('cloudConfigModal');" title="Télécharger les données les plus récentes depuis le serveur">
+            🔄 Forcer l'actualisation BDD
+          </button>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('cloudConfigModal')">Fermer</button>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+          </div>
         </div>
       </form>
     </div>

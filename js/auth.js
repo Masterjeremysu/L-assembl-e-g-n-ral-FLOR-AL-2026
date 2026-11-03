@@ -339,6 +339,11 @@ function unlockScreen(animate = true) {
     lockscreen.classList.add("unlocked");
   }
   document.body.style.overflow = "";
+
+  // Réactualisation garantie de l'interface et des votes au déverrouillage
+  if (typeof updateUI === "function") {
+    updateUI();
+  }
 }
 
 /**

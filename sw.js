@@ -3,7 +3,7 @@
  * Assure le chargement instantané, le mode plein écran et la résilience hors-ligne
  */
 
-const CACHE_NAME = 'floreal-ag-2026-v2';
+const CACHE_NAME = 'floreal-ag-2026-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   './js/auth.js',
   './js/sync.js',
   './js/cloud.js',
+  './js/pwa.js',
   './js/app.js',
   './assets/icon.svg',
   './manifest.webmanifest'
