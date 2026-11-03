@@ -2364,10 +2364,58 @@ function toggleModeSeance() {
       broadcastLiveUpdate({ type: 'CHANGE_ACTIVE_SEANCE_RES', resId: activeSeanceResId });
     }
   } else {
-    if (panel) panel.style.display = 'none';
+    if (panel) {
+      panel.style.display = 'none';
+      panel.classList.remove('projector-fullscreen-mode');
+    }
     if (btn) btn.innerHTML = '▶ Mode Séance';
   }
 }
+
+/**
+ * Mode Vidéoprojecteur grand format pour rétroprojecteur de salle
+ */
+function toggleProjectorMode() {
+  const panel = document.getElementById('seanceFocusPanel');
+  if (!panel) return;
+
+  if (!isModeSeanceActive) {
+    toggleModeSeance();
+  }
+
+  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!isFs) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+    panel.classList.add('projector-fullscreen-mode');
+    showToast("⛶ Mode Vidéoprojecteur Actif (Flèches ⬅ ➡ pour naviguer, Échap pour quitter)", "success");
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+    panel.classList.remove('projector-fullscreen-mode');
+  }
+}
+
+// Synchronisation automatique si l'utilisateur quitte le plein écran (touche Échap)
+document.addEventListener('fullscreenchange', () => {
+  const panel = document.getElementById('seanceFocusPanel');
+  if (panel && !document.fullscreenElement) {
+    panel.classList.remove('projector-fullscreen-mode');
+  }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  const panel = document.getElementById('seanceFocusPanel');
+  if (panel && !document.webkitFullscreenElement) {
+    panel.classList.remove('projector-fullscreen-mode');
+  }
+});
 
 function ouvrirSeanceSurRes(resId) {
   activeSeanceResId = resId;

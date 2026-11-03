@@ -65,6 +65,11 @@ function startHostingLive() {
       colorLight: "#ffffff"
     });
 
+    const waBtn = document.getElementById('liveWhatsappShareBtn');
+    if (waBtn) {
+      waBtn.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent("Lien direct synchronisé AG 2026 : " + currentUrl);
+    }
+
     showToast(`Session hôte démarrée : ${id}`, "success");
   });
 
@@ -176,7 +181,9 @@ function handleIncomingPeerMessage(msg, senderConn) {
     appData = msg.data;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
     updateUI();
-    showToast("Votes synchronisés en direct !", "info");
+    if (typeof populateAuthProfiles === 'function') populateAuthProfiles();
+    if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
+    showToast("Votes et codes PIN synchronisés en direct !", "success");
 
     // Si nous sommes l'hôte, on relaie aux autres téléphones/tablettes
     if (isHost) {
@@ -303,3 +310,21 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { joinLiveSession(roomParam); }, 600);
   }
 });
+
+/**
+ * Copie le lien synchronisé pour le coller / envoyer à sa tablette
+ */
+function copyLiveSyncLink() {
+  const codeEl = document.getElementById('liveSessionCodeDisplay');
+  const code = codeEl ? codeEl.innerText.trim() : '';
+  const currentUrl = window.location.href.split('?')[0] + (code && code !== '-' ? '?room=' + code : '');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(currentUrl).then(() => {
+      showToast("✅ Lien copié ! Ouvrez-le sur votre tablette pour synchroniser vos votes et vos codes PIN.", "success");
+    }).catch(() => {
+      prompt("Copiez ce lien à ouvrir sur votre tablette :", currentUrl);
+    });
+  } else {
+    prompt("Copiez ce lien à ouvrir sur votre tablette :", currentUrl);
+  }
+}

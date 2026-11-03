@@ -112,7 +112,7 @@ function updateAuthPinHint() {
   const pin = getActivePinForMember(memberName);
 
   if (pin === DEFAULT_PIN) {
-    hintEl.innerHTML = `💡 Code PIN initial de ce profil : <code>${DEFAULT_PIN}</code> (modifiable une fois connecté)`;
+    hintEl.innerHTML = `💡 Code PIN initial de ce profil : <code>${DEFAULT_PIN}</code><br><span style="font-size:0.75rem; color:#94a3b8; display:inline-block; margin-top:0.25rem;">(Sur un nouvel appareil ou tablette, tapez <strong>2026</strong> ou synchronisez via le bouton ci-dessous)</span>`;
   } else {
     hintEl.innerHTML = `🔒 Ce membre a configuré un <strong>code PIN personnel</strong> secret.`;
   }
@@ -201,21 +201,35 @@ function getActivePinForSelectedMember() {
 }
 
 /**
+ * Nettoie une clé pour la rendre 100% compatible avec Firebase Realtime Database
+ * (Firebase interdit formellement les caractères . # $ [ ] / dans les clés d'objets)
+ */
+function sanitizeMemberPinKey(key) {
+  if (!key) return "";
+  return String(key).replace(/[\.\#\$\[\]\/]/g, "").trim();
+}
+
+/**
  * Récupère le code PIN personnel d'un membre (avec fallback 2026)
  */
 function getActivePinForMember(memberName) {
   if (!memberName) return DEFAULT_PIN;
 
   if (typeof appData !== "undefined") {
-    // 1. Recherche dans les PINs personnels
-    if (appData.memberPins && appData.memberPins[memberName]) {
-      return String(appData.memberPins[memberName]).trim();
+    const safeName = sanitizeMemberPinKey(memberName);
+
+    // 1. Recherche dans les PINs personnels (clé Firebase nettoyée ou brute)
+    if (appData.memberPins) {
+      if (appData.memberPins[safeName]) return String(appData.memberPins[safeName]).trim();
+      if (appData.memberPins[memberName]) return String(appData.memberPins[memberName]).trim();
     }
 
     // 2. Recherche par ID de membre
     const m = (appData.members || []).find(x => x.name === memberName || (x.name && x.name.includes(memberName)));
-    if (m && appData.memberPins && appData.memberPins[m.id]) {
-      return String(appData.memberPins[m.id]).trim();
+    if (m && appData.memberPins) {
+      if (m.id && appData.memberPins[m.id]) return String(appData.memberPins[m.id]).trim();
+      const safeId = sanitizeMemberPinKey(m.id);
+      if (safeId && appData.memberPins[safeId]) return String(appData.memberPins[safeId]).trim();
     }
 
     // 3. Fallback sur le PIN global s'il existe
@@ -275,10 +289,34 @@ function verifyEnteredPin() {
     }
     dots.forEach(d => d.classList.add("error"));
 
-    showAuthError(`Code PIN incorrect pour ${selectedName}.`);
+    let errMsg = `Code PIN incorrect pour ${selectedName}.`;
+    if (activePin === DEFAULT_PIN) {
+      errMsg = `Code incorrect. Sur une nouvelle tablette/appareil, le code de départ est 2026.`;
+    }
+    showAuthError(errMsg);
     setTimeout(() => {
       onKeypadClear();
-    }, 600);
+    }, 1100);
+  }
+}
+
+/**
+ * Permet de synchroniser une tablette avec l'ordinateur directement depuis l'écran de verrouillage
+ */
+function openLockscreenJoinModal() {
+  const code = prompt("📲 Synchronisation Multi-écrans :\nEntrez le code de session affiché sur l'ordinateur principal (ex: floreal-xxxx) pour synchroniser immédiatement vos votes et vos codes PIN :");
+  if (code && code.trim()) {
+    const cleanCode = code.trim();
+    if (typeof joinLiveSession === "function") {
+      joinLiveSession(cleanCode);
+      showToast("Connexion à l'ordinateur en cours...", "info");
+      setTimeout(() => {
+        populateAuthProfiles();
+        updateAuthPinHint();
+      }, 1200);
+    } else {
+      alert("Module de synchronisation non disponible.");
+    }
   }
 }
 
@@ -435,15 +473,21 @@ function saveNewPinForm(e) {
     return;
   }
 
-  // Enregistrer dans appData.memberPins (par nom de membre)
+  // Enregistrer dans appData.memberPins (par nom de membre nettoyé pour Firebase)
   if (typeof appData !== "undefined") {
     if (!appData.memberPins) appData.memberPins = {};
-    appData.memberPins[u.name] = newPin;
+    const safeKey = sanitizeMemberPinKey(u.name);
+    appData.memberPins[safeKey] = newPin;
 
     // Si le membre a un id dans appData.members, l'enregistrer aussi sous cet id
     const m = (appData.members || []).find(x => x.name === u.name || (x.name && x.name.includes(u.name)));
-    if (m) {
-      appData.memberPins[m.id] = newPin;
+    if (m && m.id) {
+      appData.memberPins[sanitizeMemberPinKey(m.id)] = newPin;
+    }
+
+    // Si c'est M. SUZET Jérémy, aligner aussi le code PIN global
+    if (u.name && u.name.includes("SUZET") && appData.config) {
+      appData.config.pinCode = newPin;
     }
 
     if (typeof logAuditAction === "function") {
@@ -504,14 +548,19 @@ function saveOnboardingPinForm(e) {
 
   const u = getCurrentUser();
 
-  // Enregistrer le PIN individuel
+  // Enregistrer le PIN individuel nettoyé pour Firebase
   if (typeof appData !== "undefined") {
     if (!appData.memberPins) appData.memberPins = {};
-    appData.memberPins[u.name] = newPin;
+    const safeKey = sanitizeMemberPinKey(u.name);
+    appData.memberPins[safeKey] = newPin;
 
     const m = (appData.members || []).find(x => x.name === u.name || (x.name && x.name.includes(u.name)));
-    if (m) {
-      appData.memberPins[m.id] = newPin;
+    if (m && m.id) {
+      appData.memberPins[sanitizeMemberPinKey(m.id)] = newPin;
+    }
+
+    if (u.name && u.name.includes("SUZET") && appData.config) {
+      appData.config.pinCode = newPin;
     }
 
     if (typeof logAuditAction === "function") {

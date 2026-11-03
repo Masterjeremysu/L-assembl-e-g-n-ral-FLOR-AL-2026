@@ -183,6 +183,16 @@ function cloudPushData(data) {
   data._lastUpdated = lastLocalSaveTimestamp;
   data._lastUpdatedBy = typeof getCurrentUser === 'function' ? getCurrentUser().name : 'Membre CS';
 
+  // Nettoyage impératif des clés pour Firebase (interdiction des points '.' et caractères réservés)
+  if (data.memberPins) {
+    const cleanPins = {};
+    Object.keys(data.memberPins).forEach(k => {
+      const cleanKey = k.replace(/[\.\#\$\[\]\/]/g, '').trim();
+      if (cleanKey) cleanPins[cleanKey] = data.memberPins[k];
+    });
+    data.memberPins = cleanPins;
+  }
+
   clearTimeout(cloudPushDebounceTimer);
   updateCloudStatusUI('syncing', 'Envoi au Cloud...');
 
@@ -238,7 +248,11 @@ function handleIncomingCloudData(remoteData) {
     if (typeof renderAuditTab === 'function') renderAuditTab();
   }
 
-  updateCloudStatusUI('online', `Sync Cloud (${remoteData._lastUpdatedBy || 'Distant'})`);
+  // Ravitaillement immédiat de l'écran de verrouillage avec les données et PINs Firebase
+  if (typeof populateAuthProfiles === 'function') populateAuthProfiles();
+  if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
+
+  updateCloudStatusUI('online', `Cloud Connecté (${remoteData._lastUpdatedBy || 'En direct'})`);
 }
 
 /**
