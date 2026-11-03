@@ -12,10 +12,9 @@
   z-index: 99999;
   background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%);
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 1.25rem;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition: opacity 0.35s ease, visibility 0.35s ease;
 }
 
@@ -26,8 +25,9 @@
 }
 
 .auth-card {
+  margin: auto;
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: rgba(30, 41, 59, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -543,4 +543,75 @@
   border-color: #3b82f6;
   outline: none;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* =========================================================
+   ADAPTATION ROTATION PAYSAGE MOBILE (SMARTPHONE PAYSAGE)
+   ========================================================= */
+@media (max-height: 520px) and (orientation: landscape) {
+  #authLockscreen {
+    padding: 0.6rem;
+  }
+  .auth-card {
+    max-width: 680px;
+    padding: 1rem 1.4rem;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1.25rem;
+    align-items: center;
+    text-align: left;
+  }
+  .auth-icon-wrap {
+    display: none;
+  }
+  .auth-title {
+    font-size: 1.15rem;
+    margin-bottom: 0.2rem;
+  }
+  .auth-subtitle {
+    margin-bottom: 0.6rem;
+    font-size: 0.75rem;
+  }
+  .auth-profile-group {
+    margin-bottom: 0.5rem;
+  }
+  .auth-profile-group label {
+    font-size: 0.72rem;
+    margin-bottom: 0.2rem;
+  }
+  .auth-select {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+  }
+  .auth-pin-display {
+    margin: 0.5rem 0 0.6rem;
+    gap: 0.6rem;
+  }
+  .auth-pin-dot {
+    width: 14px;
+    height: 14px;
+  }
+  .auth-keypad {
+    max-width: 230px;
+    gap: 0.4rem;
+    margin: 0 auto;
+  }
+  .auth-key {
+    min-height: 38px;
+    font-size: 1.15rem;
+    border-radius: 10px;
+  }
+  .auth-error-msg {
+    min-height: 1rem;
+    font-size: 0.76rem;
+    margin-bottom: 0.4rem;
+  }
+  .auth-hint {
+    font-size: 0.72rem;
+  }
+  .auth-tablet-sync-box {
+    grid-column: 1 / -1;
+    margin-top: 0.35rem !important;
+    padding-top: 0.35rem !important;
+  }
 }

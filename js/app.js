@@ -2417,6 +2417,15 @@ document.addEventListener('webkitfullscreenchange', () => {
   }
 });
 
+// Réajustement instantané et fluide lors de la rotation de l'écran (smartphone / tablette)
+window.addEventListener('orientationchange', () => {
+  window.scrollTo(0, 0);
+  setTimeout(() => {
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof renderModeSeance === 'function' && isModeSeanceActive) renderModeSeance();
+  }, 150);
+});
+
 function ouvrirSeanceSurRes(resId) {
   activeSeanceResId = resId;
   seanceResSeconds = 0;
