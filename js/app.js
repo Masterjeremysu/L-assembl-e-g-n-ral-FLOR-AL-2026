@@ -531,7 +531,6 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
         <tr>
           <td>
             <strong>${escapeHtml(c.nom)}</strong>
-            ${isTop20 ? '<span style="font-size:0.75rem; color:#dc2626; margin-left:0.3rem;">🔥 Top 20%</span>' : ''}
           </td>
           <td>${escapeHtml(c.lots || '-')}</td>
           <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
@@ -1758,7 +1757,6 @@ function renderPouvoirsTab() {
       <tr>
         <td>
           <strong>${escapeHtml(c.nom)}</strong>
-          ${(c.categorie && c.categorie.includes('Top 20%')) ? '<span style="font-size:0.72rem; color:#dc2626; margin-left:0.3rem;">🔥 Top 20%</span>' : ''}
         </td>
         <td>${escapeHtml(c.lots || '-')}</td>
         <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>

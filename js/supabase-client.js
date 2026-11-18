@@ -25,11 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
  * Initialise le client Supabase et lance la synchronisation
  */
 function initSupabase() {
-  updateCloudStatusUI('syncing', 'Connexion PostgreSQL Supabase...');
+  updateCloudStatusUI('syncing', 'Connexion BDD...');
 
   // Détection du réseau
   window.addEventListener('online', () => {
-    updateCloudStatusUI('syncing', 'Réseau rétabli, reconnexion Supabase...');
+    updateCloudStatusUI('syncing', 'Reconnexion...');
     if (supabaseClient) {
       syncFromSupabase(true);
     } else {
@@ -150,7 +150,7 @@ async function syncFromSupabase(isManual = false) {
 
     isSupabaseOnline = true;
     lastSupabaseSyncTimestamp = Date.now();
-    updateCloudStatusUI('online', 'PostgreSQL Supabase (Temps réel actif)');
+    updateCloudStatusUI('online', 'Supabase Direct');
 
     if (typeof updateUI === 'function') {
       updateUI();
@@ -455,7 +455,7 @@ async function cloudPushAllCoprosToSupabase(silent = false) {
 
     isSupabaseOnline = true;
     lastSupabaseSyncTimestamp = Date.now();
-    updateCloudStatusUI('online', 'PostgreSQL Supabase (Temps réel actif)');
+    updateCloudStatusUI('online', 'Supabase Direct');
 
     const countPouvoirs = appData.coproprietaires.filter(c => c.statut === 'POUVOIR').length;
     if (!silent && typeof showToast === 'function') {

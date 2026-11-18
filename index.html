@@ -192,22 +192,47 @@
         <!-- Badge Statut Supabase PostgreSQL BDD Cloud -->
         <div id="cloudStatusBadge" class="cloud-status-badge syncing" onclick="forceSyncFromCloud()" title="État BDD Supabase - Cliquer pour forcer l'actualisation">
           <span id="cloudStatusDot" class="cloud-dot syncing"></span>
-          <span id="cloudStatusText">Connexion BDD...</span>
+          <span id="cloudStatusText">Supabase Direct</span>
         </div>
 
-        <!-- Direct Multi-écrans -->
-        <button class="btn btn-header-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones / tablettes en direct">
-          <span class="live-pulse-dot"></span>
-          <span>Multi-écrans</span>
+        <!-- 📽️ Écran Salle / Vidéoprojecteur XXL -->
+        <button class="btn btn-outline" style="border-color:#38bdf8; color:#ffffff; background:linear-gradient(135deg, rgba(2,132,199,0.35), rgba(14,165,233,0.2)); font-weight:800; box-shadow:0 0 10px rgba(56,189,248,0.25);" onclick="ouvrirEcranPublic()" title="Ouvrir l'Écran Rétroprojecteur public de la salle sur second écran (ou télé / Chromecast)">
+          <span>📽️ Écran Salle</span>
         </button>
 
-        <!-- Menu groupé déroulant : Documents & PV -->
+        <!-- ▶ Mode Séance -->
+        <button class="btn btn-header-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
+          <span>▶ Séance</span>
+        </button>
+
+        <!-- + Pouvoir rapide -->
+        <button class="btn btn-header-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
+          <span>✉️ + Pouvoir</span>
+        </button>
+
+        <!-- Menu groupé déroulant : Documents, Outils & Multi-écrans -->
         <div class="header-dropdown" id="dropdownDocs">
-          <button class="btn btn-header-subtle dropdown-trigger" onclick="toggleHeaderDropdown('dropdownDocsMenu')" title="Procès-verbaux, Attestation officielle et Flash-Info">
-            <span>📑 Documents & PV</span>
+          <button class="btn btn-header-subtle dropdown-trigger" onclick="toggleHeaderDropdown('dropdownDocsMenu')" title="Procès-verbaux, Attestation officielle, Multi-écrans et Simulateur">
+            <span>📑 Outils & PV</span>
             <span class="dropdown-chevron">▾</span>
           </button>
           <div class="dropdown-menu-pro" id="dropdownDocsMenu">
+            <div class="dropdown-group-title">Direct & Outils AG</div>
+            <button class="dropdown-item-pro" onclick="openLiveSyncModal(); closeHeaderDropdowns();">
+              <span class="item-icon">📲</span>
+              <div class="item-text">
+                <span class="item-title">Session Multi-écrans (Tablettes & Mobiles)</span>
+                <span class="item-desc">Synchronisation temps réel avec QR Code</span>
+              </div>
+            </button>
+            <button class="dropdown-item-pro" onclick="ouvrirSimulateurFinancier(); closeHeaderDropdowns();">
+              <span class="item-icon">💰</span>
+              <div class="item-text">
+                <span class="item-title">Quote-Part Travaux & Devis</span>
+                <span class="item-desc">Simulateur financier instantané par tantièmes</span>
+              </div>
+            </button>
+            <div class="dropdown-divider"></div>
             <div class="dropdown-group-title">Documents de Séance</div>
             <button class="dropdown-item-pro" onclick="openOuvertureModal(); closeHeaderDropdowns();">
               <span class="item-icon">🎙️</span>
@@ -256,44 +281,10 @@
           </div>
         </div>
 
-        <!-- 📽️ Écran Salle / Vidéoprojecteur XXL -->
-        <button class="btn btn-outline" style="border-color:#38bdf8; color:#ffffff; background:linear-gradient(135deg, rgba(2,132,199,0.35), rgba(14,165,233,0.2)); font-weight:800; box-shadow:0 0 10px rgba(56,189,248,0.25);" onclick="ouvrirEcranPublic()" title="Ouvrir l'Écran Rétroprojecteur public de la salle sur second écran (ou télé / Chromecast)">
-          <span>📽️ Écran Salle (Vidéoprojecteur)</span>
-        </button>
-
-        <!-- 💰 Simulateur Travaux & Devis -->
-        <button class="btn btn-outline" style="border-color:#f59e0b; color:#fde047; background:rgba(245, 158, 11, 0.1);" onclick="ouvrirSimulateurFinancier()" title="Calculateur financier de quote-part par tantièmes en direct">
-          <span>💰 Quote-Part Travaux</span>
-        </button>
-
-        <!-- + Pouvoir -->
-        <button class="btn btn-header-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
-          <span>✉️ + Pouvoir</span>
-        </button>
-
-        <!-- ▶ Mode Séance -->
-        <button class="btn btn-header-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
-          <span>▶ Mode Séance</span>
-        </button>
-
-        <!-- Groupe Sécurité & Cloud Hébergé -->
-        <div class="header-auth-group">
-          <!-- Indicateur Cloud Sync -->
-          <div class="cloud-status-pill" id="cloudStatusPill" onclick="openCloudConfigModal()" title="État de la BDD Cloud (Cliquez pour options)">
-            <span class="cloud-dot"></span>
-            <span id="cloudStatusLabel">BDD Maître</span>
-          </div>
-
-          <!-- Bouton Forcer Actualisation BDD directe -->
-          <button class="btn-icon-subtle" onclick="forceSyncFromCloud()" title="Forcer l'actualisation depuis la BDD Cloud (Recharger immédiatement)" style="font-size:0.95rem; padding:0.25rem 0.5rem;">
-            🔄
-          </button>
-
-          <!-- Profil Utilisateur & PIN -->
-          <div class="auth-user-pill" id="authUserPill" onclick="openChangePinModal()" title="Connecté au CS - Cliquez pour modifier le code PIN">
-            <span class="auth-user-avatar" id="authUserAvatar">CS</span>
-            <span id="authUserName">Membre CS</span>
-          </div>
+        <!-- Profil Utilisateur & PIN -->
+        <div class="auth-user-pill" id="authUserPill" onclick="openChangePinModal()" title="Connecté au CS - Cliquez pour modifier votre code PIN">
+          <span class="auth-user-avatar" id="authUserAvatar">CS</span>
+          <span id="authUserName">Membre CS</span>
         </div>
 
         <!-- Groupe Utilitaires -->
@@ -301,10 +292,10 @@
           <button class="btn-icon-subtle" onclick="logoutUser()" title="Verrouiller l'application (Code PIN requis)">
             🔒
           </button>
-          <button class="btn-icon-subtle" onclick="openShortcutsModal()" title="Raccourcis Clavier Mode Turbo (Touche ?)">
+          <button class="btn-icon-subtle" onclick="openShortcutsModal()" title="Raccourcis Clavier (Touche ?)">
             ⌨️
           </button>
-          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre / Éco-Batterie">
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre">
             🌙
           </button>
         </div>
@@ -312,15 +303,15 @@
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
+  <!-- Navigation Tabs (App Pro - Zéro scrollbar) -->
   <nav class="tabs-nav no-print">
     <div class="tabs-container">
       <button class="tab-btn active" onclick="switchTab('votes')">
-        📋 Ordre du jour & Votes Miroir
+        📋 Ordre du jour & Votes
         <span class="badge-count" id="badgeVotesCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('presence')">
-        🚪 Émargement & Départs
+        🚪 Émargement
         <span class="badge-count" id="badgePresenceCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('pouvoirs')">
@@ -328,15 +319,15 @@
         <span class="badge-count" id="badgePouvoirsCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('members')">
-        👥 Membres Conseil Syndical
+        👥 Conseil Syndical
         <span class="badge-count" id="badgeMembersCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('audit')">
-        📜 Journal d'Audit & Traçabilité
+        📜 Journal d'Audit
         <span class="badge-count" id="badgeAuditCount">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('settings')">
-        ⚙️ Paramètres & Sauvegarde
+        ⚙️ Paramètres
       </button>
     </div>
   </nav>
@@ -572,7 +563,6 @@
             <option value="PRESENT">✅ Présents en salle</option>
             <option value="PARTI">🚪 Partis en cours d'AG</option>
             <option value="ABSENT">❌ Absents non représentés</option>
-            <option value="TOP20">🔥 Top 20%</option>
           </select>
           <select id="filterCoproLotType" class="select-input" onchange="renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes)">
             <option value="ALL">Tous les types de lots</option>
