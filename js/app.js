@@ -462,6 +462,17 @@ function fuzzyMatch(query, target) {
   });
 }
 
+function cleanCoproNote(rawNote) {
+  if (!rawNote) return '-';
+  const cleaned = String(rawNote)
+    .replace(/🔥\s*Top\s*20%\s*\|?\s*/gi, '')
+    .replace(/Top\s*20%\s*\|?\s*/gi, '')
+    .replace(/^Standard\s*\|?\s*/i, '')
+    .replace(/\|\s*Standard$/i, '')
+    .trim();
+  return cleaned || '-';
+}
+
 // Render Copropriétaires (Accueil / Émargement & Départs en séance)
 function renderCoproprietaires(totalEnSalle, totalTant) {
   const tbody = document.getElementById('coproTableBody');
@@ -470,24 +481,14 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
   const list = appData.coproprietaires || [];
   const search = document.getElementById('searchCoproInput')?.value || '';
   const filterStatut = document.getElementById('filterCoproStatut')?.value || 'ALL';
-  const filterLot = document.getElementById('filterCoproLotType')?.value || 'ALL';
 
   const filtered = list.filter(c => {
     const matchSearch = fuzzyMatch(search, `${c.nom} ${c.mandataire || ''} ${c.notes || ''} ${c.lots || ''}`);
     let matchStatut = true;
-    if (filterStatut === 'TOP20') {
-      matchStatut = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
-    } else if (filterStatut !== 'ALL') {
+    if (filterStatut !== 'ALL') {
       matchStatut = (c.statut === filterStatut);
     }
-
-    let matchLot = true;
-    if (filterLot !== 'ALL') {
-      const lotInfo = getCoproLotType(c.tantiemes);
-      matchLot = (lotInfo.code === filterLot);
-    }
-
-    return matchSearch && matchStatut && matchLot;
+    return matchSearch && matchStatut;
   });
 
   // Tri dynamique
@@ -508,12 +509,9 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
   if (indTant) indTant.innerText = coproSortCol === 'tantiemes' ? (coproSortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕️';
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire trouvé avec ces filtres.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--gray-500);">Aucun copropriétaire trouvé avec ces filtres.</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
-      const isTop20 = (c.categorie && c.categorie.includes('Top 20%')) || (c.notes && c.notes.includes('Top 20%'));
-      const lotInfo = getCoproLotType(c.tantiemes);
-
       let statutBadge = '';
       if (c.statut === 'PRESENT') {
         statutBadge = `<span class="badge-present">✅ Présent (${c.heureArrivee || '18h00'})</span>`;
@@ -527,6 +525,8 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
         statutBadge = `<span class="badge-absent">❌ Absent</span>`;
       }
 
+      const displayNote = cleanCoproNote(c.notes);
+
       return `
         <tr>
           <td>
@@ -534,9 +534,8 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
           </td>
           <td>${escapeHtml(c.lots || '-')}</td>
           <td><span class="tantieme-pill">${c.tantiemes || 0}</span></td>
-          <td><span class="badge-lot ${lotInfo.badgeClass}">${lotInfo.icon} ${lotInfo.label}</span></td>
           <td>${statutBadge}</td>
-          <td>${escapeHtml(c.notes || '-')}</td>
+          <td style="color:var(--gray-600); font-size:0.84rem;">${escapeHtml(displayNote)}</td>
           <td class="no-print" style="text-align:right; white-space:nowrap;">
             <div class="table-action-group">
               <button class="table-action-btn" style="${c.statut === 'PRESENT' ? 'background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700;' : 'background:rgba(16,185,129,0.1); color:#059669; border-color:rgba(16,185,129,0.25);'}" onclick="pointerCoproPresent('${c.id}')" title="Pointer comme Présent en personne (révoque son pouvoir si existant)">
@@ -1759,7 +1758,8 @@ function renderPouvoirsTab() {
       legalStatusBadge = `<span style="font-size:0.75rem; color:var(--gray-500);">Mandataire extérieur</span>`;
     }
 
-    const consignesText = c.consignes || c.notes || 'Pouvoir général';
+    const rawNote = cleanCoproNote(c.notes);
+    const consignesText = c.consignes || (rawNote !== '-' ? rawNote : 'Pouvoir général');
 
     return `
       <tr>
@@ -3620,12 +3620,11 @@ function onSpotlightSearchInput() {
   if (copros.length > 0) {
     html += `<div style="font-size:0.75rem; font-weight:700; color:var(--primary); padding:0.4rem 0.6rem; text-transform:uppercase;">Copropriétaires & Pouvoirs (${copros.length})</div>`;
     html += copros.map(c => {
-      const lotInfo = getCoproLotType(c.tantiemes);
       return `
         <div class="spotlight-item" onclick="closeModal('spotlightModal'); switchTab('presence'); document.getElementById('searchCoproInput').value='${escapeHtml(c.nom)}'; renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);">
           <div>
             <strong>${escapeHtml(c.nom)}</strong>
-            <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">[${escapeHtml(c.lots || 'Sans lot')}] • ${lotInfo.icon} ${lotInfo.label} • Statut : <strong>${c.statut}</strong> ${c.mandataire ? `(➔ ${escapeHtml(c.mandataire)})` : ''}</span>
+            <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.3rem;">${c.lots ? `[${escapeHtml(c.lots)}] • ` : ''}Statut : <strong>${c.statut}</strong> ${c.mandataire ? `(➔ ${escapeHtml(c.mandataire)})` : ''}</span>
           </div>
           <span class="tantieme-pill">${c.tantiemes} tantièmes</span>
         </div>
