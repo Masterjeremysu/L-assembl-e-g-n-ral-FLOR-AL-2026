@@ -30,6 +30,22 @@ function loadData() {
           m.statut = 'ACTIF';
         }
       });
+
+      // Purge définitive des mentions "🔥 Top 20%" et "Standard" dans les notes et catégories
+      parsed.coproprietaires.forEach(c => {
+        if (c.categorie && (c.categorie.includes('Top 20%') || c.categorie === 'Standard')) {
+          c.categorie = '';
+        }
+        if (c.notes) {
+          c.notes = String(c.notes)
+            .replace(/🔥\s*Top\s*20%\s*\|?\s*/gi, '')
+            .replace(/Top\s*20%\s*\|?\s*/gi, '')
+            .replace(/^Standard\s*\|?\s*/i, '')
+            .replace(/\|\s*Standard$/i, '')
+            .trim();
+        }
+      });
+
       return parsed;
     } catch (e) {
       console.error("Erreur parsing localStorage", e);
@@ -1464,7 +1480,8 @@ function exportPresenceCsv() {
     const mandataire = `"${(c.mandataire || '').replace(/"/g, '""')}"`;
     const arr = `"${c.heureArrivee || ''}"`;
     const dep = `"${c.heureDepart || ''}"`;
-    const notes = `"${(c.notes || '').replace(/"/g, '""')}"`;
+    const cleanedNote = cleanCoproNote(c.notes);
+    const notes = `"${(cleanedNote === '-' ? '' : cleanedNote).replace(/"/g, '""')}"`;
 
     csv += `${nom};${lots};${tant};${statut};${mandataire};${arr};${dep};${notes}\n`;
   });
@@ -2751,7 +2768,8 @@ function exportPouvoirsEclateCsv() {
 
     const mandataire = `"${mandataireNom.replace(/"/g, '""')}"`;
     const typeStr = `"${typeMandataire}"`;
-    const consignes = `"${(c.consignes || c.notes || 'Pouvoir général').replace(/"/g, '""')}"`;
+    const rawNote = cleanCoproNote(c.notes);
+    const consignes = `"${(c.consignes || (rawNote !== '-' ? rawNote : 'Pouvoir général')).replace(/"/g, '""')}"`;
     const legal = `"${statutLegal}"`;
 
     csv += `${mandant};${lots};${tant};${mandataire};${typeStr};${consignes};${legal}\n`;
@@ -3842,7 +3860,7 @@ function renderFicheOuverture() {
         <div>
           <h2 style="margin:0; font-size:1.25rem; color:#0f172a;">🏢 Résidence Le Floréal — Assemblée Générale Ordinaire</h2>
           <div style="font-size:0.85rem; color:#64748b; margin-top:0.2rem;">
-            Séance du <strong>25 Novembre 2026 à 18h00</strong> • Salle Jacques Prévert, Noisy-le-Grand
+            Séance du <strong>25 Novembre 2026 à 18h00</strong> • Salle Jacques Prévert, Sassenage
           </div>
         </div>
         <div style="text-align:right;">
@@ -4723,7 +4741,7 @@ function renderFicheCloture() {
             📑 Attestation Officielle de Clôture de Séance & Relevé Contradictoire
           </h2>
           <div style="font-size:0.85rem; color:#475569; margin-top:0.25rem;">
-            Assemblée Générale Ordinaire du <strong>25 novembre 2026</strong> • Résidence Le Floréal (Noisy-le-Grand)
+            Assemblée Générale Ordinaire du <strong>25 novembre 2026</strong> • Résidence Le Floréal (Sassenage)
           </div>
         </div>
         <div style="text-align:right;">
@@ -4830,7 +4848,7 @@ function renderFicheCloture() {
 
       <!-- DÉCLARATION SOLENNELLE ET SIGNATURES -->
       <div style="font-size:0.8rem; color:#334155; line-height:1.45; margin-bottom:1rem; font-style:italic; border-top:1px solid #cbd5e1; padding-top:0.75rem;">
-        « Les soussignés, membres du bureau de l'assemblée générale et scrutateurs désignés du Conseil Syndical, certifient sur l'honneur que le présent relevé contradictoire est conforme aux résultats proclamés et aux déclarations exprimées en séance ce 25 novembre 2026 à Noisy-le-Grand. »
+        « Les soussignés, membres du bureau de l'assemblée générale et scrutateurs désignés du Conseil Syndical, certifient sur l'honneur que le présent relevé contradictoire est conforme aux résultats proclamés et aux déclarations exprimées en séance ce 25 novembre 2026 à Sassenage. »
       </div>
 
       <div class="signatures-grid">
@@ -4927,7 +4945,7 @@ function renderFlashInfo() {
           📢 FLASH-INFO : RÉSULTATS DE L'ASSEMBLÉE GÉNÉRALE 2026
         </h1>
         <div style="font-size:0.85rem; color:#bfdbfe;">
-          Séance du 25 novembre 2026 • Salle Jacques Prévert, Noisy-le-Grand
+          Séance du 25 novembre 2026 • Salle Jacques Prévert, Sassenage
         </div>
       </div>
 
