@@ -1,10 +1,4 @@
--- ==============================================================
--- BASE DE DONNÉES OFFICIELLE - ASSEMBLÉE GÉNÉRALE RÉSIDENCE LE FLORÉAL 2026
--- Projet Supabase dédié : xfsrcjdhojpwvsiyjksy (compte tac38000@gmail.com)
--- Total : 259 copropriétaires • 97 478 tantièmes • 29 résolutions
--- ==============================================================
-
--- 1. Nettoyage préventif
+/* AG FLOREAL 2026 - TABLES ET DONNEES */
 DROP TABLE IF EXISTS public.ag_audit_logs CASCADE;
 DROP TABLE IF EXISTS public.ag_resolutions CASCADE;
 DROP TABLE IF EXISTS public.ag_coproprietaires CASCADE;
