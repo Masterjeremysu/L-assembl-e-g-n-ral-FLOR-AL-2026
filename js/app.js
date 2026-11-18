@@ -1363,6 +1363,11 @@ function saveCopro(e) {
     appData.coproprietaires.push({ id: 'copro_' + Date.now(), ...coproData });
   }
 
+  // Synchronisation immédiate PostgreSQL Supabase
+  if (typeof cloudUpdateCopro === 'function') {
+    cloudUpdateCopro(id, coproData.statut, coproData.mandataire);
+  }
+
   closeModal('coproModal');
   persistData();
 }
@@ -2019,6 +2024,11 @@ function savePouvoirForm(e) {
     logAuditAction('POUVOIR', `Attribution pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes confiés à ${mandataireNom}${consignes ? ' | Consignes: ' + consignes : ''}`);
   }
 
+  // Synchronisation immédiate PostgreSQL Supabase
+  if (typeof cloudUpdateCopro === 'function') {
+    cloudUpdateCopro(c.id, 'POUVOIR', mandataireNom);
+  }
+
   closeModal('pouvoirModal');
   persistData();
   showToast(`✉️ Pouvoir de ${c.nom} (${c.tantiemes} tant.) confié à ${mandataireNom} !`, "success");
@@ -2140,6 +2150,11 @@ function saveTransfertPouvoir(e) {
     logAuditAction('POUVOIR', `Transfert de pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes réassignés vers ${newMember.name}`);
   }
 
+  // Synchronisation immédiate PostgreSQL Supabase
+  if (typeof cloudUpdateCopro === 'function') {
+    cloudUpdateCopro(c.id, 'POUVOIR', newMember.name);
+  }
+
   closeModal('transfertPouvoirModal');
   persistData();
   showToast(`Pouvoir de ${c.nom} transféré avec succès à ${newMember.name} !`, "success");
@@ -2195,6 +2210,10 @@ async function repartirPouvoirsBlancsAuto() {
       c.notes = (c.notes ? c.notes + ' | ' : '') + `Pouvoir en blanc attribué au CS (${chosen.name})`;
       chosen._nbMandats = (chosen._nbMandats || 0) + 1;
       chosen._totalVoix = (chosen._totalVoix || 0) + tant;
+
+      if (typeof cloudUpdateCopro === 'function') {
+        cloudUpdateCopro(c.id, 'POUVOIR', chosen.name);
+      }
     }
   });
 

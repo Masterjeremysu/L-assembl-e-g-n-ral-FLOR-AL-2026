@@ -93,18 +93,33 @@ async function syncFromSupabase(isManual = false) {
 
     if (errState) throw errState;
 
-    // Mise à jour de appData en mémoire
+    // Mise à jour intelligente de appData en mémoire (Fusion protectrice local/cloud)
     if (copros && copros.length > 0 && typeof appData !== 'undefined') {
+      let localPouvoirsToPush = [];
       copros.forEach(c => {
         const local = appData.coproprietaires.find(item => item.id === c.id);
         if (local) {
-          local.statut = (c.presence || 'ABSENT').toUpperCase();
-          local.mandataire = c.mandataire_id || '';
-          local.tantiemes = c.tantiemes;
-          if (c.heure_emargement) local.heure_emargement = c.heure_emargement;
-          if (c.signature) local.signature = c.signature;
+          const remotePresence = (c.presence || 'ABSENT').toUpperCase();
+          // Protection : Si l'utilisateur a enregistré un pouvoir sur son PC et que Supabase l'a encore en absent
+          if (local.statut === 'POUVOIR' && remotePresence === 'ABSENT' && local.mandataire) {
+            localPouvoirsToPush.push(local);
+          } else {
+            local.statut = remotePresence;
+            local.mandataire = c.mandataire_id || '';
+            local.tantiemes = c.tantiemes;
+            if (c.heure_emargement) local.heure_emargement = c.heure_emargement;
+            if (c.signature) local.signature = c.signature;
+          }
         }
       });
+
+      // Auto-push des pouvoirs locaux vers Supabase s'il y avait un décalage
+      if (localPouvoirsToPush.length > 0) {
+        console.log(`📡 Rapprochement : ${localPouvoirsToPush.length} pouvoir(s) locaux poussés vers Supabase`);
+        localPouvoirsToPush.forEach(lp => {
+          cloudUpdateCopro(lp.id, 'POUVOIR', lp.mandataire);
+        });
+      }
     }
 
     if (resolutions && resolutions.length > 0 && typeof appData !== 'undefined') {
@@ -387,11 +402,81 @@ function forceSyncFromCloud() {
   syncFromSupabase(true);
 }
 
+/**
+ * Pousse TOUS les copropriétaires et leurs pouvoirs locaux vers Supabase
+ * Idéal pour synchroniser en un clic l'intégralité des pouvoirs saisis sur le PC
+ */
+async function cloudPushAllCoprosToSupabase(silent = false) {
+  if (!supabaseClient || !isSupabaseOnline) {
+    if (!silent && typeof showToast === 'function') {
+      showToast('⚠️ Impossible de pousser vers Supabase : client non connecté.', 'warning');
+    }
+    return;
+  }
+
+  if (typeof appData === 'undefined' || !appData.coproprietaires) return;
+
+  try {
+    updateCloudStatusUI('syncing', 'Envoi des pouvoirs vers Supabase...');
+    const coprosToPush = appData.coproprietaires.map(c => ({
+      id: c.id,
+      nom: c.nom,
+      lots: c.lots || '',
+      tantiemes: Number(c.tantiemes) || 0,
+      presence: (c.statut || 'ABSENT').toLowerCase(),
+      mandataire_id: (c.statut === 'POUVOIR' ? (c.mandataire || null) : null),
+      signature: c.signature || null,
+      updated_at: new Date().toISOString()
+    }));
+
+    // Envoi par tranches de 60
+    const chunkSize = 60;
+    for (let i = 0; i < coprosToPush.length; i += chunkSize) {
+      const chunk = coprosToPush.slice(i, i + chunkSize);
+      const { error } = await supabaseClient
+        .from('ag_coproprietaires')
+        .upsert(chunk, { onConflict: 'id' });
+
+      if (error) throw error;
+    }
+
+    // Pousser également l'état global et les résolutions
+    if (appData.config || appData.seance) {
+      await supabaseClient
+        .from('ag_state')
+        .upsert({
+          id: SUPABASE_CONFIG.stateId,
+          config: appData.config || {},
+          seance: appData.seance || {},
+          updated_at: new Date().toISOString(),
+          updated_by: typeof getCurrentUser === 'function' ? getCurrentUser().name : 'CS Sync'
+        });
+    }
+
+    isSupabaseOnline = true;
+    lastSupabaseSyncTimestamp = Date.now();
+    updateCloudStatusUI('online', 'PostgreSQL Supabase (Temps réel actif)');
+
+    const countPouvoirs = appData.coproprietaires.filter(c => c.statut === 'POUVOIR').length;
+    if (!silent && typeof showToast === 'function') {
+      showToast(`☁️ Base Supabase synchronisée : ${countPouvoirs} pouvoirs et ${appData.coproprietaires.length} copropriétaires à jour !`, 'success');
+    }
+  } catch (err) {
+    console.error('Erreur push complet Supabase :', err);
+    updateCloudStatusUI('online', 'PostgreSQL Supabase');
+    if (!silent && typeof showToast === 'function') {
+      showToast(`Erreur lors de l'envoi vers Supabase : ${err.message}`, 'error');
+    }
+  }
+}
+
 // Export global pour compatibilité
 window.initSupabase = initSupabase;
 window.syncFromSupabase = syncFromSupabase;
 window.cloudUpdateCopro = cloudUpdateCopro;
 window.cloudUpdateResolution = cloudUpdateResolution;
 window.cloudUpdateDisplayState = cloudUpdateDisplayState;
+window.cloudPushAllCoprosToSupabase = cloudPushAllCoprosToSupabase;
+window.cloudPushData = cloudPushData;
 window.cloudPushData = cloudPushData;
 window.forceSyncFromCloud = forceSyncFromCloud;
