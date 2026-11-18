@@ -517,14 +517,71 @@ function openOnboardingPinModal(memberName, missionName) {
   const pinInput = document.getElementById("onboardingPinInput");
   const confirmInput = document.getElementById("onboardingPinConfirmInput");
   const errEl = document.getElementById("onboardingPinErrorMsg");
+  const matchIndicator = document.getElementById("onboardingPinMatchIndicator");
 
   if (titleEl) titleEl.innerText = `Bienvenue, ${memberName} !`;
   if (missionEl) missionEl.innerText = `🎯 Votre mission : ${missionName || 'Membre du Conseil Syndical'}`;
-  if (pinInput) pinInput.value = "";
-  if (confirmInput) confirmInput.value = "";
+  if (pinInput) { pinInput.value = ""; pinInput.type = "password"; }
+  if (confirmInput) { confirmInput.value = ""; confirmInput.type = "password"; }
   if (errEl) errEl.innerText = "";
+  if (matchIndicator) { matchIndicator.innerText = ""; matchIndicator.className = "pin-match-indicator"; }
 
   openModal("onboardingPinModal");
+}
+
+/**
+ * Bascule la visibilité d'un champ mot de passe (clair / masqué)
+ */
+function togglePinVisibility(inputId, btnEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    if (btnEl) btnEl.innerText = "🙈";
+  } else {
+    input.type = "password";
+    if (btnEl) btnEl.innerText = "👁️";
+  }
+}
+
+/**
+ * Vérification dynamique et temps réel de concordance du code PIN
+ */
+function checkOnboardingPinMatch() {
+  const pinInput = document.getElementById("onboardingPinInput");
+  const confirmInput = document.getElementById("onboardingPinConfirmInput");
+  const indicator = document.getElementById("onboardingPinMatchIndicator");
+  const errEl = document.getElementById("onboardingPinErrorMsg");
+  if (!pinInput || !confirmInput || !indicator) return;
+
+  if (errEl) errEl.innerText = "";
+  const v1 = pinInput.value.trim();
+  const v2 = confirmInput.value.trim();
+
+  if (!v1 && !v2) {
+    indicator.innerText = "";
+    indicator.className = "pin-match-indicator";
+    return;
+  }
+
+  if (v1.length > 0 && v1.length < 4) {
+    indicator.innerText = `⏳ ${v1.length} chiffre(s) (minimum 4 requis)`;
+    indicator.className = "pin-match-indicator mismatch";
+    return;
+  }
+
+  if (v1 && v2) {
+    if (v1 === v2) {
+      indicator.innerText = `✓ Codes identiques (${v1.length} chiffres)`;
+      indicator.className = "pin-match-indicator match";
+    } else {
+      indicator.innerText = `⚠️ Les codes ne correspondent pas encore`;
+      indicator.className = "pin-match-indicator mismatch";
+    }
+  } else if (v1.length >= 4) {
+    indicator.innerText = `✓ Code valide (${v1.length} chiffres), confirmez ci-dessous`;
+    indicator.className = "pin-match-indicator match";
+  }
 }
 
 /**
