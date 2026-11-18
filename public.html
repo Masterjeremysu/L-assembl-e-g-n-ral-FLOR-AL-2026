@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Écran Salle Vidéoprojecteur — AG 2026 Résidence Le Floréal</title>
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+  <link rel="stylesheet" href="css/app-ui.css?v=5.0">
   <style>
     :root {
       --bg: #090d16;
@@ -727,8 +728,9 @@
     // Boucle de rafraîchissement doux
     setInterval(refreshDisplay, 2000);
   </script>
-  <!-- Client SDK Supabase BDD Cloud PostgreSQL pour le Rétroprojecteur -->
+  <!-- Système UI & Client SDK Supabase BDD Cloud PostgreSQL pour le Rétroprojecteur -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/ui-dialogs.js?v=5.0"></script>
   <script src="js/supabase-client.js?v=4.2"></script>
 </body>
 </html>

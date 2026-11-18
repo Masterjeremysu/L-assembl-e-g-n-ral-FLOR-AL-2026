@@ -599,18 +599,35 @@ function setCoproStatut(id, newStatut) {
   }
 }
 
-function promptDepartCopro(id) {
+async function promptDepartCopro(id) {
   const c = appData.coproprietaires.find(x => x.id === id);
   if (!c) return;
 
   const defaultHour = getHeureParis();
-  const heure = prompt(`Heure de départ de ${c.nom} (obligatoire sur feuille de présence) :`, defaultHour);
-  if (heure !== null) {
+  let heure = null;
+  if (typeof appPrompt === 'function') {
+    heure = await appPrompt({
+      title: "🚪 Départ en séance (Art. 14 et 17 décret 1967)",
+      message: `Consigner le départ anticipé de <strong>${escapeHtml(c.nom)}</strong> (${c.tantiemes} tantièmes).<br><span style="color:#f59e0b;">Ses voix seront automatiquement déduites des votes suivants.</span>`,
+      defaultValue: defaultHour,
+      placeholder: "Ex: 20h30",
+      confirmText: "Consigner le départ",
+      cancelText: "Annuler",
+      type: "warning"
+    });
+  } else {
+    heure = prompt(`Heure de départ de ${c.nom} (obligatoire sur feuille de présence) :`, defaultHour);
+  }
+
+  if (heure !== null && heure !== "") {
     c.statut = 'PARTI';
     c.heureDepart = heure;
     c.notes = (c.notes ? c.notes + ' | ' : '') + `Parti à ${heure}`;
     if (typeof logAuditAction === 'function') {
       logAuditAction('PRESENCE', `Départ anticipé : ${c.nom}`, `Départ à ${heure} (${c.tantiemes} tantièmes déduits des votes suivants)`);
+    }
+    if (typeof cloudUpdateCopro === 'function') {
+      cloudUpdateCopro(id, 'PARTI', c.mandataire);
     }
     persistData();
     showToast(`Départ de ${c.nom} enregistré à ${heure}. Ses tantièmes sont retirés des votes suivants.`, "warning");
@@ -2013,11 +2030,24 @@ function revoquerPouvoirModal() {
   closeModal('pouvoirModal');
 }
 
-function revoquerPouvoirDirect(coproId) {
+async function revoquerPouvoirDirect(coproId) {
   const c = appData.coproprietaires.find(x => x.id === coproId);
   if (!c) return;
 
-  if (confirm(`Révoquer le pouvoir de ${c.nom} (${c.tantiemes} tantièmes) ?\nCe copropriétaire sera marqué comme Absent.`)) {
+  let conf = false;
+  if (typeof appConfirm === 'function') {
+    conf = await appConfirm({
+      title: "Révocation du mandat de vote",
+      message: `Voulez-vous révoquer le pouvoir de <strong>${escapeHtml(c.nom)}</strong> (${c.tantiemes} tantièmes) ?<br><br>Ce copropriétaire sera marqué comme <strong>Absent</strong>.`,
+      confirmText: "Révoquer le mandat",
+      cancelText: "Annuler",
+      type: "warning"
+    });
+  } else {
+    conf = confirm(`Révoquer le pouvoir de ${c.nom} (${c.tantiemes} tantièmes) ?\nCe copropriétaire sera marqué comme Absent.`);
+  }
+
+  if (conf) {
     c.statut = 'ABSENT';
     c.mandataire = '';
     delete c.mandataireMemberId;
@@ -2026,6 +2056,10 @@ function revoquerPouvoirDirect(coproId) {
 
     if (typeof logAuditAction === 'function') {
       logAuditAction('POUVOIR', `Révocation pouvoir : ${c.nom}`, `${c.tantiemes} tantièmes retirés. Copropriétaire marqué comme Absent.`);
+    }
+
+    if (typeof cloudUpdateCopro === 'function') {
+      cloudUpdateCopro(c.id, 'ABSENT', null);
     }
 
     persistData();
@@ -2111,7 +2145,7 @@ function saveTransfertPouvoir(e) {
   showToast(`Pouvoir de ${c.nom} transféré avec succès à ${newMember.name} !`, "success");
 }
 
-function repartirPouvoirsBlancsAuto() {
+async function repartirPouvoirsBlancsAuto() {
   const blancs = (appData.coproprietaires || []).filter(c =>
     c.statut === 'POUVOIR' && (c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')))
   );
@@ -2121,9 +2155,20 @@ function repartirPouvoirsBlancsAuto() {
     return;
   }
 
-  if (!confirm(`Voulez-vous répartir automatiquement les ${blancs.length} pouvoir(s) en blanc sur les membres du CS les plus disponibles ?`)) {
-    return;
+  let conf = false;
+  if (typeof appConfirm === 'function') {
+    conf = await appConfirm({
+      title: "Répartition équitable des pouvoirs en blanc",
+      message: `Voulez-vous répartir automatiquement les <strong>${blancs.length} pouvoir(s) en blanc</strong> sur les membres du CS les plus disponibles ?<br><br><span style="color:#38bdf8;">L'algorithme respecte strictement le plafond légal de 3 mandats ou 10% des voix (Art. 22).</span>`,
+      confirmText: "Répartir automatiquement",
+      cancelText: "Annuler",
+      type: "info"
+    });
+  } else {
+    conf = confirm(`Voulez-vous répartir automatiquement les ${blancs.length} pouvoir(s) en blanc sur les membres du CS les plus disponibles ?`);
   }
+
+  if (!conf) return;
 
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
   const max10Pct = totalCopro * 0.10;
@@ -2161,13 +2206,25 @@ function repartirPouvoirsBlancsAuto() {
   showToast(`${blancs.length} pouvoir(s) en blanc réparti(s) équitablement sur le CS !`, "success");
 }
 
-function pointerCoproPresent(id) {
+async function pointerCoproPresent(id) {
   const c = appData.coproprietaires.find(x => x.id === id);
   if (!c) return;
 
   if (c.statut === 'POUVOIR') {
     const mandataireNom = c.mandataire || 'un mandataire';
-    const conf = confirm(`⚠️ ATTENTION (Loi du 10 juillet 1965 - Art. 22) :\n\n${c.nom} avait délégué son pouvoir à "${mandataireNom}".\n\nEn pointant ce copropriétaire comme PRÉSENT en séance, la loi révoque automatiquement ce pouvoir.\n\nConfirmer la présence physique de ${c.nom} ?`);
+    let conf = false;
+    if (typeof appConfirm === 'function') {
+      conf = await appConfirm({
+        title: "⚠️ Révocation de mandat (Art. 22 Loi 1965)",
+        message: `<strong>${escapeHtml(c.nom)}</strong> avait confié son pouvoir à <strong>"${escapeHtml(mandataireNom)}"</strong>.<br><br>En pointant ce copropriétaire comme <strong>PRÉSENT</strong> en séance, la loi révoque automatiquement sa procuration.<br><br>Confirmer sa présence physique dans la salle ?`,
+        confirmText: "Confirmer la présence",
+        cancelText: "Annuler",
+        type: "warning"
+      });
+    } else {
+      conf = confirm(`⚠️ ATTENTION (Loi du 10 juillet 1965 - Art. 22) :\n\n${c.nom} avait délégué son pouvoir à "${mandataireNom}".\n\nEn pointant ce copropriétaire comme PRÉSENT en séance, la loi révoque automatiquement ce pouvoir.\n\nConfirmer la présence physique de ${c.nom} ?`);
+    }
+
     if (!conf) return;
     c.mandataire = '';
     delete c.mandataireMemberId;

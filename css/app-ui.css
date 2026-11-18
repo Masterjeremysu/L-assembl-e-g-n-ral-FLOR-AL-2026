@@ -1,0 +1,418 @@
+/* ==============================================================
+   DESIGN SYSTEM APP-LIKE PREMIUM - AG LE FLORÉAL 2026
+   Toasts flottants, Boîtes de confirmation natives & Callouts Pro
+   ============================================================== */
+
+/* --- 1. TOASTS NOTIFICATIONS NATIVES (Raycast / iOS Style) --- */
+#toastContainer {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 440px;
+  width: calc(100% - 48px);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  #toastContainer {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
+
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: translateY(-16px) scale(0.96);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.app-toast.hide {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.94);
+}
+
+.app-toast-icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.app-toast-content {
+  flex: 1;
+}
+
+.app-toast-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 3px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-toast-message {
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  word-break: break-word;
+}
+
+.app-toast-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+.app-toast-close:hover {
+  opacity: 1;
+  color: #ffffff;
+}
+
+/* Variantes Toasts */
+.app-toast.success {
+  border-left: 4px solid #10b981;
+}
+.app-toast.success .app-toast-title {
+  color: #34d399;
+}
+
+.app-toast.warning {
+  border-left: 4px solid #f59e0b;
+}
+.app-toast.warning .app-toast-title {
+  color: #fbbf24;
+}
+
+.app-toast.danger, .app-toast.error {
+  border-left: 4px solid #ef4444;
+}
+.app-toast.danger .app-toast-title, .app-toast.error .app-toast-title {
+  color: #f87171;
+}
+
+.app-toast.info {
+  border-left: 4px solid #3b82f6;
+}
+.app-toast.info .app-toast-title {
+  color: #60a5fa;
+}
+
+.app-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  width: 100%;
+  transform-origin: left;
+}
+
+/* --- 2. MODALES DE CONFIRMATION ET PROMPTS APP-LIKE (Exit alert/confirm natifs) --- */
+.app-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 29, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease-out;
+}
+
+.app-dialog-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-dialog-card {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  padding: 26px 28px;
+  color: #f8fafc;
+  transform: scale(0.92) translateY(12px);
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-dialog-backdrop.open .app-dialog-card {
+  transform: scale(1) translateY(0);
+}
+
+.app-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.app-dialog-icon-badge {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.app-dialog-icon-badge.warning {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+}
+
+.app-dialog-icon-badge.danger {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+}
+
+.app-dialog-icon-badge.info {
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #3b82f6;
+}
+
+.app-dialog-icon-badge.success {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.app-dialog-title-group {
+  flex: 1;
+}
+
+.app-dialog-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.01em;
+}
+
+.app-dialog-meta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+}
+
+.app-dialog-body {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 22px;
+  white-space: pre-line;
+}
+
+.app-dialog-body strong {
+  color: #ffffff;
+}
+
+.app-dialog-input-wrap {
+  margin: 16px 0 6px;
+}
+
+.app-dialog-input {
+  width: 100%;
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  outline: none;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.app-dialog-input:focus {
+  border-color: #3b82f6;
+  background: #0f172a;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.app-btn-dialog {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  user-select: none;
+}
+
+.app-btn-dialog:active {
+  transform: scale(0.97);
+}
+
+.app-btn-dialog.cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.app-btn-dialog.cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.app-btn-dialog.confirm-primary {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+.app-btn-dialog.confirm-primary:hover {
+  background: #1d4ed8;
+}
+
+.app-btn-dialog.confirm-danger {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+}
+.app-btn-dialog.confirm-danger:hover {
+  background: #b91c1c;
+}
+
+.app-btn-dialog.confirm-warning {
+  background: #d97706;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+}
+.app-btn-dialog.confirm-warning:hover {
+  background: #b45309;
+}
+
+.app-btn-dialog.confirm-success {
+  background: #059669;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+}
+.app-btn-dialog.confirm-success:hover {
+  background: #047857;
+}
+
+/* --- 3. CALLOUTS ET BOX D'INFORMATION PRO --- */
+.app-callout {
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: 14px 0;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  border: 1px solid transparent;
+}
+
+.app-callout-icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.app-callout-content {
+  flex: 1;
+}
+
+.app-callout-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+
+.app-callout.legal {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fef3c7;
+}
+.app-callout.legal .app-callout-title {
+  color: #fbbf24;
+}
+
+.app-callout.critical {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fee2e2;
+}
+.app-callout.critical .app-callout-title {
+  color: #f87171;
+}
+
+.app-callout.strategy {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #dbeafe;
+}
+.app-callout.strategy .app-callout-title {
+  color: #60a5fa;
+}
+
+.app-callout.success {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #d1fae5;
+}
+.app-callout.success .app-callout-title {
+  color: #34d399;
+}
