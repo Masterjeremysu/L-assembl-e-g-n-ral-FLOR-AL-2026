@@ -121,20 +121,22 @@
       <!-- Message d'erreur -->
       <div id="authErrorMsg" class="auth-error-msg"></div>
 
-      <!-- Clavier Numérique (Keypad tactile & souris) -->
+      <!-- Clavier Numérique (Keypad tactile & souris style smartphone Samsung) -->
       <div class="auth-keypad">
-        <button type="button" class="auth-key" onclick="onKeypadPress('1')">1<span class="sub-letters">&nbsp;</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('2')">2<span class="sub-letters">ABC</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('3')">3<span class="sub-letters">DEF</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('4')">4<span class="sub-letters">GHI</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('5')">5<span class="sub-letters">JKL</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('6')">6<span class="sub-letters">MNO</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('7')">7<span class="sub-letters">PQRS</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('8')">8<span class="sub-letters">TUV</span></button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('9')">9<span class="sub-letters">WXYZ</span></button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('1')">1</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('2')">2</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('3')">3</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('4')">4</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('5')">5</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('6')">6</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('7')">7</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('8')">8</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('9')">9</button>
         <button type="button" class="auth-key key-util" onclick="onKeypadClear()" title="Effacer tout">C</button>
-        <button type="button" class="auth-key" onclick="onKeypadPress('0')">0<span class="sub-letters">+</span></button>
-        <button type="button" class="auth-key key-util" onclick="onKeypadDelete()" title="Effacer un chiffre">⌫</button>
+        <button type="button" class="auth-key" onclick="onKeypadPress('0')">0</button>
+        <button type="button" class="auth-key key-util" onclick="onKeypadDelete()" title="Effacer un chiffre">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+        </button>
       </div>
 
       <p class="auth-hint" id="authPinHint">💡 Code PIN initial de ce profil : <code>2026</code> (modifiable une fois connecté)</p>
