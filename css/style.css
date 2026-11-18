@@ -1244,7 +1244,111 @@ tr:hover { background-color: #f8fafc; }
 }
 
 /* Cartes pointage */
-.pointage-btn-group { display:flex; gap:0.3rem; flex-wrap:wrap; }
+/* =========================================================
+   GROUPES D'ACTIONS TABLEAU MODERNES & HOMOGÈNES (DESIGN PRO 2026)
+   ========================================================= */
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.table-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 32px;
+  padding: 0 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+/* Bouton d'action principal : + Pouvoir */
+.table-action-btn.btn-action-pouvoir {
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+.table-action-btn.btn-action-pouvoir:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Boutons secondaires carrés arrondis (Éditer, Démission, Supprimer) */
+.table-action-btn.btn-action-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+  font-size: 0.85rem;
+}
+.table-action-btn.btn-action-icon:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Bouton action suppression / danger */
+.table-action-btn.btn-action-danger {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.table-action-btn.btn-action-danger:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
+}
+
+/* Dark mode pour les boutons tableau */
+body.dark-mode .table-action-btn.btn-action-pouvoir {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+body.dark-mode .table-action-btn.btn-action-pouvoir:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+body.dark-mode .table-action-btn.btn-action-icon {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+body.dark-mode .table-action-btn.btn-action-icon:hover {
+  background: #334155;
+  color: #ffffff;
+  border-color: #475569;
+}
+body.dark-mode .table-action-btn.btn-action-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+body.dark-mode .table-action-btn.btn-action-danger:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
 
 /* Alert anti-fraude */
 .anti-fraude-alert {

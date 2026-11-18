@@ -537,18 +537,18 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
           <td><span class="badge-lot ${lotInfo.badgeClass}">${lotInfo.icon} ${lotInfo.label}</span></td>
           <td>${statutBadge}</td>
           <td>${escapeHtml(c.notes || '-')}</td>
-          <td class="no-print">
-            <div class="pointage-btn-group">
-              <button class="btn btn-sm btn-success" onclick="pointerCoproPresent('${c.id}')" title="Pointer comme Présent en personne (révoque son pouvoir si existant)">
-                Présent
+          <td class="no-print" style="text-align:right; white-space:nowrap;">
+            <div class="table-action-group">
+              <button class="table-action-btn" style="${c.statut === 'PRESENT' ? 'background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700;' : 'background:rgba(16,185,129,0.1); color:#059669; border-color:rgba(16,185,129,0.25);'}" onclick="pointerCoproPresent('${c.id}')" title="Pointer comme Présent en personne (révoque son pouvoir si existant)">
+                ${c.statut === 'PRESENT' ? '✓ Présent' : 'Présent'}
               </button>
-              <button class="btn btn-sm ${c.statut === 'POUVOIR' ? 'btn-info' : 'btn-outline-primary'}" onclick="openPouvoirModalForCopro('${c.id}')" title="Administrer / Attribuer le pouvoir">
+              <button class="table-action-btn btn-action-pouvoir" onclick="openPouvoirModalForCopro('${c.id}')" title="Administrer / Attribuer le pouvoir">
                 ✉️ Pouvoir
               </button>
-              <button class="btn btn-sm btn-warning" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
-                Parti
+              <button class="table-action-btn btn-action-icon" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
+                🚪
               </button>
-              <button class="btn btn-sm btn-secondary" onclick="editCopro('${c.id}')" title="Modifier le statut / pouvoir">
+              <button class="table-action-btn btn-action-icon" onclick="editCopro('${c.id}')" title="Modifier le statut / pouvoir">
                 ✏️
               </button>
             </div>
@@ -667,15 +667,23 @@ function renderMembers(csPerso, csMandats, csTotal, totalTant) {
             <strong>${tot}</strong> ${isDemissionnaire ? '<span style="font-size:0.75rem; color:var(--gray-500);">(Hors CS)</span>' : `(${pct}%)`}
             ${isOverTenPct ? `<span title="Attention: dépasse 10% des voix totales de l'immeuble" style="color:var(--danger); font-size:0.75rem; font-weight:700;"> ⚠️ &gt;10%</span>` : ''}
           </td>
-          <td class="no-print" style="text-align:right;">
-            ${!isDemissionnaire ? `
-              <button class="btn btn-warning-gold btn-sm" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ce membre du CS">✉️ + Pouvoir</button>
-              <button class="btn btn-outline-danger btn-sm" onclick="toggleMemberDemission('${m.id}')" title="Déclarer démissionnaire en cours d'exercice">🚪 Démission</button>
-            ` : `
-              <button class="btn btn-secondary btn-sm" onclick="toggleMemberDemission('${m.id}')" title="Réintégrer parmi les membres actifs du CS">🔄 Réactiver</button>
-            `}
-            <button class="btn btn-secondary btn-sm" onclick="editMember('${m.id}')" title="Modifier fiche et tantièmes">✏️</button>
-            <button class="btn btn-secondary btn-sm" onclick="deleteMember('${m.id}')" style="color:var(--danger)" title="Supprimer définitivement">🗑️</button>
+          <td class="no-print" style="text-align:right; white-space:nowrap;">
+            <div class="table-action-group">
+              ${!isDemissionnaire ? `
+                <button class="table-action-btn btn-action-pouvoir" onclick="openNewPouvoirModal(null, '${m.id}')" title="Attribuer un pouvoir à ce membre du CS">
+                  <span>✉️</span> <span>+ Pouvoir</span>
+                </button>
+                <button class="table-action-btn btn-action-icon" onclick="editMember('${m.id}')" title="Modifier fiche et tantièmes">✏️</button>
+                <button class="table-action-btn btn-action-icon" onclick="toggleMemberDemission('${m.id}')" title="Déclarer démissionnaire en cours d'exercice">🚪</button>
+                <button class="table-action-btn btn-action-icon btn-action-danger" onclick="deleteMember('${m.id}')" title="Supprimer définitivement">🗑️</button>
+              ` : `
+                <button class="table-action-btn btn-action-pouvoir" onclick="toggleMemberDemission('${m.id}')" title="Réintégrer parmi les membres actifs du CS">
+                  <span>🔄</span> <span>Réactiver</span>
+                </button>
+                <button class="table-action-btn btn-action-icon" onclick="editMember('${m.id}')" title="Modifier fiche">✏️</button>
+                <button class="table-action-btn btn-action-icon btn-action-danger" onclick="deleteMember('${m.id}')" title="Supprimer définitivement">🗑️</button>
+              `}
+            </div>
           </td>
         </tr>
       `;
@@ -1763,15 +1771,15 @@ function renderPouvoirsTab() {
         <td>${mandataireBadge}</td>
         <td style="font-size:0.82rem; color:var(--gray-700);">${escapeHtml(consignesText)}</td>
         <td>${legalStatusBadge}</td>
-        <td class="no-print" style="text-align:right;">
-          <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
-            <button class="btn btn-sm btn-outline-primary" onclick="openTransfertModal('${c.id}')" title="Transférer vers un autre membre CS">
-              🔄 Transférer
+        <td class="no-print" style="text-align:right; white-space:nowrap;">
+          <div class="table-action-group">
+            <button class="table-action-btn btn-action-pouvoir" onclick="openTransfertModal('${c.id}')" title="Transférer vers un autre membre CS">
+              <span>🔄</span> <span>Transférer</span>
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="openPouvoirModalForCopro('${c.id}')" title="Modifier le pouvoir">
+            <button class="table-action-btn btn-action-icon" onclick="openPouvoirModalForCopro('${c.id}')" title="Modifier le pouvoir">
               ✏️
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="revoquerPouvoirDirect('${c.id}')" style="color:var(--danger)" title="Révoquer / Annuler ce pouvoir (ex: copropriétaire présent)">
+            <button class="table-action-btn btn-action-icon btn-action-danger" onclick="revoquerPouvoirDirect('${c.id}')" title="Révoquer / Annuler ce mandat">
               ❌
             </button>
           </div>
