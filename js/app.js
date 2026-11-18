@@ -697,6 +697,7 @@ function setQuickVote(id, newStatus) {
       cloudUpdateResolution(id, newStatus, res.tantiemesPour, res.tantiemesContre, res.tantiemesAbs);
     }
     persistData();
+    diffuserSurEcranPublic('RESOLUTION');
     if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && activeSeanceResId === id) {
       renderModeSeance();
     }
@@ -3300,6 +3301,10 @@ function enregistrerSeanceElu() {
 
   const val = (document.getElementById('seanceEluInput')?.value || '').trim();
   res.eluNom = val;
+  if (typeof cloudUpdateResolution === 'function') {
+    cloudUpdateResolution(res.id, 'ADOPTEE', totalEnSalle, 0, 0, { opponentsText: res.opponentsText });
+  }
+  diffuserSurEcranPublic('RESOLUTION');
   persistData();
   renderModeSeance();
   if (val) {
@@ -3348,6 +3353,10 @@ function setSeanceUnanimite() {
     res.eluNom = inputEl.value.trim();
   }
 
+  if (typeof cloudUpdateResolution === 'function') {
+    cloudUpdateResolution(res.id, 'ADOPTEE', totalEnSalle, 0, 0, { opponentsText: res.opponentsText });
+  }
+  diffuserSurEcranPublic('RESOLUTION');
   persistData();
   renderModeSeance();
   showToast(`⚡ Résolution n° ${res.number} adoptée à l'UNANIMITÉ (${totalEnSalle.toLocaleString('fr-FR')} voix POUR) !`, "success");

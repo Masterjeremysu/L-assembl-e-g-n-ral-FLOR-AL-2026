@@ -562,13 +562,14 @@
       const gaugePct = totalCopro > 0 ? Math.min(100, ((pour / (targetTantiemes || 1)) * 100)).toFixed(1) : 0;
 
       let bannerHtml = '';
+      const heureVoteStr = res.heureVote || res.voteTime || '';
       if (isAdopted) {
         bannerHtml = `
           <div class="proclamation-banner adoptee">
             <span>✅</span>
             <span>RÉSOLUTION ADOPTÉE</span>
             <span style="font-size:1.6rem; font-weight:700;">(${pour.toLocaleString('fr-FR')} POUR / ${contre.toLocaleString('fr-FR')} CONTRE)</span>
-            ${res.voteTime ? `<span style="font-size:1.3rem; opacity:0.9;">• Votée à ${res.voteTime}</span>` : ''}
+            ${heureVoteStr ? `<span style="font-size:1.3rem; opacity:0.9;">• Votée à ${heureVoteStr}</span>` : ''}
           </div>
         `;
       } else if (isRejected) {
@@ -577,7 +578,7 @@
             <span>❌</span>
             <span>RÉSOLUTION REJETÉE</span>
             <span style="font-size:1.6rem; font-weight:700;">(${pour.toLocaleString('fr-FR')} POUR / ${contre.toLocaleString('fr-FR')} CONTRE)</span>
-            ${res.voteTime ? `<span style="font-size:1.3rem; opacity:0.9;">• Votée à ${res.voteTime}</span>` : ''}
+            ${heureVoteStr ? `<span style="font-size:1.3rem; opacity:0.9;">• Votée à ${heureVoteStr}</span>` : ''}
           </div>
         `;
       } else {

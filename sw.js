@@ -3,7 +3,7 @@
  * Assure le chargement instantané, le mode plein écran et la résilience hors-ligne
  */
 
-const CACHE_NAME = 'floreal-ag-2026-v4';
+const CACHE_NAME = 'floreal-ag-2026-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -13,8 +13,8 @@ const STATIC_ASSETS = [
   './js/data.js',
   './js/audit.js',
   './js/auth.js',
+  './js/supabase-client.js',
   './js/sync.js',
-  './js/cloud.js',
   './js/pwa.js',
   './js/app.js',
   './assets/icon.svg',
@@ -47,12 +47,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // IMPORTANT : Toutes les requêtes dynamiques temps réel (Firebase, PeerJS, WebRTC, API externe)
-  // ne doivent JAMAIS être bloquées par le cache statique
+  // IMPORTANT : Toutes les requêtes dynamiques temps réel (Supabase, WebSockets, PeerJS, WebRTC, CDN)
+  // ne doivent JAMAIS être bloquées ni interceptées par le cache statique
   if (
-    url.includes('firebasedatabase.app') ||
+    url.includes('supabase.co') ||
+    url.includes('jsdelivr.net') ||
     url.includes('peerjs') ||
-    url.includes('gstatic.com/firebasejs') ||
+    url.includes('firebasedatabase.app') ||
     url.includes('.json') ||
     event.request.method !== 'GET'
   ) {
