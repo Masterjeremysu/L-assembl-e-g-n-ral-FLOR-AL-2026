@@ -1050,6 +1050,7 @@ function saveScrutin(e) {
 
   closeModal('scrutinModal');
   persistData();
+  diffuserSurEcranPublic('RESOLUTION');
   if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && activeSeanceResId === res.id) {
     renderModeSeance();
   }
@@ -2847,6 +2848,18 @@ window.exportPouvoirsParMembreCsv = exportPouvoirsParMembreCsv;
 window.imprimerPouvoirsDoc = imprimerPouvoirsDoc;
 window.copierPouvoirsResume = copierPouvoirsResume;
 
+// Fonctions Écran Public & Simulateur Financier
+window.ouvrirEcranPublic = ouvrirEcranPublic;
+window.diffuserSurEcranPublic = diffuserSurEcranPublic;
+window.ouvrirSimulateurFinancier = ouvrirSimulateurFinancier;
+window.setBudgetPreset = setBudgetPreset;
+window.calculerQuotePartTravauxModal = calculerQuotePartTravauxModal;
+window.rechercherCoproSimModal = rechercherCoproSimModal;
+window.copierAnnonceMicroModal = copierAnnonceMicroModal;
+window.projeterSimulationFinanciere = projeterSimulationFinanciere;
+window.revenirResolutionSurEcranPublic = revenirResolutionSurEcranPublic;
+
+
 
 
 // ==========================================
@@ -3052,34 +3065,50 @@ function toggleModeSeance() {
 }
 
 /**
+ * Canal de diffusion en direct pour l'Écran Rétroprojecteur Public de la salle
+ */
+let publicDisplayChannel = null;
+try {
+  publicDisplayChannel = new BroadcastChannel('floreal_ag_channel');
+} catch (e) {
+  console.log('BroadcastChannel non supporté');
+}
+
+function diffuserSurEcranPublic(mode = 'RESOLUTION', extraData = {}) {
+  const displayState = {
+    mode: mode,
+    activeResId: activeSeanceResId || (appData.resolutions && appData.resolutions[0]?.id),
+    finance: extraData.finance || null,
+    timestamp: Date.now()
+  };
+
+  try {
+    localStorage.setItem('AG_PUBLIC_DISPLAY_STATE', JSON.stringify(displayState));
+  } catch (e) {}
+
+  if (publicDisplayChannel) {
+    try {
+      publicDisplayChannel.postMessage(displayState);
+    } catch (e) {}
+  }
+}
+
+function ouvrirEcranPublic() {
+  diffuserSurEcranPublic('RESOLUTION');
+  const win = window.open('./public.html', 'FlorealPublicDisplay', 'width=1400,height=800,menubar=no,toolbar=no');
+  if (win) {
+    win.focus();
+    showToast("📽️ Écran Salle (Vidéoprojecteur) ouvert dans une fenêtre séparée !", "success");
+  } else {
+    showToast("Veuillez autoriser les fenêtres pop-up pour ouvrir l'écran salle.", "warning");
+  }
+}
+
+/**
  * Mode Vidéoprojecteur grand format pour rétroprojecteur de salle
  */
 function toggleProjectorMode() {
-  const panel = document.getElementById('seanceFocusPanel');
-  if (!panel) return;
-
-  if (!isModeSeanceActive) {
-    toggleModeSeance();
-  }
-
-  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
-  if (!isFs) {
-    const el = document.documentElement;
-    if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
-    } else if (el.webkitRequestFullscreen) {
-      el.webkitRequestFullscreen();
-    }
-    panel.classList.add('projector-fullscreen-mode');
-    showToast("⛶ Mode Vidéoprojecteur Actif (Flèches ⬅ ➡ pour naviguer, Échap pour quitter)", "success");
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
-    panel.classList.remove('projector-fullscreen-mode');
-  }
+  ouvrirEcranPublic();
 }
 
 // Synchronisation automatique si l'utilisateur quitte le plein écran (touche Échap)
@@ -3108,6 +3137,7 @@ window.addEventListener('orientationchange', () => {
 function ouvrirSeanceSurRes(resId) {
   activeSeanceResId = resId;
   seanceResSeconds = 0;
+  diffuserSurEcranPublic('RESOLUTION');
   if (!isModeSeanceActive) {
     toggleModeSeance();
   } else {
@@ -3133,6 +3163,7 @@ function naviguerSeance(dir) {
   activeSeanceResId = appData.resolutions[nextIndex].id;
   seanceResSeconds = 0;
   renderModeSeance();
+  diffuserSurEcranPublic('RESOLUTION');
 
   if (isLiveActive) {
     broadcastLiveUpdate({ type: 'CHANGE_ACTIVE_SEANCE_RES', resId: activeSeanceResId });
@@ -3985,7 +4016,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     closeHeaderDropdowns();
-    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal', 'exportPouvoirsModal'].forEach(id => closeModal(id));
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal', 'exportPouvoirsModal', 'simulateurFinancierModal'].forEach(id => closeModal(id));
     return;
   }
 
@@ -4081,8 +4112,188 @@ function toggleResTimer() {
 }
 
 // =======================================================
-// SIMULATEUR DE CHARGES & QUOTE-PART (« COMBIEN ÇA COÛTE AU VOISIN ? »)
+// SUPER SIMULATEUR DE CHARGES & QUOTE-PART LE FLORÉAL
+// (T4, T5, Garages, Parkings & Tantièmes en propre)
 // =======================================================
+
+const PROFILS_FLOREAL = [
+  { label: "🏠 T4 seul", tant: 350, desc: "Grand T4 classique" },
+  { label: "🏠 T4 + 🅿️ Parking", tant: 355, desc: "T4 + Place extérieure" },
+  { label: "🏠 T4 + 🚗 Box", tant: 394, desc: "T4 + Garage fermé" },
+  { label: "🏠 T4 + 🚗 Box + 🅿️ Parking", tant: 399, desc: "T4 + Garage + Place" },
+  { label: "🏡 T5 seul", tant: 430, desc: "Grand T5 familial" },
+  { label: "🏡 T5 + 🅿️ Parking", tant: 435, desc: "T5 + Place extérieure" },
+  { label: "🏡 T5 + 🚗 Box", tant: 474, desc: "T5 + Garage fermé" },
+  { label: "🏡 T5 + 🚗 Box + 🅿️ Parking", tant: 479, desc: "T5 + Garage + Place" },
+  { label: "🚗 Box / Garage seul", tant: 44, desc: "Lot fermé indépendant" },
+  { label: "🅿️ Place Parking seule", tant: 5, desc: "Emplacement extérieur" }
+];
+
+let lastSimModalTargetCopro = null;
+
+function ouvrirSimulateurFinancier(budgetInitial = null) {
+  let budget = Number(budgetInitial) || 0;
+  if (budget <= 0 && activeSeanceResId) {
+    const res = appData.resolutions.find(r => r.id === activeSeanceResId);
+    if (res) {
+      const match = (res.title + ' ' + (res.description || '')).match(/(\d+[\s\d]*)\s*€/);
+      if (match) {
+        budget = Number(match[1].replace(/\s/g, '')) || 0;
+      }
+    }
+  }
+  if (budget <= 0) budget = 85000;
+
+  const input = document.getElementById('simModalBudgetInput');
+  if (input) input.value = budget;
+
+  calculerQuotePartTravauxModal();
+  openModal('simulateurFinancierModal');
+}
+
+function setBudgetPreset(amount) {
+  const input = document.getElementById('simModalBudgetInput');
+  if (input) {
+    input.value = amount;
+    calculerQuotePartTravauxModal();
+  }
+}
+
+function calculerQuotePartTravauxModal() {
+  const budget = Number(document.getElementById('simModalBudgetInput')?.value) || 0;
+  const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
+  const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
+  const net = Math.max(0, budget - deduction);
+
+  const netLabel = document.getElementById('simModalNetLabel');
+  if (netLabel) netLabel.innerText = `${net.toLocaleString('fr-FR')} €`;
+
+  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+  const grid = document.getElementById('simModalProfilesGrid');
+  if (grid) {
+    grid.innerHTML = PROFILS_FLOREAL.map(p => {
+      const totalPart = (net * p.tant) / totalCopro;
+      const parEcheance = totalPart / echeances;
+      return `
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.75rem; text-align:center;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e3a8a;">${p.label}</div>
+          <div style="font-size:0.72rem; color:#64748b; margin-bottom:4px;">${p.tant} tant. • ${p.desc}</div>
+          <div style="font-size:1.15rem; font-weight:800; color:#0f172a;">
+            ${totalPart.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </div>
+          <div style="font-size:0.78rem; font-weight:700; color:#059669; margin-top:2px;">
+            ~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / échéance
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  rechercherCoproSimModal();
+}
+
+function rechercherCoproSimModal() {
+  const query = (document.getElementById('simModalCoproSearch')?.value || '').trim();
+  const zone = document.getElementById('simModalCoproResultZone');
+  const btnCopier = document.getElementById('btnCopierAnnonceMicro');
+  if (!zone) return;
+
+  if (!query) {
+    zone.style.display = 'none';
+    zone.innerHTML = '';
+    if (btnCopier) btnCopier.style.display = 'none';
+    lastSimModalTargetCopro = null;
+    return;
+  }
+
+  const budget = Number(document.getElementById('simModalBudgetInput')?.value) || 0;
+  const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
+  const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
+  const net = Math.max(0, budget - deduction);
+  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+
+  const found = (appData.coproprietaires || []).find(c =>
+    fuzzyMatch(query, `${c.nom} ${c.lots || ''}`)
+  );
+
+  if (found) {
+    const tant = Number(found.tantiemes) || 0;
+    const totalPart = (net * tant) / totalCopro;
+    const parEcheance = totalPart / echeances;
+
+    lastSimModalTargetCopro = {
+      nom: found.nom,
+      lots: found.lots || 'Lots de copropriété',
+      tantiemes: tant,
+      total: totalPart,
+      echeance: parEcheance,
+      echeanceCount: echeances
+    };
+
+    zone.style.display = 'block';
+    zone.innerHTML = `
+      <div style="background:white; border:1px solid #fde047; border-radius:8px; padding:0.85rem 1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+        <div>
+          <div style="font-size:1.05rem; font-weight:800; color:#0f172a;">${escapeHtml(found.nom)}</div>
+          <div style="font-size:0.82rem; color:#475569;">
+            ${escapeHtml(found.lots || 'Lots')} • <strong style="color:#d97706;">${tant} tantièmes en propre</strong>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.82rem; color:#64748b;">Quote-part totale exacte :</div>
+          <div style="font-size:1.45rem; font-weight:900; color:#1e40af;">
+            ${totalPart.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </div>
+          <div style="font-size:0.88rem; font-weight:700; color:#059669;">
+            Soit ${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel (${echeances} échéances)
+          </div>
+        </div>
+      </div>
+    `;
+    if (btnCopier) btnCopier.style.display = 'inline-block';
+  } else {
+    zone.style.display = 'block';
+    zone.innerHTML = `<div style="font-size:0.82rem; color:#dc2626; padding:0.3rem 0;">Aucun copropriétaire trouvé avec « ${escapeHtml(query)} ».</div>`;
+    if (btnCopier) btnCopier.style.display = 'none';
+    lastSimModalTargetCopro = null;
+  }
+}
+
+function copierAnnonceMicroModal() {
+  if (!lastSimModalTargetCopro) return;
+  const c = lastSimModalTargetCopro;
+  const txt = `« ${c.nom}, pour l'ensemble de vos lots représentant ${c.tantiemes} tantièmes en propre, votre coût total sera de ${c.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €, soit ${c.echeance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € par trimestre sur ${c.echeanceCount} échéances. »`;
+
+  navigator.clipboard.writeText(txt).then(() => {
+    showToast("📋 Phrase d'annonce micro copiée dans le presse-papier !", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement.", "error");
+  });
+}
+
+function projeterSimulationFinanciere() {
+  const budget = Number(document.getElementById('simModalBudgetInput')?.value) || 0;
+  const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
+  const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
+  const echeanceLabel = document.getElementById('simModalEcheanceSelect')?.selectedOptions[0]?.text || "4 appels trimestriels";
+
+  diffuserSurEcranPublic('FINANCE', {
+    finance: {
+      budget: budget,
+      deduction: deduction,
+      echeanceCount: echeances,
+      echeanceLabel: echeanceLabel,
+      targetCopro: lastSimModalTargetCopro
+    }
+  });
+
+  showToast("📽️ Simulation financière diffusée sur l'Écran Rétroprojecteur !", "success");
+}
+
+function revenirResolutionSurEcranPublic() {
+  diffuserSurEcranPublic('RESOLUTION');
+  showToast("📽️ Écran Rétroprojecteur rétabli sur la résolution en cours !", "info");
+}
 
 let isCostSimOpen = false;
 
@@ -4114,29 +4325,22 @@ function calculerImpactCharges() {
     }
   }
 
-  if (totalBudget <= 0) totalBudget = 25000;
+  if (totalBudget <= 0) totalBudget = 85000;
 
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
 
-  const types = [
-    { label: "🅿️ Parking", tantiemes: 5, desc: "Place extérieure" },
-    { label: "🚗 Box / Garage", tantiemes: 44, desc: "Box sous-sol" },
-    { label: "🏠 Appart. T4", tantiemes: 350, desc: "Grand 4 pièces" },
-    { label: "🏠 Appart. T5", tantiemes: 430, desc: "Grand 5 pièces" },
-  ];
-
-  grid.innerHTML = types.map(t => {
-    const part = (totalBudget * t.tantiemes / totalCopro);
-    const parMois = part / 12;
+  grid.innerHTML = PROFILS_FLOREAL.slice(0, 6).map(p => {
+    const part = (totalBudget * p.tant / totalCopro);
+    const parTrimestre = part / 4;
     return `
       <div class="quote-part-pill">
-        <div style="font-weight:700; font-size:0.82rem; color:#fde047;">${t.label}</div>
-        <div style="font-size:0.7rem; color:#cbd5e1;">${t.tantiemes} tant. • ${t.desc}</div>
-        <div style="font-size:1.1rem; font-weight:800; color:white; margin-top:3px;">
+        <div style="font-weight:700; font-size:0.8rem; color:#fde047;">${p.label}</div>
+        <div style="font-size:0.68rem; color:#cbd5e1;">${p.tant} t. • ${p.desc}</div>
+        <div style="font-size:1.05rem; font-weight:800; color:white; margin-top:2px;">
           ${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
         </div>
-        <div style="font-size:0.72rem; color:#a7f3d0;">
-          (~${parMois.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/mois sur 1 an)
+        <div style="font-size:0.7rem; color:#a7f3d0;">
+          (~${parTrimestre.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/trimestre)
         </div>
       </div>
     `;
@@ -4156,7 +4360,7 @@ function calculerQuotePartVoisin() {
     return;
   }
 
-  const budget = Number(budgetInput?.value) || 25000;
+  const budget = Number(budgetInput?.value) || 85000;
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
 
   const found = (appData.coproprietaires || []).find(c =>
@@ -4164,17 +4368,19 @@ function calculerQuotePartVoisin() {
   );
 
   if (found) {
-    const part = (budget * (found.tantiemes || 0) / totalCopro);
-    const mois = part / 12;
+    const tant = Number(found.tantiemes) || 0;
+    const part = (budget * tant / totalCopro);
+    const trim = part / 4;
     resEl.innerHTML = `
-      👉 <strong>${escapeHtml(found.nom)}</strong> (${found.tantiemes} t.) : 
+      👉 <strong>${escapeHtml(found.nom)}</strong> (${tant} t. en propre) : 
       <strong>${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong> 
-      <span style="font-size:0.75rem; color:#cbd5e1;">(~${mois.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/mois)</span>
+      <span style="font-size:0.78rem; color:#fde047;">(~${trim.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / trimestre)</span>
     `;
   } else {
     resEl.innerHTML = `<span style="color:#f87171; font-size:0.75rem;">Copropriétaire non trouvé</span>`;
   }
 }
+
 
 // =======================================================
 // FICHE DE CLÔTURE & ATTESTATION CONTRADICTOIRE SCRUTATEURS

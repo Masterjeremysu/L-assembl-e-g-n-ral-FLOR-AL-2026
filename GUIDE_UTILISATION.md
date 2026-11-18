@@ -100,7 +100,34 @@ En assemblée, faire défiler 28 résolutions sur un petit écran de smartphone 
 
 ---
 
-## 6. ⚖️ Simulateur Tactique de Majorité & Alerte Passerelle Art. 25-1
+## 6. 📽️ Mode Double Écran : Rétroprojecteur Public (Salle)
+
+Branchez un second écran ou un vidéoprojecteur en HDMI et cliquez sur **`📽️ Écran Salle (Vidéoprojecteur)`** :
+- Une fenêtre dédiée `public.html` s'ouvre : glissez-la sur l'écran du vidéoprojecteur et mettez en plein écran (Touche `F` ou `F11`).
+- **Typographie XXL lisible à 20 mètres** : Titre géant (40px), n° de résolution éclatant, texte officiel aéré et jauge d'adoption en direct.
+- **Sécurité et discrétion totale pour le CS** : Les consignes secrètes du CS, les codes PIN et les notes internes ne sont **JAMAIS** visibles par la salle.
+- **Proclamation grandiose du résultat** : Dès qu'un vote est enregistré, un bandeau plein écran vert ou rouge annonce la décision avec l'heure exacte.
+
+---
+
+## 7. 💰 Super Simulateur Financier & Quote-Part Travaux (T4, T5, Garages, Parkings)
+
+Accessible en 1 clic via le bouton **`💰 Quote-Part Travaux`** ou dans le Mode Séance :
+1. **Saisie du budget des travaux** (avec boutons rapides 25k€, 50k€, 85k€, 120k€, 180k€).
+2. **Déduction des réserves / Fonds Alur ou aides** pour obtenir le montant net appelé.
+3. **Étalement rassurant** : choix d'échéances (1x, 2x, 4 trimestres, 12 mois).
+4. **Barème officiel des 10 configurations réelles du Floréal** :
+   - T4 seul, T4 + Parking, T4 + Garage, T4 + Garage + Parking
+   - T5 seul, T5 + Parking, T5 + Garage, T5 + Garage + Parking
+   - Garage / Box seul, Place de parking seule.
+5. **Recherche nominative d'un voisin au micro** :
+   - Tapez son nom (ou son numéro de lot) : l'application extrait **ses tantièmes réels en propre** et calcule son montant exact au centime d'euro ainsi que sa mensualité/trimestrialité.
+   - Bouton **`📋 Copier la phrase micro`** pour une réponse calme, professionnelle et immédiate au micro.
+6. **Bouton `📽️ Diffuser sur Rétroprojecteur`** : bascule en direct l'écran de la salle sur le tableau financier pour apaiser toute la copropriété !
+
+---
+
+## 8. ⚖️ Simulateur Tactique de Majorité & Alerte Passerelle Art. 25-1
 
 Sur chaque résolution, une **jauge visuelle animée** calcule en temps réel :
 - **Pour l'Article 24 (Majorité simple) :** Compare la force du CS avec les voix exprimées en salle, et vous indique si la résolution est déjà acquise ou combien de voix extérieures il vous manque.

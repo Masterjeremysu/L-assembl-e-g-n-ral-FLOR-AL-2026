@@ -7,6 +7,7 @@ const CACHE_NAME = 'floreal-ag-2026-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './public.html',
   './css/style.css',
   './css/auth.css',
   './js/data.js',

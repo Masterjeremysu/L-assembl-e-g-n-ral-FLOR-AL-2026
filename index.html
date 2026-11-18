@@ -187,6 +187,16 @@
           </div>
         </div>
 
+        <!-- 📽️ Écran Salle / Vidéoprojecteur -->
+        <button class="btn btn-outline" style="border-color:#3b82f6; color:#93c5fd; background:rgba(59, 130, 246, 0.1);" onclick="ouvrirEcranPublic()" title="Ouvrir l'Écran Rétroprojecteur public de la salle sur second écran">
+          <span>📽️ Écran Salle</span>
+        </button>
+
+        <!-- 💰 Simulateur Travaux & Devis -->
+        <button class="btn btn-outline" style="border-color:#f59e0b; color:#fde047; background:rgba(245, 158, 11, 0.1);" onclick="ouvrirSimulateurFinancier()" title="Calculateur financier de quote-part par tantièmes en direct">
+          <span>💰 Quote-Part Travaux</span>
+        </button>
+
         <!-- + Pouvoir -->
         <button class="btn btn-header-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
           <span>✉️ + Pouvoir</span>
@@ -284,7 +294,7 @@
           <div style="display:flex; gap:0.4rem; align-items:center;">
             <button class="btn btn-sm btn-white" onclick="naviguerSeance(-1)" title="Résolution précédente (Flèche Gauche)">⬅ Précédente</button>
             <button class="btn btn-sm btn-white" onclick="naviguerSeance(1)" title="Résolution suivante (Flèche Droite)">Suivante ➡</button>
-            <button class="btn btn-sm btn-header-gold" onclick="toggleProjectorMode()" id="btnProjectorMode" title="Mode plein écran agrandi spécial Vidéoprojecteur pour la salle">⛶ Vidéoprojecteur</button>
+            <button class="btn btn-sm btn-header-gold" onclick="ouvrirEcranPublic()" id="btnProjectorMode" title="Ouvrir l'Écran Rétroprojecteur public de la salle sur second écran">📽️ Écran Salle (Vidéoprojecteur)</button>
             <button class="btn btn-sm btn-outline" style="color:white; border-color:rgba(255,255,255,0.4);" onclick="toggleModeSeance()" title="Fermer le mode séance">✕ Quitter</button>
           </div>
         </div>
@@ -323,7 +333,7 @@
         <div id="seanceCostSimulator" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.6rem 0.85rem; margin-bottom:0.9rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCostSimulator()">
             <div style="font-weight:700; font-size:0.85rem; color:#fde047; display:flex; align-items:center; gap:0.4rem;">
-              💶 Simulateur Quote-Part Travaux & Devis (Combien ça coûte à mon voisin ?)
+              💶 Simulateur Quote-Part Travaux (Combien ça coûte au voisin selon ses tantièmes propres ?)
             </div>
             <span id="costSimToggleIcon" style="font-size:0.8rem; color:#cbd5e1; font-weight:bold;">[ + Ouvrir le simulateur ]</span>
           </div>
@@ -334,19 +344,22 @@
                 <input type="number" id="costSimBudgetInput" class="form-control" style="width:130px; font-weight:700; background:white; color:#0f172a;" placeholder="Ex: 50000" oninput="calculerImpactCharges()">
                 <span style="font-weight:800; color:white;">€</span>
               </div>
-              <button type="button" class="btn btn-sm btn-white" onclick="calculerImpactCharges()">Calculer les quotes-parts</button>
+              <button type="button" class="btn btn-sm btn-white" onclick="calculerImpactCharges()">Recalculer</button>
+              <button type="button" class="btn btn-sm btn-header-gold" onclick="ouvrirSimulateurFinancier(document.getElementById('costSimBudgetInput')?.value)">
+                🔍 Vue Complète & Rétroprojecteur
+              </button>
             </div>
 
             <!-- Grille des types de lots Le Floréal -->
-            <div id="costSimResultsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.5rem; margin-bottom:0.6rem;">
+            <div id="costSimResultsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.5rem; margin-bottom:0.6rem;">
               <!-- Rendu dynamique par calculerImpactCharges() -->
             </div>
 
             <!-- Recherche ciblée pour un voisin qui pose la question en direct -->
-            <div style="background:rgba(255,255,255,0.08); border-radius:6px; padding:0.4rem 0.6rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-              <span style="font-size:0.78rem; color:#cbd5e1;">🔎 Question directe d'un voisin :</span>
-              <input type="text" id="costSimNeighborInput" class="form-control" style="font-size:0.78rem; width:180px; height:28px;" placeholder="Taper le nom du copropriétaire..." oninput="calculerQuotePartVoisin()">
-              <div id="costSimNeighborResult" style="font-size:0.82rem; font-weight:700; color:#4ade80;"></div>
+            <div style="background:rgba(255,255,255,0.08); border-radius:6px; padding:0.5rem 0.75rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+              <span style="font-size:0.8rem; color:#fde047; font-weight:700;">🎤 Réponse micro immédiate :</span>
+              <input type="text" id="costSimNeighborInput" class="form-control" style="font-size:0.82rem; width:220px; height:30px;" placeholder="Nom ou lot du voisin..." oninput="calculerQuotePartVoisin()">
+              <div id="costSimNeighborResult" style="font-size:0.85rem; font-weight:700; color:#4ade80;"></div>
             </div>
           </div>
         </div>
@@ -1532,6 +1545,125 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           <button type="submit" class="btn btn-primary" id="mouvementSubmitBtn">Confirmer et recalculer le quorum</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL SUPER SIMULATEUR FINANCIER & QUOTE-PART LE FLORÉAL -->
+  <div class="modal-overlay" id="simulateurFinancierModal">
+    <div class="modal-box" style="max-width: 960px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+            <span>💰</span>
+            <span>Simulateur Financier & Quote-Part Travaux (Résidence Le Floréal)</span>
+          </h3>
+          <div style="font-size:0.78rem; color:var(--gray-500); margin-top:3px;">
+            Calcul certifié proportionnel aux 97 478 tantièmes (T4, T5, Garages, Parkings)
+          </div>
+        </div>
+        <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap: wrap;">
+          <button class="btn btn-sm btn-header-gold" onclick="projeterSimulationFinanciere()" title="Projeter ce tableau financier en grand sur le rétroprojecteur pour la salle">
+            📽️ Projeter sur Rétroprojecteur
+          </button>
+          <button class="modal-close" onclick="closeModal('simulateurFinancierModal')">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem; overflow-y: auto; flex: 1; display:flex; flex-direction:column; gap:1.25rem;">
+        <!-- Barre de saisie des paramètres financiers -->
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:1.2rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; align-items:flex-end;">
+          <div>
+            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
+              💶 Budget global des travaux (€ TTC) :
+            </label>
+            <input type="number" id="simModalBudgetInput" class="form-control" style="font-size:1.1rem; font-weight:800; color:#1e40af;" placeholder="Ex: 85000" oninput="calculerQuotePartTravauxModal()">
+            <div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(25000)">25 k€</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(50000)">50 k€</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(85000)">85 k€</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(120000)">120 k€</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(180000)">180 k€</button>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
+              🛡️ Déduction Fonds Alur / Subventions (€) :
+            </label>
+            <input type="number" id="simModalDeductionInput" class="form-control" style="font-size:1.05rem; font-weight:700; color:#059669;" placeholder="Ex: 15000" value="0" oninput="calculerQuotePartTravauxModal()">
+            <div style="font-size:0.74rem; color:#64748b; margin-top:4px;">Déduit du montant net appelé aux copropriétaires</div>
+          </div>
+
+          <div>
+            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
+              📅 Échéancier des appels de fonds :
+            </label>
+            <select id="simModalEcheanceSelect" class="form-control" style="font-weight:700;" onchange="calculerQuotePartTravauxModal()">
+              <option value="1">1 appel comptant</option>
+              <option value="2">2 appels semestriels</option>
+              <option value="4" selected>4 appels trimestriels (Recommandé)</option>
+              <option value="8">8 appels (sur 2 ans)</option>
+              <option value="12">12 mensualités</option>
+            </select>
+            <div style="font-size:0.74rem; color:#64748b; margin-top:4px;">Rassure les résidents sur l'effort mensuel / trimestriel</div>
+          </div>
+        </div>
+
+        <!-- Synthèse globale calculée -->
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.9rem 1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:#1e40af;">Base officielle de calcul :</div>
+            <div style="font-size:0.95rem; color:#1e293b;">
+              Budget Net appelé : <strong id="simModalNetLabel" style="color:#1d4ed8; font-size:1.15rem;">0 €</strong> • Tantièmes généraux : <strong>97 478</strong>
+            </div>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-sm btn-primary" onclick="projeterSimulationFinanciere()">
+              📽️ Diffuser sur Rétroprojecteur
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="revenirResolutionSurEcranPublic()">
+              🔙 Rétablir la Résolution
+            </button>
+          </div>
+        </div>
+
+        <!-- Recherche nominative express au micro ("Tantièmes en propre") -->
+        <div style="background:#fefce8; border:2px solid #fde047; border-radius:10px; padding:1rem 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+            <strong style="color:#854d0e; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem;">
+              <span>🎤</span>
+              <span>Interpellation micro d'un voisin : Calcul nominatif sur ses tantièmes en propre</span>
+            </strong>
+            <span style="font-size:0.75rem; background:#fef08a; color:#713f12; padding:2px 8px; border-radius:4px; font-weight:700;">Temps réel</span>
+          </div>
+          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+            <div style="flex:1; min-width:260px;">
+              <input type="text" id="simModalCoproSearch" class="form-control" placeholder="🔍 Taper le nom du copropriétaire ou le n° de lot (ex: Akkas, 142...)" oninput="rechercherCoproSimModal()" autocomplete="off">
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copierAnnonceMicroModal()" id="btnCopierAnnonceMicro" style="display:none;">
+              📋 Copier la phrase micro
+            </button>
+          </div>
+          <div id="simModalCoproResultZone" style="margin-top:0.75rem; display:none;">
+            <!-- Rendu dynamique du copropriétaire trouvé -->
+          </div>
+        </div>
+
+        <!-- Grille des 10 profils réels du Floréal -->
+        <div>
+          <h4 style="font-size:0.95rem; font-weight:800; color:#1e293b; margin-bottom:0.6rem;">
+            📊 Barème d'impact selon les 10 configurations réelles de la Résidence Le Floréal :
+          </h4>
+          <div id="simModalProfilesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:0.75rem;">
+            <!-- Dynamique -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.8rem; color:var(--gray-500);">Calcul certifié proportionnel aux 97 478 tantièmes du Floréal</span>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('simulateurFinancierModal')">Fermer</button>
+      </div>
     </div>
   </div>
 
