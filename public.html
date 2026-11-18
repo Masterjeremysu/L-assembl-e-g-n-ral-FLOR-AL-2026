@@ -623,19 +623,12 @@
       const echeances = Number(finance?.echeanceCount) || 4;
       const echeanceLabel = finance?.echeanceLabel || "4 appels trimestriels";
 
-      // 10 Profils types réels du Floréal
-      const profils = [
-        { label: "🏠 T4 seul", tant: 350, desc: "Grand T4 classique" },
-        { label: "🏠 T4 + 🅿️ Parking", tant: 355, desc: "T4 + Place extérieure" },
-        { label: "🏠 T4 + 🚗 Box", tant: 394, desc: "T4 + Garage fermé" },
-        { label: "🏠 T4 + 🚗 Box + 🅿️ Parking", tant: 399, desc: "T4 + Garage + Place" },
-        { label: "🏡 T5 seul", tant: 430, desc: "Grand T5 familial" },
-        { label: "🏡 T5 + 🅿️ Parking", tant: 435, desc: "T5 + Place extérieure" },
-        { label: "🏡 T5 + 🚗 Box", tant: 474, desc: "T5 + Garage fermé" },
-        { label: "🏡 T5 + 🚗 Box + 🅿️ Parking", tant: 479, desc: "T5 + Garage + Place" },
-        { label: "🚗 Box / Garage seul", tant: 44, desc: "Lot fermé indépendant" },
-        { label: "🅿️ Parking seul", tant: 5, desc: "Emplacement extérieur" }
-      ];
+      // Valeur unitaire mathématique stricte au tantième
+      const valeurParTantieme = totalCopro > 0 ? (netBudget / totalCopro) : 0;
+      const echeanceParTantieme = valeurParTantieme / echeances;
+
+      // Paliers de tantièmes réels pour repères en séance
+      const paliers = [5, 44, 200, 300, 350, 400, 450, 500, 600, 800];
 
       let spotlightHtml = '';
       if (finance?.targetCopro) {
@@ -643,13 +636,13 @@
         spotlightHtml = `
           <div class="copro-spotlight-card">
             <div>
-              <div style="font-size:0.95rem; font-weight:800; text-transform:uppercase; color:#f59e0b; letter-spacing:0.05em;">🎯 ESTIMATION NOMINATIVE EN DIRECT</div>
+              <div style="font-size:1.1rem; font-weight:800; text-transform:uppercase; color:#f59e0b; letter-spacing:0.05em;">🎯 ESTIMATION NOMINATIVE EN DIRECT</div>
               <div class="copro-spotlight-nom">${escapeHtml(c.nom)}</div>
               <div class="copro-spotlight-lots">${escapeHtml(c.lots || 'Lots de copropriété')} • <span class="copro-spotlight-tant">${c.tantiemes} tantièmes en propre</span></div>
             </div>
             <div style="text-align:right;">
-              <div style="font-size:1.1rem; color:#cbd5e1;">Quote-part totale : <strong style="font-size:2.4rem; color:#fde047; font-weight:900;">${c.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></div>
-              <div style="font-size:1.35rem; font-weight:800; color:#34d399; margin-top:4px;">Soit ${c.echeance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / trimestre (${echeances} échéances)</div>
+              <div style="font-size:1.2rem; color:#cbd5e1;">Quote-part totale exacte : <strong style="font-size:2.8rem; color:#fde047; font-weight:900;">${c.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></div>
+              <div style="font-size:1.45rem; font-weight:800; color:#34d399; margin-top:6px;">Soit ${c.echeance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel (${echeances} échéances)</div>
             </div>
           </div>
         `;
@@ -658,36 +651,40 @@
       container.innerHTML = `
         <div class="finance-header">
           <div>
-            <div style="font-size:1.1rem; font-weight:800; text-transform:uppercase; color:#93c5fd; letter-spacing:0.05em;">SIMULATEUR DE CHARGES EN SÉANCE</div>
-            <h1 style="font-size:2.4rem; font-weight:900; color:#ffffff; margin:4px 0;">Impact Financier & Quote-Part des Travaux</h1>
+            <div style="font-size:1.1rem; font-weight:800; text-transform:uppercase; color:#93c5fd; letter-spacing:0.05em;">SIMULATEUR FINANCIER EN SÉANCE</div>
+            <h1 style="font-size:2.4rem; font-weight:900; color:#ffffff; margin:4px 0;">Impact Travaux & Quote-Part au Tantième</h1>
             <div style="font-size:1.2rem; color:#e2e8f0;">
               ${deduction > 0 ? `Budget brut : ${budget.toLocaleString('fr-FR')} € • Déduction Fonds Alur / Aides : <span style="color:#86efac;">-${deduction.toLocaleString('fr-FR')} €</span> • ` : ''}
-              Échéancier retenu : <strong>${escapeHtml(echeanceLabel)}</strong>
+              Échéancier : <strong>${escapeHtml(echeanceLabel)}</strong>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:1rem; color:#93c5fd; font-weight:700;">BUDGET NET À RÉPARTIR :</div>
-            <div class="finance-big-val">${netBudget.toLocaleString('fr-FR')} €</div>
-            <div style="font-size:0.95rem; color:#cbd5e1;">Base : 97 478 tantièmes</div>
+            <div style="font-size:1rem; color:#93c5fd; font-weight:700;">VALEUR EXACTE D'UN TANTIÈME :</div>
+            <div class="finance-big-val">${valeurParTantieme.toFixed(4)} € / t.</div>
+            <div style="font-size:1.1rem; font-weight:800; color:#34d399;">~${echeanceParTantieme.toFixed(4)} € / t. par échéance</div>
           </div>
         </div>
 
         ${spotlightHtml}
 
-        <div style="font-size:1.4rem; font-weight:800; color:#f8fafc; margin:${finance?.targetCopro ? '2rem' : '0'} 0 1rem;">
-          📊 Barème moyen selon les 10 configurations réelles de la Résidence Le Floréal :
+        <div style="background:rgba(245, 158, 11, 0.12); border:1px solid #ca8a04; border-radius:10px; padding:0.9rem 1.4rem; margin:${finance?.targetCopro ? '1.5rem' : '0'} 0 1.25rem; font-size:1.05rem; color:#fef3c7; line-height:1.5;">
+          ℹ️ <strong>Règle légale (Art. 5 Loi de 1965) :</strong> Dans notre résidence, les tantièmes de chaque appartement sont uniques et dépendent de sa surface exacte, de son étage et de son orientation. Donnez vos tantièmes au micro ou indiquez votre nom pour votre montant certifié au centime près !
+        </div>
+
+        <div style="font-size:1.25rem; font-weight:800; color:#f8fafc; margin-bottom:0.75rem;">
+          📊 Échelle de conversion rapide selon vos tantièmes réels :
         </div>
 
         <div class="finance-grid">
-          ${profils.map(p => {
-            const total = (netBudget * p.tant) / totalCopro;
+          ${paliers.map(tant => {
+            const total = (netBudget * tant) / totalCopro;
             const parEcheance = total / echeances;
             return `
               <div class="finance-card">
-                <div class="finance-type-title">${escapeHtml(p.label)}</div>
-                <div class="finance-type-sub">${p.tant} tantièmes • ${p.desc}</div>
+                <div class="finance-type-title">${tant} tantièmes</div>
+                <div class="finance-type-sub">${tant <= 5 ? 'Place parking' : (tant <= 44 ? 'Box garage' : 'Appartement / Lots')}</div>
                 <div class="finance-type-total">${total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
-                <div class="finance-type-echeance">~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / trimestre</div>
+                <div class="finance-type-echeance">~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel</div>
               </div>
             `;
           }).join('')}

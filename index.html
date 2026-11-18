@@ -1627,34 +1627,59 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           </div>
         </div>
 
-        <!-- Recherche nominative express au micro ("Tantièmes en propre") -->
-        <div style="background:#fefce8; border:2px solid #fde047; border-radius:10px; padding:1rem 1.25rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
-            <strong style="color:#854d0e; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem;">
-              <span>🎤</span>
-              <span>Interpellation micro d'un voisin : Calcul nominatif sur ses tantièmes en propre</span>
-            </strong>
-            <span style="font-size:0.75rem; background:#fef08a; color:#713f12; padding:2px 8px; border-radius:4px; font-weight:700;">Temps réel</span>
-          </div>
-          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
-            <div style="flex:1; min-width:260px;">
-              <input type="text" id="simModalCoproSearch" class="form-control" placeholder="🔍 Taper le nom du copropriétaire ou le n° de lot (ex: Akkas, 142...)" oninput="rechercherCoproSimModal()" autocomplete="off">
+        <!-- DEUX MODES DE CALCUL : PAR NOM OU PAR TANTIÈMES DIRECTS -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
+          <!-- 1. Recherche nominative parmi les 259 copropriétaires -->
+          <div style="background:#fefce8; border:2px solid #fde047; border-radius:10px; padding:1rem 1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+              <strong style="color:#854d0e; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem;">
+                <span>🎤</span>
+                <span>1. Recherche par Copropriétaire (Tantièmes réels en base)</span>
+              </strong>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copierAnnonceMicroModal()" id="btnCopierAnnonceMicro" style="display:none;">
-              📋 Copier la phrase micro
-            </button>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="text" id="simModalCoproSearch" class="form-control" placeholder="🔍 Taper nom ou n° de lot (ex: Akkas, Arnaud, 142...)" oninput="rechercherCoproSimModal()" autocomplete="off">
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="copierAnnonceMicroModal()" id="btnCopierAnnonceMicro" style="display:none; white-space:nowrap;">
+                📋 Phrase micro
+              </button>
+            </div>
+            <div id="simModalCoproResultZone" style="margin-top:0.65rem; display:none;">
+              <!-- Rendu dynamique du copropriétaire trouvé -->
+            </div>
           </div>
-          <div id="simModalCoproResultZone" style="margin-top:0.75rem; display:none;">
-            <!-- Rendu dynamique du copropriétaire trouvé -->
+
+          <!-- 2. Saisie libre directe de tantièmes -->
+          <div style="background:#f0fdf4; border:2px solid #86efac; border-radius:10px; padding:1rem 1.25rem;">
+            <strong style="color:#166534; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem; margin-bottom:0.6rem;">
+              <span>🔢</span>
+              <span>2. Saisie directe de Tantièmes (Lu sur la convocation)</span>
+            </strong>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="number" id="simModalDirectTantInput" class="form-control" placeholder="Ex: 356, 378, 415, 459..." oninput="calculerParTantiemesDirectsModal()">
+              <span style="font-weight:700; color:#166534;">tantièmes</span>
+            </div>
+            <div id="simModalDirectTantResultZone" style="margin-top:0.65rem; display:none;">
+              <!-- Rendu dynamique pour tantièmes saisis -->
+            </div>
           </div>
         </div>
 
-        <!-- Grille des 10 profils réels du Floréal -->
+        <!-- Encadré explicatif juridique (Pas de grille rigide) -->
+        <div style="background:#fffbeb; border-left:4px solid #f59e0b; padding:0.75rem 1rem; border-radius:4px; font-size:0.84rem; color:#92400e; line-height:1.5;">
+          ⚖️ <strong>Précision juridique essentielle (Art. 5 Loi de 1965) :</strong> Dans notre copropriété, deux T4 ou deux T5 n'ont <strong>jamais les mêmes tantièmes</strong>. L'étage, l'ensoleillement, l'orientation, les terrasses et les annexes (box, parking) personnalisent la quote-part de chacun. Le calcul officiel se fait donc <strong>exclusivement sur les tantièmes réels en propre</strong>.
+        </div>
+
+        <!-- Tableau des repères de tantièmes réels du Floréal -->
         <div>
-          <h4 style="font-size:0.95rem; font-weight:800; color:#1e293b; margin-bottom:0.6rem;">
-            📊 Barème d'impact selon les 10 configurations réelles de la Résidence Le Floréal :
-          </h4>
-          <div id="simModalProfilesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+            <h4 style="font-size:0.92rem; font-weight:800; color:#1e293b; margin:0;">
+              📊 Repères de calcul au tantième (Base 97 478 tantièmes) :
+            </h4>
+            <div style="font-size:0.82rem; font-weight:800; color:#1d4ed8;" id="simModalUnitValueLabel">
+              1 tantième = 0.0000 €
+            </div>
+          </div>
+          <div id="simModalProfilesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.6rem;">
             <!-- Dynamique -->
           </div>
         </div>

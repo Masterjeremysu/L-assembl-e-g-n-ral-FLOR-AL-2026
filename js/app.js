@@ -4113,20 +4113,22 @@ function toggleResTimer() {
 
 // =======================================================
 // SUPER SIMULATEUR DE CHARGES & QUOTE-PART LE FLORÉAL
-// (T4, T5, Garages, Parkings & Tantièmes en propre)
+// (Calculs certifiés sur tantièmes réels en propre : surface, étage, orientation)
 // =======================================================
 
-const PROFILS_FLOREAL = [
-  { label: "🏠 T4 seul", tant: 350, desc: "Grand T4 classique" },
-  { label: "🏠 T4 + 🅿️ Parking", tant: 355, desc: "T4 + Place extérieure" },
-  { label: "🏠 T4 + 🚗 Box", tant: 394, desc: "T4 + Garage fermé" },
-  { label: "🏠 T4 + 🚗 Box + 🅿️ Parking", tant: 399, desc: "T4 + Garage + Place" },
-  { label: "🏡 T5 seul", tant: 430, desc: "Grand T5 familial" },
-  { label: "🏡 T5 + 🅿️ Parking", tant: 435, desc: "T5 + Place extérieure" },
-  { label: "🏡 T5 + 🚗 Box", tant: 474, desc: "T5 + Garage fermé" },
-  { label: "🏡 T5 + 🚗 Box + 🅿️ Parking", tant: 479, desc: "T5 + Garage + Place" },
-  { label: "🚗 Box / Garage seul", tant: 44, desc: "Lot fermé indépendant" },
-  { label: "🅿️ Place Parking seule", tant: 5, desc: "Emplacement extérieur" }
+const PALIERS_TANTIEMES_REELS = [
+  { tant: 5, label: "Place de parking", desc: "Emplacement extérieur" },
+  { tant: 44, label: "Box / Garage", desc: "Lot fermé indépendant" },
+  { tant: 200, label: "Petit lot / Studio", desc: "Petite superficie" },
+  { tant: 300, label: "Appartement 2-3P", desc: "Superficie moyenne" },
+  { tant: 350, label: "Appartement 4P", desc: "Exemple T4 bas / moyen" },
+  { tant: 375, label: "Appartement 4P+", desc: "Exemple T4 étage / balcon" },
+  { tant: 400, label: "Appartement 4-5P", desc: "T4 avec annexe ou T5" },
+  { tant: 425, label: "Appartement 5P", desc: "Grand T5 classique" },
+  { tant: 450, label: "Appartement 5P+", desc: "T5 supérieur / bien orienté" },
+  { tant: 475, label: "Appartement 5P + lots", desc: "T5 avec box ou parking" },
+  { tant: 500, label: "Grand logement", desc: "Très grande superficie" },
+  { tant: 800, label: "Multi-propriétaire", desc: "Cumul de plusieurs lots" }
 ];
 
 let lastSimModalTargetCopro = null;
@@ -4169,27 +4171,85 @@ function calculerQuotePartTravauxModal() {
   if (netLabel) netLabel.innerText = `${net.toLocaleString('fr-FR')} €`;
 
   const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+  const valeurUnitaire = totalCopro > 0 ? (net / totalCopro) : 0;
+  const echeanceUnitaire = valeurUnitaire / echeances;
+
+  const unitLabel = document.getElementById('simModalUnitValueLabel');
+  if (unitLabel) {
+    unitLabel.innerText = `1 tantième = ${valeurUnitaire.toFixed(4)} € (soit ~${echeanceUnitaire.toFixed(4)} € / appel)`;
+  }
+
   const grid = document.getElementById('simModalProfilesGrid');
   if (grid) {
-    grid.innerHTML = PROFILS_FLOREAL.map(p => {
+    grid.innerHTML = PALIERS_TANTIEMES_REELS.map(p => {
       const totalPart = (net * p.tant) / totalCopro;
       const parEcheance = totalPart / echeances;
       return `
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.75rem; text-align:center;">
-          <div style="font-weight:800; font-size:0.85rem; color:#1e3a8a;">${p.label}</div>
-          <div style="font-size:0.72rem; color:#64748b; margin-bottom:4px;">${p.tant} tant. • ${p.desc}</div>
-          <div style="font-size:1.15rem; font-weight:800; color:#0f172a;">
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.65rem; text-align:center;">
+          <div style="font-weight:800; font-size:0.88rem; color:#1e3a8a;">${p.tant} tantièmes</div>
+          <div style="font-size:0.72rem; color:#64748b; margin-bottom:3px;">${p.label}</div>
+          <div style="font-size:1.1rem; font-weight:900; color:#0f172a;">
             ${totalPart.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </div>
-          <div style="font-size:0.78rem; font-weight:700; color:#059669; margin-top:2px;">
-            ~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / échéance
+          <div style="font-size:0.75rem; font-weight:700; color:#059669; margin-top:2px;">
+            ~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel
           </div>
         </div>
       `;
     }).join('');
   }
 
+  calculerParTantiemesDirectsModal();
   rechercherCoproSimModal();
+}
+
+function calculerParTantiemesDirectsModal() {
+  const tantInput = document.getElementById('simModalDirectTantInput');
+  const zone = document.getElementById('simModalDirectTantResultZone');
+  if (!zone) return;
+
+  const tant = Number(tantInput?.value) || 0;
+  if (tant <= 0) {
+    zone.style.display = 'none';
+    zone.innerHTML = '';
+    return;
+  }
+
+  const budget = Number(document.getElementById('simModalBudgetInput')?.value) || 0;
+  const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
+  const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
+  const net = Math.max(0, budget - deduction);
+  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+
+  const totalPart = (net * tant) / totalCopro;
+  const parEcheance = totalPart / echeances;
+
+  lastSimModalTargetCopro = {
+    nom: `Copropriétaire (${tant} tantièmes en propre)`,
+    lots: "Lots déclarés en séance",
+    tantiemes: tant,
+    total: totalPart,
+    echeance: parEcheance,
+    echeanceCount: echeances
+  };
+
+  zone.style.display = 'block';
+  zone.innerHTML = `
+    <div style="background:white; border:1px solid #86efac; border-radius:8px; padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <div>
+        <strong style="color:#166534; font-size:1rem;">Pour ${tant} tantièmes saisis :</strong>
+        <div style="font-size:0.75rem; color:#64748b;">${((tant/totalCopro)*100).toFixed(2)}% du syndicat</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:1.35rem; font-weight:900; color:#166534;">
+          ${totalPart.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+        </div>
+        <div style="font-size:0.85rem; font-weight:700; color:#059669;">
+          Soit ${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel (${echeances} échéances)
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function rechercherCoproSimModal() {
@@ -4202,7 +4262,6 @@ function rechercherCoproSimModal() {
     zone.style.display = 'none';
     zone.innerHTML = '';
     if (btnCopier) btnCopier.style.display = 'none';
-    lastSimModalTargetCopro = null;
     return;
   }
 
@@ -4236,7 +4295,7 @@ function rechercherCoproSimModal() {
         <div>
           <div style="font-size:1.05rem; font-weight:800; color:#0f172a;">${escapeHtml(found.nom)}</div>
           <div style="font-size:0.82rem; color:#475569;">
-            ${escapeHtml(found.lots || 'Lots')} • <strong style="color:#d97706;">${tant} tantièmes en propre</strong>
+            ${escapeHtml(found.lots || 'Lots')} • <strong style="color:#d97706;">${tant} tantièmes certifiés</strong>
           </div>
         </div>
         <div style="text-align:right;">
@@ -4255,14 +4314,13 @@ function rechercherCoproSimModal() {
     zone.style.display = 'block';
     zone.innerHTML = `<div style="font-size:0.82rem; color:#dc2626; padding:0.3rem 0;">Aucun copropriétaire trouvé avec « ${escapeHtml(query)} ».</div>`;
     if (btnCopier) btnCopier.style.display = 'none';
-    lastSimModalTargetCopro = null;
   }
 }
 
 function copierAnnonceMicroModal() {
   if (!lastSimModalTargetCopro) return;
   const c = lastSimModalTargetCopro;
-  const txt = `« ${c.nom}, pour l'ensemble de vos lots représentant ${c.tantiemes} tantièmes en propre, votre coût total sera de ${c.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €, soit ${c.echeance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € par trimestre sur ${c.echeanceCount} échéances. »`;
+  const txt = `« ${c.nom}, pour l'ensemble de vos lots totalisant ${c.tantiemes} tantièmes en propre, votre quote-part exacte est de ${c.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €, soit ${c.echeance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € par trimestre sur ${c.echeanceCount} échéances. »`;
 
   navigator.clipboard.writeText(txt).then(() => {
     showToast("📋 Phrase d'annonce micro copiée dans le presse-papier !", "success");
@@ -4329,13 +4387,13 @@ function calculerImpactCharges() {
 
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
 
-  grid.innerHTML = PROFILS_FLOREAL.slice(0, 6).map(p => {
+  grid.innerHTML = PALIERS_TANTIEMES_REELS.slice(0, 6).map(p => {
     const part = (totalBudget * p.tant / totalCopro);
     const parTrimestre = part / 4;
     return `
       <div class="quote-part-pill">
-        <div style="font-weight:700; font-size:0.8rem; color:#fde047;">${p.label}</div>
-        <div style="font-size:0.68rem; color:#cbd5e1;">${p.tant} t. • ${p.desc}</div>
+        <div style="font-weight:700; font-size:0.8rem; color:#fde047;">${p.tant} t.</div>
+        <div style="font-size:0.68rem; color:#cbd5e1;">${p.label}</div>
         <div style="font-size:1.05rem; font-weight:800; color:white; margin-top:2px;">
           ${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
         </div>
@@ -4363,6 +4421,19 @@ function calculerQuotePartVoisin() {
   const budget = Number(budgetInput?.value) || 85000;
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
 
+  // Si l'utilisateur tape un nombre direct de tantièmes
+  if (/^\d+$/.test(query)) {
+    const tant = Number(query);
+    const part = (budget * tant / totalCopro);
+    const trim = part / 4;
+    resEl.innerHTML = `
+      👉 <strong>${tant} tantièmes en propre :</strong> 
+      <strong>${part.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong> 
+      <span style="font-size:0.78rem; color:#fde047;">(~${trim.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / trimestre)</span>
+    `;
+    return;
+  }
+
   const found = (appData.coproprietaires || []).find(c =>
     fuzzyMatch(query, `${c.nom} ${c.lots || ''}`)
   );
@@ -4380,6 +4451,7 @@ function calculerQuotePartVoisin() {
     resEl.innerHTML = `<span style="color:#f87171; font-size:0.75rem;">Copropriétaire non trouvé</span>`;
   }
 }
+
 
 
 // =======================================================
