@@ -797,13 +797,14 @@
       </div>
 
       <div class="config-card">
-        <h3>☁️ Synchronisation Cloud Hébergée (Temps Réel)</h3>
+        <h3>⚡ Base de Données Cloud Supabase (Temps Réel Actif)</h3>
         <p style="font-size:0.85rem; color:var(--gray-500); margin-bottom:1rem;">
-          Connectez l'application à une base Cloud sécurisée (Firebase Realtime Database) pour que tous les smartphones et ordinateurs soient synchronisés en direct de n'importe où.
+          L'application est connectée en direct à votre base PostgreSQL sécurisée <strong>Supabase</strong> (AG Résidence Le Floréal 2026). Tous les émargements, pouvoirs et votes sont synchronisés instantanément sur tous les appareils du Conseil Syndical, avec sauvegarde locale de secours automatique en cas de coupure réseau.
         </p>
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
-          <button class="btn btn-primary" onclick="openCloudConfigModal()">⚙️ Configurer la base Cloud Firebase</button>
-          <span style="font-size:0.82rem; color:var(--success); font-weight:700;">🟢 Sauvegarde locale active en continu</span>
+          <button class="btn btn-primary" onclick="forceSyncFromCloud()">🔄 Actualiser depuis Supabase</button>
+          <button class="btn btn-success" onclick="cloudPushAllCoprosToSupabase()">☁️ Pousser mes données locales vers Supabase</button>
+          <span style="font-size:0.82rem; color:var(--success); font-weight:700;">🟢 Synchro temps réel & secours local actifs</span>
         </div>
       </div>
 
