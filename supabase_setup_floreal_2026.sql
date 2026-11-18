@@ -1,0 +1,405 @@
+-- ==============================================================
+-- BASE DE DONNÉES OFFICIELLE - ASSEMBLÉE GÉNÉRALE RÉSIDENCE LE FLORÉAL 2026
+-- Projet Supabase dédié : xfsrcjdhojpwvsiyjksy (compte tac38000@gmail.com)
+-- Total : 259 copropriétaires • 97 478 tantièmes • 29 résolutions
+-- ==============================================================
+
+-- 1. Nettoyage préventif
+DROP TABLE IF EXISTS public.ag_audit_logs CASCADE;
+DROP TABLE IF EXISTS public.ag_resolutions CASCADE;
+DROP TABLE IF EXISTS public.ag_coproprietaires CASCADE;
+DROP TABLE IF EXISTS public.ag_state CASCADE;
+
+-- 2. Table ag_state (État global de la séance & Rétroprojecteur)
+CREATE TABLE public.ag_state (
+  id TEXT PRIMARY KEY DEFAULT 'floreal_2026',
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  seance JSONB NOT NULL DEFAULT '{}'::jsonb,
+  display_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by TEXT DEFAULT 'CS'
+);
+
+-- 3. Table ag_coproprietaires (259 copropriétaires et émargements)
+CREATE TABLE public.ag_coproprietaires (
+  id TEXT PRIMARY KEY,
+  nom TEXT NOT NULL,
+  lots TEXT DEFAULT '',
+  tantiemes INT NOT NULL DEFAULT 0,
+  batiment TEXT DEFAULT '',
+  escalier TEXT DEFAULT '',
+  etage TEXT DEFAULT '',
+  presence TEXT NOT NULL DEFAULT 'absent',
+  mandataire_id TEXT DEFAULT NULL,
+  heure_emargement TIMESTAMPTZ DEFAULT NULL,
+  signature TEXT DEFAULT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Table ag_resolutions (29 résolutions & votes en direct)
+CREATE TABLE public.ag_resolutions (
+  id TEXT PRIMARY KEY,
+  numero INT NOT NULL,
+  titre TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  majorite TEXT NOT NULL DEFAULT 'Article 24',
+  budget NUMERIC DEFAULT 0,
+  statut TEXT NOT NULL DEFAULT 'en_attente',
+  votes_pour INT NOT NULL DEFAULT 0,
+  votes_contre INT NOT NULL DEFAULT 0,
+  votes_abstention INT NOT NULL DEFAULT 0,
+  votes_details JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. Table ag_audit_logs (Journal d'audit anti-fraude)
+CREATE TABLE public.ag_audit_logs (
+  id BIGSERIAL PRIMARY KEY,
+  action TEXT NOT NULL,
+  details JSONB DEFAULT '{}'::jsonb,
+  auteur TEXT DEFAULT 'CS',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6. Sécurité Row Level Security (RLS)
+ALTER TABLE public.ag_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ag_coproprietaires ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ag_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ag_audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY ag_state_all ON public.ag_state FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY ag_copros_all ON public.ag_coproprietaires FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY ag_resolutions_all ON public.ag_resolutions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY ag_audit_all ON public.ag_audit_logs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 7. Activation du Temps Réel Supabase (WebSocket)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.ag_state;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.ag_coproprietaires;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.ag_resolutions;
+
+-- 8. Données initiales : État de séance
+INSERT INTO public.ag_state (id, config, seance, display_state, updated_at, updated_by)
+VALUES (
+  'floreal_2026',
+  '{"coproName":"RÉSIDENCE LE FLORÉAL","address":"13-19 Rue du Moucherotte, 38360 Sassenage","agDate":"2026-11-25","agTime":"18h00","agLocation":"Salle Jacques Prévert, Rue du Moucherotte, 38360 Sassenage","syndic":"Citya Agence Henry","totalTantiemes":97478,"presentTantiemes":0,"pinCode":"2026"}'::jsonb,
+  '{"statut": "non_commencee", "currentResolutionIndex": 0}'::jsonb,
+  '{"activeResolution": "r01", "phase": "attente", "titre": "Ouverture de l''AG", "description": "En attente de l''ouverture de séance"}'::jsonb,
+  NOW(),
+  'INIT_SYSTEM'
+);
+
+-- 9. Données initiales : Résolutions officielles (29 résolutions)
+INSERT INTO public.ag_resolutions (id, numero, titre, description, majorite, budget, statut, votes_pour, votes_contre, votes_abstention, votes_details, updated_at)
+VALUES
+('r01', 1, 'Élection du/de la président(e) de séance de l''assemblée', 'Pour remplir les fonctions de président(e) de séance, l''assemblée générale élit : ...
+Cette décision devra recueillir la majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Choisir un membre du conseil syndical pour présider la séance.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r02', 2, 'Élection de scrutateur(s)/scrutatrice(s) de l''assemblée', 'Pour remplir les fonctions de scrutateur(s)/scrutatrice(s) de séance, l''assemblée générale élit : ...
+Cette décision devra recueillir la majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r03', 3, 'Élection du secrétaire de séance de l''assemblée', 'Pour remplir les fonctions de secrétaire de séance, l''assemblée générale élit : ...
+Le syndic dépose sur le bureau la feuille de présence, les pouvoirs, les bulletins de vote par correspondance, le registre des LRAR.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Le syndic assure généralement le secrétariat.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r04', 4, 'Rapport du conseil syndical pour l''exercice N du 01/07/2025 au 30/06/2026', 'Le conseil syndical fait lecture de son rapport d''activité au cours de l''exercice N.
+Cette résolution est une information, elle n''appelle pas au vote.', 'article sans vote', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Présentation du bilan annuel par le Conseil Syndical.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r05', 5, 'Approbation des comptes de l''exercice N du 01/07/2025 au 30/06/2026', 'Comptes joints à la convocation en annexe.
+Approbation des comptes de charges dudit exercice pour un montant de 703 324,59 EUROS TTC.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Comptes vérifiés avec le grand livre et les factures justificatives.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r06', 6, 'Désignation du syndic (contrats joints à la convocation en annexes)', 'Présentation des contrats de syndic en concurrence.
+Cette résolution est une information, elle n''appelle pas au vote.', 'article sans vote', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Passer directement aux votes des candidatures 06a et 06b.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r06a', 6, 'Candidature du syndic : CITYA agence HENRY', 'Désignation du cabinet CITYA AGENCE HENRY pour une durée de 12 MOIS (01.01.2027 au 31.12.2027).
+Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Syndic sortant. Comparer les honoraires et prestations avec Trenta.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r06b', 6, 'Candidature du syndic : TRENTA IMMOBILIER', 'Désignation du cabinet TRENTA IMMOBILIER pour une durée de 18 MOIS.
+Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Candidature concurrente proposée à l''AG.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r07', 7, 'Approbation du budget prévisionnel pour l''exercice N+2 (01.07.2027 au 30.06.2028)', 'Budget prévisionnel N+2 arrêté à la somme de 708 674 EUROS TTC.
+Exigible par trimestres égaux.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Budget nécessaire au fonctionnement courant de la résidence.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08', 8, 'Élection du conseil syndical', 'Le conseil syndical assiste et contrôle la gestion du syndic.
+Cette résolution est une information, elle n''appelle pas au vote.', 'article sans vote', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Vote individuel candidat par candidat de 08a à 08n.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08a', 8, 'Élection au Conseil Syndical : MME GANET', 'Élection de MME GANET. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08b', 8, 'Élection au Conseil Syndical : MME PIGOIS', 'Élection de MME PIGOIS. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08c', 8, 'Élection au Conseil Syndical : MME GUERRE', 'Élection de MME GUERRE. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08d', 8, 'Élection au Conseil Syndical : MME GARCIA', 'Élection de MME GARCIA. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08e', 8, 'Élection au Conseil Syndical : M. DUCHEZ', 'Élection de M. DUCHEZ. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Démissionnaire en cours d''exercice.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08f', 8, 'Élection au Conseil Syndical : M. CASARI', 'Élection de M. CASARI. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08g', 8, 'Élection au Conseil Syndical : M. LOUIS', 'Élection de M. LOUIS. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08h', 8, 'Élection au Conseil Syndical : M. BEZY', 'Élection de M. BEZY. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08i', 8, 'Élection au Conseil Syndical : MME ARMONIA PESENTI', 'Élection de MME ARMONIA PESENTI. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08j', 8, 'Élection au Conseil Syndical : M. LEGRAND', 'Élection de M. LEGRAND. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Démissionnaire en cours d''exercice.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08k', 8, 'Élection au Conseil Syndical : M. BONSIGNORE', 'Élection de M. BONSIGNORE. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08l', 8, 'Élection au Conseil Syndical : M. BRUN', 'Élection de M. BRUN. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08m', 8, 'Élection au Conseil Syndical : MME FANTINI', 'Élection de MME FANTINI. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"CONTRE","csNotes":"Erreur syndic : n''a jamais été membre du Conseil Syndical.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r08n', 8, 'Élection au Conseil Syndical : M. SUZET', 'Élection de M. SUZET. Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r09', 9, 'Validation du cahier des charges pour l''installation de climatisations', 'PJ : projet de cahier des charges.
+Validation du cahier des charges joint à la convocation pour l''installation de climatisations.
+Majorité de l''Article 25 ou à défaut article 25-1.', 'Article 25 ou à défaut article 25-1', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Encadre l''esthétique et les règles techniques des climatiseurs privatifs.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r10', 10, 'Décision quant à la mise en vente par adjudication du bien appartenant à PADRINES Jennifer', 'Information générale sur les procédures en recouvrement.
+Cette résolution est une information, elle n''appelle pas au vote.', 'article sans vote', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"LIBRE","csNotes":"Information préalable aux votes 10a, 10b, 10c.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r10a', 10, 'Saisie immobilière : montant des sommes estimées définitivement perdues', 'Lots 456 et 363. Risque de sommes définitivement perdues évalué à 13 716,95 €.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Nécessaire pour constater le montant de la créance irrécouvrable.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r10b', 10, 'Saisie immobilière : mise en vente des lots par adjudication', 'L''assemblée générale décide de faire procéder à la saisie immobilière en vue de la vente des lots 456 et 363, et donne tous pouvoirs au syndic.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"Permet de recouvrer les charges impayées au bénéfice du syndicat.","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW()),
+('r10c', 10, 'Saisie immobilière : montant de la mise à prix', 'Fixe la mise à prix à un tiers de la valeur des biens, soit 42 000 €.
+Si défaut d''enchérisseur, le syndicat sera déclaré adjudicataire d''office.
+Majorité de l''Article 24.', 'Article 24', 0, 'en_attente', 0, 0, 0, '{"csConsigne":"POUR","csNotes":"","votes":{"pour":0,"contre":0,"abstention":0}}'::jsonb, NOW());
+
+-- 10. Données initiales : Les 259 copropriétaires et leurs tantièmes exacts (Total 97 478)
+INSERT INTO public.ag_coproprietaires (id, nom, lots, tantiemes, batiment, escalier, etage, presence, mandataire_id, heure_emargement, signature, updated_at)
+VALUES
+('c_1', 'AKKAS Costun', '', 378, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_2', 'AKKAS Samet', '', 459, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_3', 'AMBROGIO', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_4', 'ANTOINE Jeanine', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_5', 'ARMONIA Frédéric / Diane', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_6', 'ARNAUD Alain', '', 356, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_7', 'AUBREE Rémi', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_8', 'AVELINE Céline', '', 356, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_9', 'AZIMI Galina', '', 464, '🔥 Top 20%', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_10', 'BACCAVIN Michel', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_11', 'BASSO Stéphane', '', 476, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_12', 'BAUM Patrick', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_13', 'BELHABIB Abdel', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_14', 'BELLIN Patrick', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_15', 'BELOUD & MME PRAMPOLINI ABDELAL ET MANON', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_16', 'BENAHCENE Brahim', '', 723, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_17', 'BENENATI Louis', '', 405, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_18', 'BERARDI Vito', '', 407, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_19', 'BERNARD Jeanine', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_20', 'BERTHAUD Martine', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_21', 'BEZY David', '', 464, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_22', 'BIASINI Georgette', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_23', 'BIROCHEAU Joël / Annie', '', 356, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_24', 'BITON Raquel', '', 480, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_25', 'BITON Jules', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_26', 'BONATO ET CELESTRI Florian et Patricia', '', 413, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_27', 'BONSIGNORE Alexis', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_28', 'BORGHIN Serge', '', 417, 'Standard', '', '', 'pouvoir', 'ARMONIA Diane', NULL, NULL, NOW()),
+('c_29', 'BOUHMAR Aïcha', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_30', 'BOULEGHLEM Samir', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_31', 'BOULUD Andrée', '', 463, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_32', 'BOUMAIZA Sofien / Marie', '', 378, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_33', 'BRAIDA Xavier et Charlotte', '', 434, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_34', 'BREAN Morgane', '', 400, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_35', 'BRIFFOD Ludovic', '', 407, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_36', 'BRUN Éric', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_37', 'BRUN Ludovic / Jennifer', '', 441, '🔥 Top 20%', '', '', 'pouvoir', 'BRUN Éric', NULL, NULL, NOW()),
+('c_38', 'BRUN R. / CASANOVA T.', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_39', 'BRUN Robert', '', 395, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_40', 'BUGNARD Philippe', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_41', 'CALVELO VAZQUEZ Fernando', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_42', 'CANTON Gilles', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_43', 'CAPRARA Anthony', '', 409, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_44', 'CAPRON Yvette', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_45', 'CARATINI Yves', '', 380, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_46', 'CARELLA E.', '', 409, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_47', 'CARNEL Mauricette', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_48', 'CARUSO Julien', '', 376, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_49', 'CASARI Jean-Paul', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_50', 'CHALET Josiane', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_51', 'CHANGEL Yvonne', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_52', 'CHAPELIER Mickaël / Stéphanie', '', 459, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_53', 'CHAPPELET Alain', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_54', 'CHAPPELET Stéphanie', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_55', 'CHARDIN Bernard', '', 427, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_56', 'CHARRIN Noémie', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_57', 'CHASTAING Landry', '', 343, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_58', 'CHATIOU Mohamed', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_59', 'CHAVANCY / FERRANDO Philippe / Ingrid', '', 434, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_60', 'CHAVANCY Rudy', '', 373, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_61', 'CHETRY Laurent', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_62', 'CHEVALME Florence', '', 483, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_63', 'CHIHI ET MME ABIDAT Saifeddine et Nawel', '', 425, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_64', 'CLARY Maud', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_65', 'CLAVEL Marcel', '', 356, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_66', 'COLOTTO Nicaise', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_67', 'CORBEL / MEDICI Chrystel / Sophie', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_68', 'CORDEL Marc', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_69', 'CORREIA MARIA FERNANDA', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_70', 'CORRENOZ Florence', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_71', 'CORRENOZ Marcel', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_72', 'COSTE Jean-Claude', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_73', 'COSTERG François', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_74', 'COUDRY Émilie', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_75', 'COURANT Daniel', '', 466, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_76', 'COUTAND David', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_77', 'COYNEL Gilbert', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_78', 'CRAPANZANO Angélo', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_79', 'CRISPOLTI / PARADISO Mathilde / Julien', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_80', 'CROCHON Jean-Louis', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_81', 'CROIBIER MUSCAT Jean-Marie', '', 444, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_82', 'CULLIE ou CAMPS Francis ou Yvette', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_83', 'CURCIO MONTESINOS Jean-Baptiste Kelly', '', 356, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_84', 'CUTILLAS Julien', '', 402, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_85', 'CUTILLAS Pascual', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_86', 'DAIMO Danielle', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_87', 'DARMAISIN Gérard', '', 348, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_88', 'DERBRE Michel', '', 425, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_89', 'DESBOIS Laurent / Pornpana', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_90', 'DI CARO Roland', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_91', 'DI TOMMASO Giuseppina', '', 360, 'Standard', '', '', 'pouvoir', 'SUZET', NULL, NULL, NOW()),
+('c_92', 'DIKYUVA Dilek', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_93', 'DOLFINI Franck', '', 351, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_94', 'DONAT-REVERDY Odette', '', 373, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_95', 'DONDEYNE Noëlle', '', 373, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_96', 'DUCHEZ & MME DABOIN SOTO Kévin et Risobel', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_97', 'DUMAS David', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_98', 'DUMETZ Bastien', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_99', 'DUMKE GERACI Anaïs ou Philippe', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_100', 'E.P.F.L. - D', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_101', 'FENARD Bernadette', '', 419, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_102', 'FERNANDES JOAQUIM', '', 408, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_103', 'FERRERA Auguste', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_104', 'FILECCIA V.', '', 378, 'Standard', '', '', 'pouvoir', 'BRUN Éric', NULL, NULL, NOW()),
+('c_105', 'FRAILE Victor', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_106', 'FRAMINET ROGER', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_107', 'FRANCOIS CLAUDINE', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_108', 'GABUS Francisca', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_109', 'GANET Chantal', '', 464, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_110', 'GARCIA F.-OSIOL F', '', 409, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_111', 'GARCIA Rémy', '', 88, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_112', 'GAUCH Claude', '', 400, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_113', 'GAUDE Julien', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_114', 'GAUTHIER Jean-Paul', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_115', 'GHANMI Souad', '', 351, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_116', 'GIBALDI Alfonso', '', 392, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_117', 'GIBALDI Antonino', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_118', 'GIL ET SOLLAMI JOSE ET PATRICIA', '', 402, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_119', 'GINET Erwan', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_120', 'GIOTTA Elisabeth', '', 424, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_121', 'GIRARD Laure', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_122', 'GODFRIN Bernadette', '', 378, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_123', 'GOMEZ Corinne', '', 436, '🔥 Top 20%', '', '', 'pouvoir', 'CASARI Jean-Paul', NULL, NULL, NOW()),
+('c_124', 'GOUDET Valentin', '', 360, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_125', 'GRAMMATICA Jeanne', '', 419, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_126', 'GRISOLET Patrick', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_127', 'GROEN Jérôme', '', 366, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_128', 'GUERRE Joël', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_129', 'GUILLET Michel', '', 400, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_130', 'HADJ SAID Mohamed', '', 343, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_131', 'HAFSAOUI Zahra', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_132', 'HEULINE Daniel / Véronique', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_133', 'HUGON Francis', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_134', 'IMBAULT-HUART Nathalie GX', '', 419, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_135', 'IZZO S.', '', 464, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_136', 'JARRAND-ALLIER / RICHTER Olivier / Audrey', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_137', '22', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_138', 'JEANSELME Pierre', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_139', 'JONAS Raymonde', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_140', 'JULLIEN Franck', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_141', 'KECK Joséphine', '', 425, 'Standard', '', '', 'pouvoir', 'CASARI Jean-Paul', NULL, NULL, NOW()),
+('c_142', 'KERNEVEZ', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_143', 'KERNOU Fodil ou Nadira', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_144', 'KHALFI Rachid / Amel', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_145', 'KIBARDINA Anastasia', '', 417, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_146', 'KNEUSS Oria', '', 373, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_147', 'LA BOMBARDIERE (Mme MOREL Domi)', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_148', 'LA GRECA Antonio', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_149', 'LA LOGGIA Nunzia', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_150', 'LAARIBIA Sid Ahmed', '', 425, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_151', 'LACAGNINA Geneviève', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_152', 'LACAGNINA Lucia ou Concettina', '', 405, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_153', 'LACAGNINA Maurice G', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_154', 'LACHGUER Ahmed', '', 405, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_155', 'LANVIN Nicolas', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_156', 'LARDENOIS-ROBERT François-Louis', '', 434, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_157', 'LARGIER Serge et Aline', '', 452, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_158', 'LAROCHE René / Martine', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_159', 'LAUREL Marie-Christine', '', 425, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_160', 'LAVERGNE Muriel', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_161', 'LE FLOREAL CONCIERGERIE', '', 407, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_162', 'LE GAL Armand', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_163', 'LEGRAND David', '', 432, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_164', 'LENOBLE Brigitte', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_165', 'LEONE & MME GABUS Noel & Audrey', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_166', 'LIAS Frédérique', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_167', 'LO MONACO Christian', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_168', 'LORINQUER J. OU RUIZ S.', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_169', 'LOUIS Janick', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_170', 'LOUIS Justin', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_171', 'LUENGO Martine', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_172', 'MARTINET Robert', '', 498, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_173', 'MAS Claude', '', 399, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_174', 'MAS Elodie', '', 510, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_175', 'MASCIAVE Louis', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_176', 'MAUGIRONT Philippe', '', 49, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_177', 'MAZZOLENI Bertrand', '', 402, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_178', 'MELO & MME MANKA Mathieu et Laetitia', '', 413, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_179', 'MERITTO Kévin', '', 128, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_180', 'MESSINA S. & MME SAILLIER Stéphanie', '', 434, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_181', 'MEURANT David', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_182', 'MINIAC Michèle', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_183', 'MONACHINO-CALABRO Sandrine', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_184', 'MONDINI Bernard', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_185', 'MOREAU Alain', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_186', 'MORIN Gisèle', '', 422, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_187', 'MORO Didier', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_188', 'NAFFATI Samir / Inchirah', '', 469, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_189', 'NICOUD Colette', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_190', 'NOVAT & MME LIOTIER Lionel et Christelle', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_191', 'OSMANOVIC Midhet', '', 405, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_192', 'PADRINES Jennifer', '', 358, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_193', 'PAPIN ET MME VERVISCH REMY ET PATRICIA', '', 415, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_194', 'PARRINELLO Frédéric / Virginie', '', 417, 'Standard', '', '', 'pouvoir', 'SUZET', NULL, NULL, NOW()),
+('c_195', 'PEIS Patrice', '', 5, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_196', 'PEREIRA LEONARDA', '', 371, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_197', 'PERLI Eric', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_198', 'PERONNET Jessica', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_199', 'PICCARRETA', '', 402, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_200', 'PIGOIS Véronique', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_201', 'POCARD Daniel', '', 404, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_202', 'PORCHIER Bernard', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_203', 'PRESTI Lillo', '', 449, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_204', 'QUERCIA Rose', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_205', 'REPENTIN André', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_206', 'REYNARD Elisabeth', '', 410, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_207', 'RISSO Jean-Marc', '', 373, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_208', 'RIVAS Evelyne / Didier', '', 457, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_209', 'RODRIGUES DE OLIVEIRA Daniel / Arminda', '', 452, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_210', 'RODRIGUES Narcisse', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_211', 'ROUX Corine', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_212', 'ROUX Estelle', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_213', 'ROUX Michel', '', 402, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_214', 'ROYBON Grégoire', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_215', 'RUDD Caixia', '', 378, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_216', 'RUSSO Anna', '', 427, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_217', 'RUSSO Thibaut', '', 351, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_218', 'SALERNO Indivision', '', 410, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_219', 'SANAA Hakim', '', 436, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_220', 'SANDRO', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_221', 'SAUVENT Yolande', '', 459, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_222', 'SCANNELLA Pascal', '', 432, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_223', 'SCHRAMMEK & DUGLUE Julien et Morgane', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_224', 'SELEK Martine', '', 549, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_225', 'SEOUD Nabil', '', 464, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_226', 'SERAPHIN Gilles', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_227', 'SESTIER Hubert', '', 420, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_228', 'SIBUE David', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_229', 'SICIGNANO / ABREUX Sandra et Fabrizio', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_230', 'SIERRA Indivision', '', 476, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_231', 'SILVAGNI Alain', '', 405, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_232', 'SILVESTRI Renato / Dominique', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_233', 'SIMONETTI Emmanuel', '', 476, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_234', 'SOLITRO Hélène', '', 407, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_235', 'SOUSA RODRIGUES Narciso', '', 409, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_236', 'STOCLET David', '', 434, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_237', 'SUZET & MME FALCON Jérémy et Laura', '', 802, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_238', 'TARDY Pascal', '', 348, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_239', 'TARRICONE V. - SOARES J.', '', 439, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_240', 'TASKIN Haci / Serap', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_241', 'TINCHON Jean-Loup', '', 459, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_242', 'TISSEYRE André', '', 478, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_243', 'TOMAS CAMBERO Antonio', '', 365, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_244', 'TOMASINO', '', 464, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_245', 'TRAJILOVIC Olga', '', 413, 'Standard', '', '', 'pouvoir', 'BRUN Éric', NULL, NULL, NOW()),
+('c_246', 'TRAPANI Felicia', '', 413, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_247', 'TREILLARD P.', '', 400, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_248', 'TRIBOULAT Frédéric / Virginie', '', 417, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_249', 'TRICOLI Indivision', '', 425, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_250', 'TRICOLI Luigi', '', 363, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_251', 'TRICOLI Luigina', '', 44, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_252', 'TROITSKY Gérald', '', 461, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_253', 'UN TOIT POUR TOUS DEV', '', 2098, '🔥 Top 20%', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_254', 'VALLIER Frédéric / Virginie', '', 408, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_255', 'VARESANO Angèle & Corinne', '', 351, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_256', 'VOILQUE', '', 378, 'Standard', '', '', 'pouvoir', 'GUERRE Sylvie', NULL, NULL, NOW()),
+('c_257', 'ZANCO Florence', '', 375, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_258', 'ZARO Amandine', '', 432, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW()),
+('c_259', 'ZEFI / SERGENT Agim / Alexandra', '', 378, 'Standard', '', '', 'absent', NULL, NULL, NULL, NOW());

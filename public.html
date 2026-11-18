@@ -721,9 +721,13 @@
     }
 
     // Chargement initial
+    window.onRemoteDisplayStateUpdate = handleStateUpdate;
     refreshDisplay();
     // Boucle de rafraîchissement doux
     setInterval(refreshDisplay, 2000);
   </script>
+  <!-- Client SDK Supabase BDD Cloud PostgreSQL pour le Rétroprojecteur -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js?v=4.2"></script>
 </body>
 </html>

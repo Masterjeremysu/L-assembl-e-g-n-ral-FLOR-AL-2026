@@ -20,6 +20,66 @@
   <!-- Bibliothèques gratuites WebRTC & QR Code -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Style Badge Statut Supabase BDD -->
+  <style>
+    .cloud-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(15, 23, 42, 0.6);
+      color: #94a3b8;
+    }
+    .cloud-status-badge:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .cloud-status-badge.online {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    .cloud-status-badge.offline {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+    .cloud-status-badge.syncing {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+    }
+    .cloud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+    .cloud-dot.online {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+    .cloud-dot.offline {
+      background: #f59e0b;
+    }
+    .cloud-dot.syncing {
+      background: #3b82f6;
+      box-shadow: 0 0 8px #3b82f6;
+      animation: cloudPulse 1.4s infinite ease-in-out;
+    }
+    @keyframes cloudPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+  </style>
 </head>
 <body>
 
@@ -126,6 +186,12 @@
       </div>
 
       <div class="header-actions no-print">
+        <!-- Badge Statut Supabase PostgreSQL BDD Cloud -->
+        <div id="cloudStatusBadge" class="cloud-status-badge syncing" onclick="forceSyncFromCloud()" title="État BDD Supabase - Cliquer pour forcer l'actualisation">
+          <span id="cloudStatusDot" class="cloud-dot syncing"></span>
+          <span id="cloudStatusText">Connexion BDD...</span>
+        </div>
+
         <!-- Direct Multi-écrans -->
         <button class="btn btn-header-live" onclick="openLiveSyncModal()" title="Synchroniser sur plusieurs téléphones / tablettes en direct">
           <span class="live-pulse-dot"></span>
@@ -2103,9 +2169,10 @@ M. LEROY Jacques	Lot 8	85"></textarea>
   </div>
 
   <!-- Fichiers modulaires de l'application -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/data.js?v=4.0"></script>
   <script src="js/auth.js?v=4.0"></script>
-  <script src="js/cloud.js?v=4.0"></script>
+  <script src="js/supabase-client.js?v=4.2"></script>
   <script src="js/audit.js?v=4.0"></script>
   <script src="js/sync.js?v=4.0"></script>
   <script src="js/pwa.js?v=4.0"></script>

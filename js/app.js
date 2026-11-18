@@ -591,6 +591,9 @@ function setCoproStatut(id, newStatut) {
     if (typeof logAuditAction === 'function') {
       logAuditAction('PRESENCE', `Émargement : ${c.nom}`, `Statut défini à ${newStatut} (${c.tantiemes} tantièmes)`);
     }
+    if (typeof cloudUpdateCopro === 'function') {
+      cloudUpdateCopro(id, newStatut, c.mandataire);
+    }
     persistData();
     showToast(`${c.nom} pointé comme ${newStatut}`, "success");
   }
@@ -689,6 +692,9 @@ function setQuickVote(id, newStatus) {
       }
     } else {
       delete res.heureVote;
+    }
+    if (typeof cloudUpdateResolution === 'function') {
+      cloudUpdateResolution(id, newStatus, res.tantiemesPour, res.tantiemesContre, res.tantiemesAbs);
     }
     persistData();
     if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive && activeSeanceResId === id) {
@@ -3090,6 +3096,10 @@ function diffuserSurEcranPublic(mode = 'RESOLUTION', extraData = {}) {
     try {
       publicDisplayChannel.postMessage(displayState);
     } catch (e) {}
+  }
+
+  if (typeof cloudUpdateDisplayState === 'function') {
+    cloudUpdateDisplayState(displayState);
   }
 }
 
