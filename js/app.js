@@ -3402,7 +3402,14 @@ function enregistrerSeanceElu() {
   const val = (document.getElementById('seanceEluInput')?.value || '').trim();
   res.eluNom = val;
   if (typeof cloudUpdateResolution === 'function') {
-    cloudUpdateResolution(res.id, 'ADOPTEE', totalEnSalle, 0, 0, { opponentsText: res.opponentsText });
+    cloudUpdateResolution(
+      res.id,
+      res.status || 'EN_ATTENTE',
+      Number(res.tantiemesPour) || 0,
+      Number(res.tantiemesContre) || 0,
+      Number(res.tantiemesAbs) || 0,
+      { eluNom: res.eluNom, heureVote: res.heureVote || '', opponentsText: res.opponentsText || '' }
+    );
   }
   diffuserSurEcranPublic('RESOLUTION');
   persistData();
@@ -3454,7 +3461,11 @@ function setSeanceUnanimite() {
   }
 
   if (typeof cloudUpdateResolution === 'function') {
-    cloudUpdateResolution(res.id, 'ADOPTEE', totalEnSalle, 0, 0, { opponentsText: res.opponentsText });
+    cloudUpdateResolution(res.id, 'ADOPTEE', totalEnSalle, 0, 0, {
+      eluNom: res.eluNom || '',
+      heureVote: res.heureVote || '',
+      opponentsText: res.opponentsText || ''
+    });
   }
   diffuserSurEcranPublic('RESOLUTION');
   persistData();

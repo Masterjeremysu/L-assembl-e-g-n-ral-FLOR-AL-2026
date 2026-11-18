@@ -127,11 +127,18 @@ async function syncFromSupabase(isManual = false) {
         const local = appData.resolutions.find(item => item.id === r.id);
         if (local) {
           local.status = (r.statut || 'EN_ATTENTE').toUpperCase();
+          local.tantiemesPour = r.votes_pour || 0;
+          local.tantiemesContre = r.votes_contre || 0;
+          local.tantiemesAbs = r.votes_abstention || 0;
+          const details = r.votes_details || {};
+          if (details.eluNom !== undefined) local.eluNom = details.eluNom;
+          if (details.heureVote) local.heureVote = details.heureVote;
+          if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
           local.votes = {
             pour: r.votes_pour || 0,
             contre: r.votes_contre || 0,
             abstention: r.votes_abstention || 0,
-            details: r.votes_details || {}
+            details: details
           };
         }
       });
@@ -215,11 +222,18 @@ function setupSupabaseRealtime() {
         const local = appData.resolutions.find(r => r.id === row.id);
         if (local) {
           local.status = (row.statut || 'EN_ATTENTE').toUpperCase();
+          local.tantiemesPour = row.votes_pour || 0;
+          local.tantiemesContre = row.votes_contre || 0;
+          local.tantiemesAbs = row.votes_abstention || 0;
+          const details = row.votes_details || {};
+          if (details.eluNom !== undefined) local.eluNom = details.eluNom;
+          if (details.heureVote) local.heureVote = details.heureVote;
+          if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
           local.votes = {
             pour: row.votes_pour || 0,
             contre: row.votes_contre || 0,
             abstention: row.votes_abstention || 0,
-            details: row.votes_details || {}
+            details: details
           };
           
           if (typeof STORAGE_KEY !== 'undefined') {
@@ -347,10 +361,15 @@ function cloudPushData(data) {
     cloudUpdateResolution(
       activeRes.id,
       activeRes.status,
-      activeRes.votes?.pour || 0,
-      activeRes.votes?.contre || 0,
-      activeRes.votes?.abstention || 0,
-      activeRes.votes?.details || {}
+      Number(activeRes.tantiemesPour) || activeRes.votes?.pour || 0,
+      Number(activeRes.tantiemesContre) || activeRes.votes?.contre || 0,
+      Number(activeRes.tantiemesAbs) || activeRes.votes?.abstention || 0,
+      {
+        ...(activeRes.votes?.details || {}),
+        eluNom: activeRes.eluNom || '',
+        heureVote: activeRes.heureVote || '',
+        opponentsText: activeRes.opponentsText || ''
+      }
     );
   }
 }

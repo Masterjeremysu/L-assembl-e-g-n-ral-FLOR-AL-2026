@@ -268,6 +268,37 @@
       box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
     }
 
+    .elu-proclamation-card {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(217, 119, 6, 0.12) 100%);
+      border: 2px solid #f59e0b;
+      border-radius: 18px;
+      padding: 1.25rem 2rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      text-align: center;
+      box-shadow: 0 10px 28px rgba(245, 158, 11, 0.22);
+    }
+
+    .elu-proclamation-label {
+      font-size: 1.15rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #fcd34d;
+    }
+
+    .elu-proclamation-name {
+      font-size: 2.3rem;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    }
+
     /* ===================================================
        VUE SIMULATION FINANCIÈRE TRAVAUX XXL
        =================================================== */
@@ -591,6 +622,21 @@
         `;
       }
 
+      let descText = res.description || 'Texte de la délibération soumis au vote de l\'Assemblée Générale.';
+      if (res.eluNom && descText.includes('...')) {
+        descText = descText.replace('...', res.eluNom);
+      }
+
+      const eluBannerHtml = res.eluNom ? `
+        <div class="elu-proclamation-card">
+          <span style="font-size:2.4rem;">👑</span>
+          <div>
+            <div class="elu-proclamation-label">${isAdopted ? 'Élu(e) / Désigné(e) par l\'Assemblée' : 'Candidat(e) proposé(e) au vote'}</div>
+            <div class="elu-proclamation-name">${escapeHtml(res.eluNom)}</div>
+          </div>
+        </div>
+      ` : '';
+
       container.innerHTML = `
         <div class="res-meta-bar">
           <div class="res-number-badge">RÉSOLUTION N° ${escapeHtml(res.number)}</div>
@@ -599,7 +645,9 @@
 
         <h1 class="res-title">${escapeHtml(res.title)}</h1>
 
-        <div class="res-description">${formatDescription(res.description || 'Texte de la délibération soumis au vote de l\'Assemblée Générale.')}</div>
+        <div class="res-description">${formatDescription(descText)}</div>
+
+        ${eluBannerHtml}
 
         ${hasVoted ? `
           <div class="vote-gauge-section">
