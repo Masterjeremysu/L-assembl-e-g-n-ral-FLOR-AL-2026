@@ -3,7 +3,7 @@
  * Assure le chargement instantané, le mode plein écran et la résilience hors-ligne
  */
 
-const CACHE_NAME = 'floreal-ag-2026-v3';
+const CACHE_NAME = 'floreal-ag-2026-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activation : nettoyage des anciens caches
+// Activation : nettoyage des anciens caches et prise de contrôle immédiate
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -58,10 +58,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stratégie Stale-While-Revalidate pour les fichiers de l'application
+  // Stratégie Network-First avec fallback Cache pour garantir la fraîcheur du code et le fonctionnement hors-ligne
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -69,12 +69,10 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // En cas de coupure réseau complète, fallback sur le cache
-        return cachedResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => {
+        // En cas de coupure réseau ou mode hors-ligne, fallback sur le cache
+        return caches.match(event.request);
+      })
   );
 });

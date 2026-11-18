@@ -2838,6 +2838,16 @@ function copierPouvoirsResume() {
   });
 }
 
+// Export explicite sur window pour compatibilité PWA et inline handlers
+window.openExportPouvoirsModal = openExportPouvoirsModal;
+window.switchPouvoirsExportView = switchPouvoirsExportView;
+window.renderPouvoirsExportPreview = renderPouvoirsExportPreview;
+window.exportPouvoirsEclateCsv = exportPouvoirsEclateCsv;
+window.exportPouvoirsParMembreCsv = exportPouvoirsParMembreCsv;
+window.imprimerPouvoirsDoc = imprimerPouvoirsDoc;
+window.copierPouvoirsResume = copierPouvoirsResume;
+
+
 
 // ==========================================
 // SIMULATEUR TACTIQUE DE MAJORITÉ & JAUGES
