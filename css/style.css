@@ -3311,5 +3311,90 @@ body.dark-mode .signature-box {
   text-align: center;
 }
 
+/* ==========================================
+   EXPORT & IMPRESSION DES POUVOIRS (ART. 22)
+   ========================================== */
+.btn-tab-export {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid #cbd5e1;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-tab-export:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.btn-tab-export.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+body.dark-mode .btn-tab-export {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+body.dark-mode .btn-tab-export.active {
+  background: var(--primary);
+  color: white;
+}
+
+.pouvoirs-export-print-container {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+body.dark-mode .pouvoirs-export-print-container {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.export-section-card {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: #f8fafc;
+  page-break-inside: avoid;
+}
+
+body.dark-mode .export-section-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.export-fiche-vote {
+  border: 2px dashed #94a3b8;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  background: white;
+  page-break-inside: avoid;
+}
+
+body.dark-mode .export-fiche-vote {
+  background: #0f172a;
+  border-color: #475569;
+}
+
+
 
 

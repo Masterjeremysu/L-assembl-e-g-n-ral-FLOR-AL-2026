@@ -2171,6 +2171,675 @@ function pointerCoproPresent(id) {
 }
 
 // ==========================================
+// EXPORT & IMPRESSION DES POUVOIRS (ART. 22)
+// ==========================================
+
+let currentPouvoirsExportView = 'MEMBRES';
+
+function openExportPouvoirsModal(viewType = 'MEMBRES') {
+  currentPouvoirsExportView = viewType;
+  renderPouvoirsExportPreview(viewType);
+  openModal('exportPouvoirsModal');
+}
+
+function switchPouvoirsExportView(viewType) {
+  currentPouvoirsExportView = viewType;
+  renderPouvoirsExportPreview(viewType);
+}
+
+function renderPouvoirsExportPreview(viewType) {
+  syncMembersAndPouvoirs();
+
+  const printZone = document.getElementById('pouvoirsExportPrintZone');
+  const footerSummary = document.getElementById('pouvoirsExportFooterSummary');
+  if (!printZone) return;
+
+  // Mise à jour de l'état actif des boutons onglets
+  const btnMembres = document.getElementById('btnExportViewMembres');
+  const btnEclate = document.getElementById('btnExportViewEclate');
+  const btnFiches = document.getElementById('btnExportViewFiches');
+  if (btnMembres) btnMembres.className = `btn-tab-export ${viewType === 'MEMBRES' ? 'active' : ''}`;
+  if (btnEclate) btnEclate.className = `btn-tab-export ${viewType === 'ECLATE' ? 'active' : ''}`;
+  if (btnFiches) btnFiches.className = `btn-tab-export ${viewType === 'FICHES' ? 'active' : ''}`;
+
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const maxVoix10Pct = totalCopro * 0.10;
+  const copros = appData.coproprietaires || [];
+  const allPouvoirs = copros.filter(c => c.statut === 'POUVOIR');
+  const totalPouvoirsCount = allPouvoirs.length;
+  const totalPouvoirsTant = allPouvoirs.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+  const totalPouvoirsPct = totalCopro > 0 ? ((totalPouvoirsTant / totalCopro) * 100).toFixed(2) : '0';
+
+  const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE' || (m._assignedCopros && m._assignedCopros.length > 0));
+  const csPerso = activeMembers.reduce((s, m) => s + (Number(m.tantiemes) || 0), 0);
+  const csMandatsTant = activeMembers.reduce((s, m) => s + (Number(m.mandatTantiemes) || 0), 0);
+  const csTotalVoix = csPerso + csMandatsTant;
+  const csTotalPct = totalCopro > 0 ? ((csTotalVoix / totalCopro) * 100).toFixed(2) : '0';
+
+  const blancs = allPouvoirs.filter(c => c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')));
+  const blancsCount = blancs.length;
+  const blancsTant = blancs.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+
+  const externes = allPouvoirs.filter(c => c.mandataireMemberId === 'AUTRE' || (!c.mandataireMemberId && c.mandataire && !c.mandataire.toUpperCase().includes('BLANC') && !findMemberByName(c.mandataire)));
+  const externesCount = externes.length;
+  const externesTant = externes.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  if (footerSummary) {
+    footerSummary.innerHTML = `<strong>Total Pouvoirs :</strong> ${totalPouvoirsCount} (${totalPouvoirsTant} tantièmes, ${totalPouvoirsPct}%) • <strong>Force CS :</strong> ${csTotalVoix} tantièmes (${csTotalPct}%) • <strong>Plafond Art. 22 (10%) :</strong> ${Math.floor(maxVoix10Pct)} tant.`;
+  }
+
+  let html = '';
+
+  if (viewType === 'MEMBRES') {
+    // VUE 1 : PAR MEMBRE DU CONSEIL SYNDICAL
+    html += `
+      <div style="border-bottom:2px solid #0f172a; padding-bottom:0.75rem; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#2563eb;">CONSEIL SYNDICAL • RÉSIDENCE LE FLORÉAL</div>
+          <h2 style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:4px 0 2px;">RÉPARTITION DES POUVOIRS PAR MEMBRE DU CS</h2>
+          <div style="font-size:0.82rem; color:#64748b;">Contrôle de conformité légale (Art. 22 Loi du 10 juillet 1965) • AG 2026</div>
+        </div>
+        <div style="text-align:right; font-size:0.78rem; color:#64748b;">
+          <div>Édité le <strong>${dateStr} à ${timeStr}</strong></div>
+          <div>Base légale copropriété : <strong>${totalCopro} tantièmes</strong></div>
+        </div>
+      </div>
+
+      <!-- Synthèse 4 indicateurs -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.75rem; margin-bottom:1.5rem;">
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#64748b;">Pouvoirs Totaux</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#0f172a;">${totalPouvoirsCount} mandats</div>
+          <div style="font-size:0.75rem; color:#64748b;">${totalPouvoirsTant} tantièmes (${totalPouvoirsPct}%)</div>
+        </div>
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#1d4ed8;">Mandats Reçus par le CS</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#1d4ed8;">${activeMembers.reduce((s, m) => s + (m._nbMandats || 0), 0)} mandats</div>
+          <div style="font-size:0.75rem; color:#2563eb;">+${csMandatsTant} tantièmes</div>
+        </div>
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#15803d;">Force Totale du CS</div>
+          <div style="font-size:1.25rem; font-weight:800; color:#15803d;">${csTotalVoix} tantièmes</div>
+          <div style="font-size:0.75rem; color:#16a34a;"><strong>${csTotalPct}%</strong> des voix de l'AG</div>
+        </div>
+        <div style="background:${blancsCount > 0 ? '#fffbeb' : '#f8fafc'}; border:1px solid ${blancsCount > 0 ? '#fde68a' : '#cbd5e1'}; border-radius:6px; padding:0.75rem; text-align:center;">
+          <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:${blancsCount > 0 ? '#b45309' : '#64748b'};">Pouvoirs en Blanc</div>
+          <div style="font-size:1.25rem; font-weight:800; color:${blancsCount > 0 ? '#b45309' : '#0f172a'};">${blancsCount}</div>
+          <div style="font-size:0.75rem; color:${blancsCount > 0 ? '#d97706' : '#64748b'};">${blancsCount > 0 ? `${blancsTant} t. à attribuer` : 'Aucun en attente'}</div>
+        </div>
+      </div>
+    `;
+
+    // Cartes des membres CS
+    if (activeMembers.length === 0) {
+      html += `<div style="text-align:center; padding:2rem; color:#64748b;">Aucun membre du Conseil Syndical configuré.</div>`;
+    } else {
+      activeMembers.forEach(m => {
+        const assigned = m._assignedCopros || [];
+        const perso = Number(m.tantiemes) || 0;
+        const mand = Number(m.mandatTantiemes) || 0;
+        const tot = perso + mand;
+        const pct = totalCopro > 0 ? ((tot / totalCopro) * 100).toFixed(2) : '0';
+        const isSafe = m._isLegalSafe !== false;
+        const isDem = m.statut === 'DEMISSIONNAIRE';
+
+        html += `
+          <div class="export-section-card" style="border:1px solid ${isSafe ? '#cbd5e1' : '#fca5a5'}; background:${isSafe ? '#ffffff' : '#fff5f5'};">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.6rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.4rem;">
+              <div>
+                <strong style="font-size:1.02rem; color:#0f172a;">${escapeHtml(m.name)}</strong>
+                <span style="font-size:0.78rem; color:#64748b; margin-left:0.4rem;">${escapeHtml(m.lots || (isDem ? 'Démissionnaire' : 'Conseil Syndical'))}</span>
+              </div>
+              <div>
+                ${isDem ?
+                  `<span style="background:#fee2e2; color:#b91c1c; padding:2px 7px; border-radius:4px; font-weight:700; font-size:0.75rem;">🚪 Démissionnaire</span>` :
+                  (isSafe ?
+                    `<span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:2px 7px; border-radius:4px; font-weight:700; font-size:0.75rem;">🟢 Conforme Art. 22 (${assigned.length}/3 mandats ou &lt;10%)</span>` :
+                    `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:2px 7px; border-radius:4px; font-weight:700; font-size:0.75rem;">⚠️ DÉPASSEMENT ART. 22 (>3 mandats ET >10%)</span>`
+                  )
+                }
+              </div>
+            </div>
+
+            <!-- Chiffres clés du membre -->
+            <div style="display:flex; gap:1.25rem; font-size:0.84rem; margin-bottom:0.6rem; flex-wrap:wrap; background:#f8fafc; padding:0.45rem 0.75rem; border-radius:6px;">
+              <div>Voix personnelles : <strong>${perso}</strong> tant.</div>
+              <div>Mandats reçus (${assigned.length}) : <strong style="color:#2563eb;">+${mand}</strong> tant.</div>
+              <div>Total en séance : <strong style="color:#0f172a; font-size:0.92rem;">${tot}</strong> tantièmes (<strong>${pct}%</strong> de l'AG)</div>
+            </div>
+
+            <!-- Liste détaillée des mandats reçus -->
+            ${assigned.length === 0 ?
+              `<div style="font-size:0.78rem; color:#64748b; font-style:italic; padding:0.3rem 0;">Aucun mandat attribué (Ce membre est disponible pour recevoir des pouvoirs).</div>` :
+              `
+              <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.82rem;">
+                <thead>
+                  <tr style="background:#f1f5f9; text-align:left;">
+                    <th style="padding:4px 8px; border:1px solid #cbd5e1;">Mandant (Copropriétaire)</th>
+                    <th style="padding:4px 8px; border:1px solid #cbd5e1;">Lot(s)</th>
+                    <th style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right;">Tantièmes</th>
+                    <th style="padding:4px 8px; border:1px solid #cbd5e1;">Consignes / Remarques</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${assigned.map(cp => `
+                    <tr>
+                      <td style="padding:4px 8px; border:1px solid #cbd5e1; font-weight:600;">${escapeHtml(cp.nom)}</td>
+                      <td style="padding:4px 8px; border:1px solid #cbd5e1;">${escapeHtml(cp.lots || '-')}</td>
+                      <td style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right; font-weight:700; color:#2563eb;">${cp.tantiemes || 0}</td>
+                      <td style="padding:4px 8px; border:1px solid #cbd5e1; color:#475569;">${escapeHtml(cp.consignes || cp.notes || 'Pouvoir général')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+                <tfoot>
+                  <tr style="background:#f8fafc; font-weight:700;">
+                    <td colspan="2" style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right;">Sous-total mandats reçus :</td>
+                    <td style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right; color:#2563eb;">${mand}</td>
+                    <td style="padding:4px 8px; border:1px solid #cbd5e1;"></td>
+                  </tr>
+                </tfoot>
+              </table>
+              `
+            }
+          </div>
+        `;
+      });
+    }
+
+    // Bloc Pouvoirs en blanc si présents
+    if (blancsCount > 0) {
+      html += `
+        <div class="export-section-card" style="border:1px solid #fde68a; background:#fffdf5;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <strong style="color:#b45309; font-size:0.95rem;">⚠️ POUVOIRS EN BLANC EN ATTENTE (${blancsCount} pouvoir(s), ${blancsTant} tantièmes)</strong>
+            <span style="font-size:0.75rem; background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:700;">À répartir avant le début du 1er vote</span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+            <thead>
+              <tr style="background:#fef3c7; text-align:left;">
+                <th style="padding:4px 8px; border:1px solid #fcd34d;">Mandant</th>
+                <th style="padding:4px 8px; border:1px solid #fcd34d;">Lot(s)</th>
+                <th style="padding:4px 8px; border:1px solid #fcd34d; text-align:right;">Tantièmes</th>
+                <th style="padding:4px 8px; border:1px solid #fcd34d;">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${blancs.map(b => `
+                <tr>
+                  <td style="padding:4px 8px; border:1px solid #fcd34d; font-weight:600;">${escapeHtml(b.nom)}</td>
+                  <td style="padding:4px 8px; border:1px solid #fcd34d;">${escapeHtml(b.lots || '-')}</td>
+                  <td style="padding:4px 8px; border:1px solid #fcd34d; text-align:right; font-weight:700; color:#b45309;">${b.tantiemes || 0}</td>
+                  <td style="padding:4px 8px; border:1px solid #fcd34d; color:#78350f;">${escapeHtml(b.consignes || b.notes || 'Pouvoir en blanc sans nom')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Bloc Mandataires extérieurs si présents
+    if (externesCount > 0) {
+      html += `
+        <div class="export-section-card" style="border:1px solid #cbd5e1; background:#f8fafc;">
+          <div style="margin-bottom:0.6rem;">
+            <strong style="color:#475569; font-size:0.95rem;">👥 MANDATAIRES EXTÉRIEURS AU CONSEIL SYNDICAL (${externesCount} pouvoir(s), ${externesTant} tantièmes)</strong>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+            <thead>
+              <tr style="background:#e2e8f0; text-align:left;">
+                <th style="padding:4px 8px; border:1px solid #cbd5e1;">Mandant</th>
+                <th style="padding:4px 8px; border:1px solid #cbd5e1;">Lot(s)</th>
+                <th style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right;">Tantièmes</th>
+                <th style="padding:4px 8px; border:1px solid #cbd5e1;">Mandataire Désigné</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${externes.map(ex => `
+                <tr>
+                  <td style="padding:4px 8px; border:1px solid #cbd5e1; font-weight:600;">${escapeHtml(ex.nom)}</td>
+                  <td style="padding:4px 8px; border:1px solid #cbd5e1;">${escapeHtml(ex.lots || '-')}</td>
+                  <td style="padding:4px 8px; border:1px solid #cbd5e1; text-align:right; font-weight:700;">${ex.tantiemes || 0}</td>
+                  <td style="padding:4px 8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(ex.mandataire || 'Inconnu')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Signatures
+    html += `
+      <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid #cbd5e1; display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; page-break-inside:avoid;">
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Le Président du CS</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Le Secrétaire de séance</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Les Scrutateurs CS</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+      </div>
+    `;
+
+  } else if (viewType === 'ECLATE') {
+    // VUE 2 : VUE ÉCLATÉE COMPLÈTE
+    html += `
+      <div style="border-bottom:2px solid #0f172a; padding-bottom:0.75rem; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#2563eb;">CONSEIL SYNDICAL • RÉSIDENCE LE FLORÉAL</div>
+          <h2 style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:4px 0 2px;">REGISTRE EXHAUSTIF DES POUVOIRS (VUE ÉCLATÉE)</h2>
+          <div style="font-size:0.82rem; color:#64748b;">Liste complète ligne par ligne des copropriétaires représentés • AG 2026</div>
+        </div>
+        <div style="text-align:right; font-size:0.78rem; color:#64748b;">
+          <div>Édité le <strong>${dateStr} à ${timeStr}</strong></div>
+          <div>Total enregistrés : <strong>${totalPouvoirsCount} mandats (${totalPouvoirsTant} tantièmes)</strong></div>
+        </div>
+      </div>
+
+      <!-- Synthèse rapide -->
+      <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.75rem 1rem; margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; font-size:0.84rem;">
+        <div><strong>Total Pouvoirs :</strong> ${totalPouvoirsCount} mandats (${totalPouvoirsTant} tant., ${totalPouvoirsPct}%)</div>
+        <div><strong>Détenus par le CS :</strong> ${activeMembers.reduce((s, m) => s + (m._nbMandats || 0), 0)} mandats (${csMandatsTant} tant.)</div>
+        <div><strong>En blanc :</strong> ${blancsCount} (${blancsTant} tant.)</div>
+        <div><strong>Externes :</strong> ${externesCount} (${externesTant} tant.)</div>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+        <thead>
+          <tr style="background:#f1f5f9; text-align:left;">
+            <th style="padding:6px 8px; border:1px solid #cbd5e1; width:35px; text-align:center;">N°</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1;">Mandant (Copropriétaire)</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1;">Lot(s)</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1; text-align:right;">Tantièmes</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1;">Mandataire Désigné</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1;">Consignes de vote</th>
+            <th style="padding:6px 8px; border:1px solid #cbd5e1;">Statut Art. 22</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allPouvoirs.length === 0 ?
+            `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#64748b;">Aucun pouvoir enregistré pour le moment.</td></tr>` :
+            allPouvoirs.map((c, idx) => {
+              const isBlanc = c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC'));
+              const isCs = c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE';
+              
+              let mandataireLabel = '';
+              let legalBadge = '';
+
+              if (isBlanc) {
+                mandataireLabel = `<span style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:700;">⚠️ Pouvoir en blanc</span>`;
+                legalBadge = `<span style="color:#b45309; font-weight:600; font-size:0.75rem;">À répartir en séance</span>`;
+              } else if (isCs) {
+                const m = appData.members.find(mem => mem.id === c.mandataireMemberId) || findMemberByName(c.mandataire);
+                mandataireLabel = `<span style="background:#eff6ff; color:#1d4ed8; padding:2px 6px; border-radius:4px; font-weight:700;">👥 CS : ${escapeHtml(m ? m.name : c.mandataire)}</span>`;
+                if (m && m._isLegalSafe === false) {
+                  legalBadge = `<span style="color:#b91c1c; font-weight:700; font-size:0.75rem;">⚠️ Dépassement Art. 22</span>`;
+                } else {
+                  legalBadge = `<span style="color:#15803d; font-weight:700; font-size:0.75rem;">🟢 Conforme Art. 22</span>`;
+                }
+              } else {
+                mandataireLabel = `<span style="background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">Extérieur : ${escapeHtml(c.mandataire || 'Inconnu')}</span>`;
+                legalBadge = `<span style="color:#64748b; font-size:0.75rem;">Mandataire tiers</span>`;
+              }
+
+              return `
+                <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : ''}">
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1; text-align:center; color:#64748b; font-weight:600;">${idx + 1}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1; font-weight:700; color:#0f172a;">${escapeHtml(c.nom)}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1;">${escapeHtml(c.lots || '-')}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1; text-align:right; font-weight:700; color:#2563eb;">${c.tantiemes || 0}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1;">${mandataireLabel}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#475569;">${escapeHtml(c.consignes || c.notes || 'Pouvoir général')}</td>
+                  <td style="padding:6px 8px; border:1px solid #cbd5e1;">${legalBadge}</td>
+                </tr>
+              `;
+            }).join('')
+          }
+        </tbody>
+        <tfoot>
+          <tr style="background:#f1f5f9; font-weight:800; font-size:0.85rem;">
+            <td colspan="3" style="padding:8px; border:1px solid #cbd5e1; text-align:right;">TOTAL GÉNÉRAL POUVOIRS :</td>
+            <td style="padding:8px; border:1px solid #cbd5e1; text-align:right; color:#2563eb;">${totalPouvoirsTant}</td>
+            <td colspan="3" style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;">${totalPouvoirsCount} pouvoir(s) enregistré(s) (${totalPouvoirsPct}% du syndicat)</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Signatures -->
+      <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid #cbd5e1; display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; page-break-inside:avoid;">
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Le Président de séance</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Le Secrétaire de séance</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+        <div style="border:1px solid #cbd5e1; border-radius:4px; padding:0.75rem; min-height:80px; background:#f8fafc; font-size:0.78rem;">
+          <strong>Les Scrutateurs CS</strong>
+          <div style="margin-top:2.5rem; color:#94a3b8; font-style:italic;">Signature</div>
+        </div>
+      </div>
+    `;
+
+  } else if (viewType === 'FICHES') {
+    // VUE 3 : FICHES DE VOTE INDIVIDUELLES
+    html += `
+      <div style="border-bottom:2px solid #0f172a; padding-bottom:0.75rem; margin-bottom:1.25rem;">
+        <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#2563eb;">CONSEIL SYNDICAL • RÉSIDENCE LE FLORÉAL</div>
+        <h2 style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:4px 0 2px;">FICHES DE VOTE INDIVIDUELLES DU CONSEIL SYNDICAL</h2>
+        <div style="font-size:0.82rem; color:#64748b;">Feuilles de mandats nominatives à remettre à chaque membre du CS en séance pour les votes • AG 2026</div>
+      </div>
+    `;
+
+    if (activeMembers.length === 0) {
+      html += `<div style="text-align:center; padding:2rem; color:#64748b;">Aucun membre du Conseil Syndical configuré.</div>`;
+    } else {
+      activeMembers.forEach(m => {
+        const assigned = m._assignedCopros || [];
+        const perso = Number(m.tantiemes) || 0;
+        const mand = Number(m.mandatTantiemes) || 0;
+        const tot = perso + mand;
+        const pct = totalCopro > 0 ? ((tot / totalCopro) * 100).toFixed(2) : '0';
+        const isSafe = m._isLegalSafe !== false;
+
+        html += `
+          <div class="export-fiche-vote">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; border-bottom:1.5px dashed #cbd5e1; padding-bottom:0.6rem;">
+              <div>
+                <div style="font-size:0.72rem; text-transform:uppercase; font-weight:800; color:#2563eb; letter-spacing:0.04em;">🏢 FEUILLE DE VOTE OFFICIELLE — AG 2026</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:2px;">MANDATAIRE : ${escapeHtml(m.name)}</div>
+                <div style="font-size:0.78rem; color:#64748b;">${escapeHtml(m.lots || 'Conseil Syndical')}</div>
+              </div>
+              <div style="text-align:right;">
+                ${isSafe ?
+                  `<span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.75rem;">🟢 Conforme Art. 22</span>` :
+                  `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.75rem;">⚠️ Dépassement Art. 22</span>`
+                }
+                <div style="font-size:0.72rem; color:#64748b; margin-top:3px;">${assigned.length}/3 mandats max</div>
+              </div>
+            </div>
+
+            <!-- Grand bandeau des voix à exprimer -->
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.75rem; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.75rem; text-align:center; margin-bottom:0.9rem;">
+              <div>
+                <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#64748b;">Voix Personnelles</div>
+                <div style="font-size:1.2rem; font-weight:800; color:#0f172a;">${perso} tant.</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#2563eb;">Mandats Reçus (${assigned.length})</div>
+                <div style="font-size:1.2rem; font-weight:800; color:#2563eb;">+${mand} tant.</div>
+              </div>
+              <div style="background:#eff6ff; border-radius:4px; padding:4px 0;">
+                <div style="font-size:0.72rem; text-transform:uppercase; font-weight:800; color:#1d4ed8;">TOTAL VOIX À ANNONCER</div>
+                <div style="font-size:1.35rem; font-weight:900; color:#1d4ed8;">${tot} tantièmes</div>
+                <div style="font-size:0.72rem; color:#2563eb;">(${pct}% de l'AG)</div>
+              </div>
+            </div>
+
+            <!-- Tableau des mandats confiés -->
+            <div style="font-size:0.8rem; font-weight:700; color:#334155; margin-bottom:0.35rem;">
+              Détail des copropriétaires représentés :
+            </div>
+            ${assigned.length === 0 ?
+              `<div style="font-size:0.8rem; color:#64748b; font-style:italic; padding:0.4rem 0;">Aucun pouvoir confié à ce membre pour le moment (Vote uniquement avec ses voix personnelles : ${perso} tantièmes).</div>` :
+              `
+              <table style="width:100%; border-collapse:collapse; font-size:0.82rem; margin-bottom:0.75rem;">
+                <thead>
+                  <tr style="background:#f1f5f9; text-align:left;">
+                    <th style="padding:5px 8px; border:1px solid #cbd5e1;">Mandant (Copropriétaire)</th>
+                    <th style="padding:5px 8px; border:1px solid #cbd5e1;">Lot(s)</th>
+                    <th style="padding:5px 8px; border:1px solid #cbd5e1; text-align:right;">Tantièmes</th>
+                    <th style="padding:5px 8px; border:1px solid #cbd5e1;">Consigne de vote obligatoire</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${assigned.map(cp => `
+                    <tr>
+                      <td style="padding:5px 8px; border:1px solid #cbd5e1; font-weight:700;">${escapeHtml(cp.nom)}</td>
+                      <td style="padding:5px 8px; border:1px solid #cbd5e1;">${escapeHtml(cp.lots || '-')}</td>
+                      <td style="padding:5px 8px; border:1px solid #cbd5e1; text-align:right; font-weight:800; color:#2563eb;">${cp.tantiemes || 0}</td>
+                      <td style="padding:5px 8px; border:1px solid #cbd5e1; color:#0f172a; font-weight:600;">${escapeHtml(cp.consignes || cp.notes || 'Pouvoir général (Vote selon recommandation CS)')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              `
+            }
+
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:0.6rem; padding-top:0.6rem; border-top:1px solid #e2e8f0; font-size:0.78rem; color:#64748b;">
+              <div>Attesté conforme à l'Article 22 de la loi du 10 juillet 1965</div>
+              <div>Signature du membre en séance : _________________________</div>
+            </div>
+          </div>
+        `;
+      });
+    }
+  }
+
+  printZone.innerHTML = html;
+}
+
+function exportPouvoirsEclateCsv() {
+  syncMembersAndPouvoirs();
+  const copros = (appData.coproprietaires || []).filter(c => c.statut === 'POUVOIR');
+  let csv = "Mandant;Lots;Tantiemes;Mandataire_Nom;Mandataire_Type;Consignes_Vote;Statut_Legal_Art22\n";
+
+  copros.forEach(c => {
+    const mandant = `"${(c.nom || '').replace(/"/g, '""')}"`;
+    const lots = `"${(c.lots || '').replace(/"/g, '""')}"`;
+    const tant = c.tantiemes || 0;
+    const isBlanc = c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC'));
+    const isCs = c.mandataireMemberId && c.mandataireMemberId !== 'BLANC' && c.mandataireMemberId !== 'AUTRE';
+    
+    let mandataireNom = c.mandataire || 'Inconnu';
+    let typeMandataire = 'EXTERNE';
+    let statutLegal = 'Conforme';
+
+    if (isBlanc) {
+      mandataireNom = 'POUVOIR EN BLANC (À ATTRIBUER)';
+      typeMandataire = 'BLANC';
+      statutLegal = 'À répartir';
+    } else if (isCs) {
+      typeMandataire = 'CONSEIL_SYNDICAL';
+      const m = (appData.members || []).find(mem => mem.id === c.mandataireMemberId) || findMemberByName(c.mandataire);
+      if (m) {
+        mandataireNom = m.name;
+        statutLegal = m._isLegalSafe ? 'Conforme Art. 22' : 'Dépassement Art. 22';
+      }
+    }
+
+    const mandataire = `"${mandataireNom.replace(/"/g, '""')}"`;
+    const typeStr = `"${typeMandataire}"`;
+    const consignes = `"${(c.consignes || c.notes || 'Pouvoir général').replace(/"/g, '""')}"`;
+    const legal = `"${statutLegal}"`;
+
+    csv += `${mandant};${lots};${tant};${mandataire};${typeStr};${consignes};${legal}\n`;
+  });
+
+  const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Pouvoirs_Vue_Eclatee_AG_2026.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("📊 Export CSV (Vue éclatée des pouvoirs) téléchargé !", "success");
+}
+
+function exportPouvoirsParMembreCsv() {
+  syncMembersAndPouvoirs();
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE' || (m._assignedCopros && m._assignedCopros.length > 0));
+  
+  let csv = "Membre_CS;Role_Lots;Tantiemes_Perso;Nb_Mandats;Tantiemes_Mandats;Total_Voix_En_AG;Pourcentage_Syndicat;Conformite_Art22;Mandants_Detailles\n";
+
+  activeMembers.forEach(m => {
+    const nom = `"${(m.name || '').replace(/"/g, '""')}"`;
+    const roleLots = `"${(m.lots || (m.statut === 'DEMISSIONNAIRE' ? 'Démissionnaire' : 'Conseil Syndical')).replace(/"/g, '""')}"`;
+    const perso = Number(m.tantiemes) || 0;
+    const nbMandats = m._nbMandats || 0;
+    const tantMandats = Number(m.mandatTantiemes) || 0;
+    const totVoix = perso + tantMandats;
+    const pct = totalCopro > 0 ? ((totVoix / totalCopro) * 100).toFixed(2) + '%' : '0%';
+    const conformite = `"${m._isLegalSafe ? 'CONFORME' : 'DEPASSEMENT_ART_22'}"`;
+    
+    const assigned = m._assignedCopros || [];
+    const detailsStr = assigned.map(c => `${c.nom} (${c.tantiemes} tant.${c.consignes ? ' - ' + c.consignes : ''})`).join(' | ');
+    const details = `"${detailsStr.replace(/"/g, '""')}"`;
+
+    csv += `${nom};${roleLots};${perso};${nbMandats};${tantMandats};${totVoix};${pct};${conformite};${details}\n`;
+  });
+
+  const allPouvoirs = (appData.coproprietaires || []).filter(c => c.statut === 'POUVOIR');
+  const blancs = allPouvoirs.filter(c => c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')));
+  if (blancs.length > 0) {
+    const tantBlancs = blancs.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+    const detailsBlancs = `"${blancs.map(c => `${c.nom} (${c.tantiemes} tant.)`).join(' | ').replace(/"/g, '""')}"`;
+    const pctBlancs = totalCopro > 0 ? ((tantBlancs / totalCopro) * 100).toFixed(2) + '%' : '0%';
+    csv += `"POUVOIRS EN BLANC";"À attribuer";0;${blancs.length};${tantBlancs};${tantBlancs};${pctBlancs};"NON_ATTRIBUE";${detailsBlancs}\n`;
+  }
+
+  const externes = allPouvoirs.filter(c => c.mandataireMemberId === 'AUTRE' || (!c.mandataireMemberId && c.mandataire && !c.mandataire.toUpperCase().includes('BLANC') && !findMemberByName(c.mandataire)));
+  if (externes.length > 0) {
+    const tantExt = externes.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+    const detailsExt = `"${externes.map(c => `${c.nom} -> ${c.mandataire} (${c.tantiemes} tant.)`).join(' | ').replace(/"/g, '""')}"`;
+    const pctExt = totalCopro > 0 ? ((tantExt / totalCopro) * 100).toFixed(2) + '%' : '0%';
+    csv += `"MANDATAIRES EXTERNES";"Hors CS";0;${externes.length};${tantExt};${tantExt};${pctExt};"EXTERNE";${detailsExt}\n`;
+  }
+
+  const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Pouvoirs_Par_Membre_CS_AG_2026.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("👥 Export CSV (Synthèse par membre CS) téléchargé !", "success");
+}
+
+function imprimerPouvoirsDoc() {
+  const container = document.getElementById('pouvoirsExportPrintZone');
+  if (!container) return;
+  const content = container.innerHTML;
+
+  let docTitle = "Pouvoirs et Mandats - AG 2026 Le Floréal";
+  if (currentPouvoirsExportView === 'MEMBRES') docTitle = "Répartition des Pouvoirs par Membre CS - AG 2026";
+  if (currentPouvoirsExportView === 'ECLATE') docTitle = "Registre Exhaustif des Pouvoirs - AG 2026";
+  if (currentPouvoirsExportView === 'FICHES') docTitle = "Feuilles de Mandats Individuelles CS - AG 2026";
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <title>${docTitle}</title>
+      <style>
+        body {
+          font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          padding: 20px;
+          color: #0f172a;
+          line-height: 1.4;
+          font-size: 10pt;
+          background: white;
+        }
+        h2, h3, h4 { margin-top: 0; color: #0f172a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px; font-size: 9pt; }
+        th, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; }
+        th { background: #f1f5f9; font-weight: 700; color: #334155; }
+        .export-section-card { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-bottom: 14px; background: white; page-break-inside: avoid; }
+        .export-fiche-vote { border: 2px dashed #64748b; border-radius: 8px; padding: 14px; margin-bottom: 16px; background: white; page-break-inside: avoid; }
+        @media print {
+          body { padding: 0; }
+          .no-print { display: none !important; }
+        }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function copierPouvoirsResume() {
+  syncMembersAndPouvoirs();
+  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const copros = (appData.coproprietaires || []).filter(c => c.statut === 'POUVOIR');
+  const totalPouvoirsCount = copros.length;
+  const totalPouvoirsTant = copros.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+  const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
+  const csPerso = activeMembers.reduce((sum, m) => sum + (Number(m.tantiemes) || 0), 0);
+  const csMandats = activeMembers.reduce((sum, m) => sum + (Number(m.mandatTantiemes) || 0), 0);
+  const csTotal = csPerso + csMandats;
+  const csPct = totalCopro > 0 ? ((csTotal / totalCopro) * 100).toFixed(1) : '0';
+
+  let txt = `🏢 RÉPARTITION DES POUVOIRS - AG LE FLORÉAL 2026\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `📊 TOTAL POUVOIRS : ${totalPouvoirsCount} mandats (${totalPouvoirsTant} tantièmes)\n`;
+  txt += `👥 FORCE DE VOTE CS : ${csTotal} tantièmes (${csPct}% de la copropriété)\n`;
+  txt += `   (Voix perso : ${csPerso} | Mandats reçus : ${csMandats})\n\n`;
+  txt += `📋 RÉPARTITION PAR MEMBRE DU CONSEIL SYNDICAL :\n`;
+
+  activeMembers.forEach(m => {
+    const assigned = m._assignedCopros || [];
+    const perso = Number(m.tantiemes) || 0;
+    const mand = Number(m.mandatTantiemes) || 0;
+    const tot = perso + mand;
+    const legal = m._isLegalSafe ? '🟢 Conforme Art. 22' : '⚠️ Alerte Dépassement';
+
+    txt += `\n• ${m.name} : ${tot} voix (${perso} perso + ${mand} mandats) - ${legal}\n`;
+    if (assigned.length === 0) {
+      txt += `  └─ Aucun pouvoir attribué (Disponible pour recevoir des mandats)\n`;
+    } else {
+      assigned.forEach(c => {
+        txt += `  └─ ${c.nom} (${c.tantiemes} tant.)${c.consignes ? ' [Consigne : ' + c.consignes + ']' : ''}\n`;
+      });
+    }
+  });
+
+  const blancs = copros.filter(c => c.mandataireMemberId === 'BLANC' || (c.mandataire && c.mandataire.toUpperCase().includes('BLANC')));
+  if (blancs.length > 0) {
+    const tantBlancs = blancs.reduce((s, c) => s + (Number(c.tantiemes) || 0), 0);
+    txt += `\n⚠️ POUVOIRS EN BLANC EN ATTENTE (${blancs.length} pouvoir(s), ${tantBlancs} tantièmes) :\n`;
+    blancs.forEach(c => {
+      txt += `  • ${c.nom} (${c.tantiemes} tant.)\n`;
+    });
+  }
+
+  txt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `Document officiel Conseil Syndical - Art. 22 Loi du 10/07/1965\n`;
+
+  navigator.clipboard.writeText(txt).then(() => {
+    showToast("📋 Synthèse des pouvoirs copiée dans le presse-papier !", "success");
+  }).catch(() => {
+    showToast("Impossible de copier automatiquement dans le presse-papier.", "error");
+  });
+}
+
+
+// ==========================================
 // SIMULATEUR TACTIQUE DE MAJORITÉ & JAUGES
 // ==========================================
 
@@ -3306,7 +3975,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     closeHeaderDropdowns();
-    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal'].forEach(id => closeModal(id));
+    ['scrutinModal', 'ouvertureModal', 'reserveModal', 'shortcutsModal', 'spotlightModal', 'coproModal', 'pouvoirModal', 'transfertModal', 'resolutionModal', 'pvMiroirModal', 'mouvementSeanceModal', 'exportModal', 'clotureModal', 'flashInfoModal', 'exportPouvoirsModal'].forEach(id => closeModal(id));
     return;
   }
 

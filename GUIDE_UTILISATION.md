@@ -77,6 +77,17 @@ L'application intègre un **module complet d'administration des pouvoirs** confo
    - Bouton **`🔄 Transférer`** sur chaque mandat pour réassigner un pouvoir d'un membre à un autre en 1 clic en cas d'absence ou pour rééquilibrer les voix.
    - Bouton **`✨ Répartir automatiquement les pouvoirs en blanc`** pour distribuer équitablement les pouvoirs reçus sans nom sur les membres disponibles.
 
+5. **📑 Export & Feuilles de Mandats pour les Membres du CS :**
+   - Cliquez sur le bouton bleu **`📑 Exporter / Imprimer les Pouvoirs`** (ou via le menu *Communication & Export* en haut) :
+     - **👥 Vue par Membre du CS ("Par perso")** : Récapitulatif individuel de chaque membre CS (tantièmes personnels, mandats reçus avec détail des mandants, total cumulé de voix à annoncer en séance, % de l'AG et conformité légale stricte Art. 22).
+     - **📋 Vue Éclatée complète** : Registre exhaustif ligne par ligne de tous les pouvoirs enregistrés avec nom du mandant, lots, tantièmes, mandataire désigné, consignes de vote et statut légal.
+     - **📇 Fiches de vote individuelles CS** : Feuilles de mandats officielles prêtes à imprimer et découper pour chaque membre du CS en entrant en séance (très pratique pour garder sous les yeux son total de voix et ses consignes de vote pendant chaque scrutin !).
+   - **Formats d'export disponibles en 1 clic :**
+     - 🖨️ **Impression PDF A4 officiel** avec mise en page professionnelle et cadres de signatures.
+     - 📊 **CSV Vue Éclatée** (compatible Excel & ERP).
+     - 📊 **CSV Synthèse par Membre CS** (idéal pour archives et PV).
+     - 📋 **Copier la synthèse** (format texte épuré prêt à coller dans WhatsApp ou par email aux membres du CS).
+
 ---
 
 ## 5. 🎯 Mode Séance Focus en direct (Spécial Smartphone & AG)
