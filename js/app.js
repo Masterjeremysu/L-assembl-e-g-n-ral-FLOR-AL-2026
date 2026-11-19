@@ -4577,6 +4577,30 @@ function projeterEcranAccueil() {
   showToast("🏛️ Écran Accueil & Quorum en direct diffusé sur le vidéoprojecteur !", "success");
 }
 
+function appliquerPresetMessageSalle(titre, corps) {
+  const t = document.getElementById('msgSalleTitreInput');
+  const c = document.getElementById('msgSalleCorpsInput');
+  if (t) t.value = titre;
+  if (c) c.value = corps;
+}
+
+function projeterMessageLibreSalle() {
+  const titre = (document.getElementById('msgSalleTitreInput')?.value || '').trim();
+  const corps = (document.getElementById('msgSalleCorpsInput')?.value || '').trim();
+  if (!titre && !corps) {
+    showToast("⚠️ Veuillez saisir un titre ou choisir un raccourci.", "warning");
+    return;
+  }
+  diffuserSurEcranPublic('MESSAGE', {
+    message: {
+      titre: titre || 'Information — Assemblée Générale',
+      corps: corps
+    }
+  });
+  closeModal('messageSalleModal');
+  showToast("💬 Message diffusé en grand sur l'Écran Salle !", "success");
+}
+
 function recalculerScrutinDirect() {
   if (typeof computeScrutinTotals === 'function') computeScrutinTotals();
   if (typeof verifierDiscordanceScrutin === 'function') verifierDiscordanceScrutin();

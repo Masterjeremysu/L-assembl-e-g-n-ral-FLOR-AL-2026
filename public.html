@@ -584,6 +584,12 @@
         return;
       }
 
+      // Mode Message Libre / Consigne / Pause
+      if (displayState && displayState.mode === 'MESSAGE') {
+        renderMessageScreen(displayState.message);
+        return;
+      }
+
       // Mode Spécifique : Simulation Financière Travaux
       if (displayState && displayState.mode === 'FINANCE') {
         renderFinanceScreen(displayState.finance, totalCopro, appData);
@@ -840,6 +846,30 @@
               </div>
             </div>
           </div>
+        </div>
+      `;
+    }
+
+    function renderMessageScreen(msg) {
+      const container = document.getElementById('projectorContentCard');
+      const titre = msg?.titre || 'Information — Assemblée Générale';
+      const corps = msg?.corps || '';
+      container.innerHTML = `
+        <div style="text-align:center; padding:3rem 2rem; max-width:980px; margin:0 auto;">
+          <div style="width:82px; height:82px; margin:0 auto 1.5rem; border-radius:20px; overflow:hidden; border:2px solid #f59e0b; box-shadow:0 10px 30px rgba(245,158,11,0.3);">
+            <img src="./assets/icon.svg" alt="Le Floréal" style="width:100%; height:100%; object-fit:cover;">
+          </div>
+          <div style="display:inline-block; background:rgba(245,158,11,0.14); border:1px solid rgba(251,191,36,0.4); color:#fde047; padding:0.35rem 1.1rem; border-radius:9999px; font-size:0.95rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:1.25rem;">
+            Annonce en Séance • Résidence Le Floréal
+          </div>
+          <h1 style="font-size:3.1rem; font-weight:900; color:#ffffff; margin:0 0 1.5rem 0; line-height:1.15; letter-spacing:-0.02em;">
+            ${escapeHtml(titre)}
+          </h1>
+          ${corps ? `
+            <div style="background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:18px; padding:2rem 2.5rem; font-size:1.75rem; color:#e2e8f0; line-height:1.5; font-weight:600;">
+              ${escapeHtml(corps)}
+            </div>
+          ` : ''}
         </div>
       `;
     }
