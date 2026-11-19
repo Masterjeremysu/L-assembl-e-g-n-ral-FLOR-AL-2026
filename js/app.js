@@ -4578,6 +4578,64 @@ function projeterEcranAccueil() {
   showToast("🏛️ Écran Accueil & Quorum en direct diffusé sur le vidéoprojecteur !", "success");
 }
 
+function openMessageSalleModal() {
+  renderCustomMessagesSalle();
+  openModal('messageSalleModal');
+}
+
+function renderCustomMessagesSalle() {
+  const wrap = document.getElementById('customMessagesSalleWrap');
+  const listEl = document.getElementById('customMessagesSalleList');
+  if (!wrap || !listEl) return;
+
+  const list = (appData.config && Array.isArray(appData.config.customMessages)) ? appData.config.customMessages : [];
+  if (list.length === 0) {
+    wrap.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  listEl.innerHTML = list.map((m, idx) => `
+    <span class="sim-preset-chip" style="display:inline-flex; align-items:center; gap:0.4rem; padding-right:0.35rem;">
+      <span onclick="appliquerPresetMessageSalle(${JSON.stringify(m.titre).replace(/"/g, '&quot;')}, ${JSON.stringify(m.corps).replace(/"/g, '&quot;')})" style="cursor:pointer;">
+        📌 ${escapeHtml(m.titre)}
+      </span>
+      <button type="button" onclick="deleteCustomMessageSalle(${idx})" title="Supprimer ce raccourci" style="background:none; border:none; color:inherit; opacity:0.65; cursor:pointer; font-size:0.85rem; padding:0 2px; line-height:1;">×</button>
+    </span>
+  `).join('');
+}
+
+function saveCustomMessageSalle() {
+  const titre = (document.getElementById('msgSalleTitreInput')?.value || '').trim();
+  const corps = (document.getElementById('msgSalleCorpsInput')?.value || '').trim();
+  if (!titre) {
+    showToast("⚠️ Donnez au moins un titre à votre message pour le mémoriser.", "warning");
+    return;
+  }
+  if (!appData.config) appData.config = {};
+  if (!Array.isArray(appData.config.customMessages)) appData.config.customMessages = [];
+
+  appData.config.customMessages.push({ titre, corps });
+  persistData();
+  if (typeof cloudSaveCustomMessages === 'function') {
+    cloudSaveCustomMessages(appData.config.customMessages);
+  }
+  renderCustomMessagesSalle();
+  showToast(`💾 Raccourci « ${titre} » mémorisé pour la séance !`, "success");
+}
+
+function deleteCustomMessageSalle(idx) {
+  if (!appData.config || !Array.isArray(appData.config.customMessages)) return;
+  appData.config.customMessages.splice(idx, 1);
+  persistData();
+  if (typeof cloudSaveCustomMessages === 'function') {
+    cloudSaveCustomMessages(appData.config.customMessages);
+  }
+  renderCustomMessagesSalle();
+  showToast("Raccourci personnalisé supprimé", "info");
+}
+
 function appliquerPresetMessageSalle(titre, corps) {
   const t = document.getElementById('msgSalleTitreInput');
   const c = document.getElementById('msgSalleCorpsInput');

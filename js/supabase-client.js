@@ -146,10 +146,16 @@ async function syncFromSupabase(isManual = false) {
       });
     }
 
-    // 4. Synchronisation des codes PIN personnalisés (memberPins)
-    if (stateData && stateData.config && stateData.config.memberPins && typeof appData !== 'undefined') {
-      appData.memberPins = { ...(appData.memberPins || {}), ...stateData.config.memberPins };
-      if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
+    // 4. Synchronisation des codes PIN personnalisés (memberPins) & messages persos
+    if (stateData && stateData.config && typeof appData !== 'undefined') {
+      if (stateData.config.memberPins) {
+        appData.memberPins = { ...(appData.memberPins || {}), ...stateData.config.memberPins };
+        if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
+      }
+      if (Array.isArray(stateData.config.customMessages)) {
+        if (!appData.config) appData.config = {};
+        appData.config.customMessages = stateData.config.customMessages;
+      }
     }
 
     // 5. Récupérer les derniers journaux d'audit partagés (ag_audit_logs)
@@ -584,6 +590,29 @@ async function cloudPushAuditLog(entry) {
   }
 }
 
+async function cloudSaveCustomMessages(customMessages) {
+  if (!supabaseClient || !isSupabaseOnline || !Array.isArray(customMessages)) return;
+  try {
+    const { data: stateRow } = await supabaseClient
+      .from('ag_state')
+      .select('config')
+      .eq('id', SUPABASE_CONFIG.stateId)
+      .maybeSingle();
+
+    const currentConfig = (stateRow && stateRow.config) ? stateRow.config : {};
+    await supabaseClient
+      .from('ag_state')
+      .update({
+        config: { ...currentConfig, customMessages: customMessages },
+        updated_at: new Date().toISOString(),
+        updated_by: typeof getCurrentUser === 'function' ? getCurrentUser().name : 'CS Régie'
+      })
+      .eq('id', SUPABASE_CONFIG.stateId);
+  } catch (e) {
+    console.warn('Erreur synchro customMessages Supabase :', e);
+  }
+}
+
 // Export global pour compatibilité
 window.initSupabase = initSupabase;
 window.syncFromSupabase = syncFromSupabase;
@@ -592,6 +621,7 @@ window.cloudUpdateResolution = cloudUpdateResolution;
 window.cloudUpdateDisplayState = cloudUpdateDisplayState;
 window.cloudPushAllCoprosToSupabase = cloudPushAllCoprosToSupabase;
 window.cloudSaveMemberPins = cloudSaveMemberPins;
+window.cloudSaveCustomMessages = cloudSaveCustomMessages;
 window.cloudPushAuditLog = cloudPushAuditLog;
 window.cloudPushData = cloudPushData;
 window.forceSyncFromCloud = forceSyncFromCloud;
