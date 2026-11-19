@@ -3275,6 +3275,7 @@ function diffuserSurEcranPublic(mode = 'RESOLUTION', extraData = {}) {
     mode: mode,
     activeResId: activeSeanceResId || (appData.resolutions && appData.resolutions[0]?.id),
     finance: extraData.finance || null,
+    message: extraData.message || null,
     timestamp: Date.now()
   };
 
