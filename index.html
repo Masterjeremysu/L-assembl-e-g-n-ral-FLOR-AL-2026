@@ -14,7 +14,7 @@
   <title>Suivi AG & Votes - RÉSIDENCE LE FLORÉAL 2026</title>
   <link rel="stylesheet" href="css/style.css?v=4.0">
   <link rel="stylesheet" href="css/auth.css?v=4.0">
-  <link rel="stylesheet" href="css/app-ui.css?v=6.0">
+  <link rel="stylesheet" href="css/app-ui.css?v=7.0">
   <!-- Firebase SDK Compat (Temps réel Cloud sécurisé) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -1637,146 +1637,125 @@ M. LEROY Jacques	Lot 8	85"></textarea>
     </div>
   </div>
 
-  <!-- MODAL SUPER SIMULATEUR FINANCIER & QUOTE-PART LE FLORÉAL -->
+  <!-- MODAL SUPER SIMULATEUR FINANCIER & QUOTE-PART LE FLORÉAL (DESIGN FINTECH PRO 2026) -->
   <div class="modal-overlay" id="simulateurFinancierModal">
-    <div class="modal-box" style="max-width: 960px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="modal-header" style="flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-          <h3 class="modal-title" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
-            <span>💰</span>
-            <span>Simulateur Financier & Quote-Part Travaux (Résidence Le Floréal)</span>
-          </h3>
-          <div style="font-size:0.78rem; color:var(--gray-500); margin-top:3px;">
-            Calcul certifié proportionnel aux 97 478 tantièmes (T4, T5, Garages, Parkings)
+    <div class="modal-box sim-pro-modal">
+      <div class="sim-pro-header">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div class="sim-pro-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
+          </div>
+          <div>
+            <h3 class="sim-pro-title">Simulateur Quote-Part Travaux</h3>
+            <div class="sim-pro-sub">Résidence Le Floréal • Charges générales (Base officielle 97 478 tantièmes)</div>
           </div>
         </div>
-        <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap: wrap;">
-          <button class="btn btn-sm btn-header-gold" onclick="projeterSimulationFinanciere()" title="Projeter ce tableau financier en grand sur le rétroprojecteur pour la salle">
-            📽️ Projeter sur Rétroprojecteur
-          </button>
-          <button class="modal-close" onclick="closeModal('simulateurFinancierModal')">&times;</button>
-        </div>
+        <button type="button" class="sim-pro-close" onclick="closeModal('simulateurFinancierModal')" title="Fermer">&times;</button>
       </div>
 
-      <div class="modal-body" style="padding: 1.25rem; overflow-y: auto; flex: 1; display:flex; flex-direction:column; gap:1.25rem;">
-        <!-- Barre de saisie des paramètres financiers -->
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:1.2rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; align-items:flex-end;">
-          <div>
-            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
-              💶 Budget global des travaux (€ TTC) :
-            </label>
-            <input type="number" id="simModalBudgetInput" class="form-control" style="font-size:1.1rem; font-weight:800; color:#1e40af;" placeholder="Ex: 85000" oninput="calculerQuotePartTravauxModal()">
-            <div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">
-              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(25000)">25 k€</button>
-              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(50000)">50 k€</button>
-              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(85000)">85 k€</button>
-              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(120000)">120 k€</button>
-              <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.72rem; padding:2px 6px;" onclick="setBudgetPreset(180000)">180 k€</button>
+      <div class="sim-pro-body">
+        <!-- 1. Paramètres financiers -->
+        <div class="sim-pro-panel sim-params-grid">
+          <div class="sim-field">
+            <label for="simModalBudgetInput">Budget global des travaux (€ TTC)</label>
+            <input type="number" id="simModalBudgetInput" class="sim-input sim-input-lg" placeholder="Ex: 85000" oninput="calculerQuotePartTravauxModal()">
+            <div class="sim-presets">
+              <button type="button" class="sim-preset-chip" onclick="setBudgetPreset(25000)">25 k€</button>
+              <button type="button" class="sim-preset-chip" onclick="setBudgetPreset(50000)">50 k€</button>
+              <button type="button" class="sim-preset-chip" onclick="setBudgetPreset(85000)">85 k€</button>
+              <button type="button" class="sim-preset-chip" onclick="setBudgetPreset(120000)">120 k€</button>
+              <button type="button" class="sim-preset-chip" onclick="setBudgetPreset(180000)">180 k€</button>
             </div>
           </div>
 
-          <div>
-            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
-              🛡️ Déduction Fonds Alur / Subventions (€) :
-            </label>
-            <input type="number" id="simModalDeductionInput" class="form-control" style="font-size:1.05rem; font-weight:700; color:#059669;" placeholder="Ex: 15000" value="0" oninput="calculerQuotePartTravauxModal()">
-            <div style="font-size:0.74rem; color:#64748b; margin-top:4px;">Déduit du montant net appelé aux copropriétaires</div>
+          <div class="sim-field">
+            <label for="simModalDeductionInput">Déduction Fonds Alur / Aides (€)</label>
+            <input type="number" id="simModalDeductionInput" class="sim-input sim-input-green" placeholder="0" value="0" oninput="calculerQuotePartTravauxModal()">
+            <div class="sim-field-hint">Montant déduit avant répartition aux copropriétaires</div>
           </div>
 
-          <div>
-            <label style="font-size:0.82rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
-              📅 Échéancier des appels de fonds :
-            </label>
-            <select id="simModalEcheanceSelect" class="form-control" style="font-weight:700;" onchange="calculerQuotePartTravauxModal()">
+          <div class="sim-field">
+            <label for="simModalEcheanceSelect">Échéancier des appels de fonds</label>
+            <select id="simModalEcheanceSelect" class="sim-input" onchange="calculerQuotePartTravauxModal()">
               <option value="1">1 appel comptant</option>
               <option value="2">2 appels semestriels</option>
               <option value="4" selected>4 appels trimestriels (Recommandé)</option>
               <option value="8">8 appels (sur 2 ans)</option>
               <option value="12">12 mensualités</option>
             </select>
-            <div style="font-size:0.74rem; color:#64748b; margin-top:4px;">Rassure les résidents sur l'effort mensuel / trimestriel</div>
+            <div class="sim-field-hint">Affiche l'effort réel par appel de fonds</div>
           </div>
         </div>
 
-        <!-- Synthèse globale calculée -->
-        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.9rem 1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+        <!-- 2. Synthèse Net & Contrôle Écran Salle -->
+        <div class="sim-pro-summary-bar">
           <div>
-            <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:#1e40af;">Base officielle de calcul :</div>
-            <div style="font-size:0.95rem; color:#1e293b;">
-              Budget Net appelé : <strong id="simModalNetLabel" style="color:#1d4ed8; font-size:1.15rem;">0 €</strong> • Tantièmes généraux : <strong>97 478</strong>
+            <div class="sim-summary-kicker">Budget net appelé en charges générales</div>
+            <div class="sim-summary-values">
+              <strong id="simModalNetLabel" class="sim-net-amount">0 €</strong>
+              <span class="sim-sep">•</span>
+              <span class="sim-base-tag">Base 97 478 tantièmes</span>
             </div>
           </div>
-          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            <button class="btn btn-sm btn-primary" onclick="projeterSimulationFinanciere()">
-              📽️ Diffuser sur Rétroprojecteur
+          <div class="sim-summary-actions">
+            <button type="button" class="topbar-btn topbar-btn-primary" onclick="projeterSimulationFinanciere()" title="Afficher ce simulateur en plein écran sur le vidéoprojecteur de la salle">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+              <span>Projeter sur l'Écran Salle</span>
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="revenirResolutionSurEcranPublic()">
-              🔙 Rétablir la Résolution
+            <button type="button" class="topbar-btn topbar-btn-ghost" onclick="revenirResolutionSurEcranPublic()" title="Revenir à l'affichage de la résolution en cours sur l'Écran Salle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+              <span>Rétablir la Résolution</span>
             </button>
           </div>
         </div>
 
-        <!-- DEUX MODES DE CALCUL : PAR NOM OU PAR TANTIÈMES DIRECTS -->
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
-          <!-- 1. Recherche nominative parmi les 259 copropriétaires -->
-          <div style="background:#fefce8; border:2px solid #fde047; border-radius:10px; padding:1rem 1.25rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
-              <strong style="color:#854d0e; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem;">
-                <span>🎤</span>
-                <span>1. Recherche par Copropriétaire (Tantièmes réels en base)</span>
-              </strong>
+        <!-- 3. Calcul individuel en direct (2 cartes modernes) -->
+        <div class="sim-dual-grid">
+          <div class="sim-lookup-card">
+            <div class="sim-lookup-head">
+              <span class="sim-step-badge">1</span>
+              <span>Recherche par Copropriétaire (Tantièmes réels)</span>
             </div>
             <div style="display:flex; gap:0.5rem; align-items:center;">
-              <input type="text" id="simModalCoproSearch" class="form-control" placeholder="🔍 Taper nom ou n° de lot (ex: Akkas, Arnaud, 142...)" oninput="rechercherCoproSimModal()" autocomplete="off">
-              <button type="button" class="btn btn-sm btn-outline-primary" onclick="copierAnnonceMicroModal()" id="btnCopierAnnonceMicro" style="display:none; white-space:nowrap;">
-                📋 Phrase micro
+              <input type="text" id="simModalCoproSearch" class="sim-input" style="flex:1;" placeholder="Taper un nom (ex: Akkas, Arnaud, Suzet...)" oninput="rechercherCoproSimModal()" autocomplete="off">
+              <button type="button" class="topbar-btn topbar-btn-ghost" onclick="copierAnnonceMicroModal()" id="btnCopierAnnonceMicro" style="display:none; height:38px;">
+                Copier
               </button>
             </div>
-            <div id="simModalCoproResultZone" style="margin-top:0.65rem; display:none;">
-              <!-- Rendu dynamique du copropriétaire trouvé -->
-            </div>
+            <div id="simModalCoproResultZone" style="margin-top:0.65rem; display:none;"></div>
           </div>
 
-          <!-- 2. Saisie libre directe de tantièmes -->
-          <div style="background:#f0fdf4; border:2px solid #86efac; border-radius:10px; padding:1rem 1.25rem;">
-            <strong style="color:#166534; font-size:0.95rem; display:flex; align-items:center; gap:0.35rem; margin-bottom:0.6rem;">
-              <span>🔢</span>
-              <span>2. Saisie directe de Tantièmes (Lu sur la convocation)</span>
-            </strong>
-            <div style="display:flex; gap:0.5rem; align-items:center;">
-              <input type="number" id="simModalDirectTantInput" class="form-control" placeholder="Ex: 356, 378, 415, 459..." oninput="calculerParTantiemesDirectsModal()">
-              <span style="font-weight:700; color:#166534;">tantièmes</span>
+          <div class="sim-lookup-card">
+            <div class="sim-lookup-head">
+              <span class="sim-step-badge">2</span>
+              <span>Saisie directe de Tantièmes (Convocation)</span>
             </div>
-            <div id="simModalDirectTantResultZone" style="margin-top:0.65rem; display:none;">
-              <!-- Rendu dynamique pour tantièmes saisis -->
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+              <input type="number" id="simModalDirectTantInput" class="sim-input" style="flex:1;" placeholder="Ex: 356, 378, 415, 459..." oninput="calculerParTantiemesDirectsModal()">
+              <span style="font-size:0.8rem; font-weight:600; color:#94a3b8; white-space:nowrap;">tantièmes</span>
             </div>
+            <div id="simModalDirectTantResultZone" style="margin-top:0.65rem; display:none;"></div>
           </div>
         </div>
 
-        <!-- Encadré explicatif juridique (Pas de grille rigide) -->
-        <div style="background:#fffbeb; border-left:4px solid #f59e0b; padding:0.75rem 1rem; border-radius:4px; font-size:0.84rem; color:#92400e; line-height:1.5;">
-          ⚖️ <strong>Précision juridique essentielle (Art. 5 Loi de 1965) :</strong> Dans notre copropriété, deux T4 ou deux T5 n'ont <strong>jamais les mêmes tantièmes</strong>. L'étage, l'ensoleillement, l'orientation, les terrasses et les annexes (box, parking) personnalisent la quote-part de chacun. Le calcul officiel se fait donc <strong>exclusivement sur les tantièmes réels en propre</strong>.
-        </div>
-
-        <!-- Tableau des repères de tantièmes réels du Floréal -->
+        <!-- 4. Repères de calcul au tantième -->
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
-            <h4 style="font-size:0.92rem; font-weight:800; color:#1e293b; margin:0;">
-              📊 Repères de calcul au tantième (Base 97 478 tantièmes) :
-            </h4>
-            <div style="font-size:0.82rem; font-weight:800; color:#1d4ed8;" id="simModalUnitValueLabel">
-              1 tantième = 0.0000 €
-            </div>
+          <div class="sim-section-head">
+            <h4>Repères de calcul au tantième (Charges générales • 97 478 t.)</h4>
+            <div class="sim-unit-pill" id="simModalUnitValueLabel">1 tantième = 0.0000 €</div>
           </div>
-          <div id="simModalProfilesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.6rem;">
-            <!-- Dynamique -->
-          </div>
+          <div id="simModalProfilesGrid" class="sim-tiers-grid"></div>
+        </div>
+
+        <!-- Note juridique discrète -->
+        <div class="sim-legal-note">
+          <strong>Précision juridique (Art. 5 Loi de 1965) :</strong> Calcul mathématiquement exact au centime près sur les <strong>charges générales (97 478 tantièmes)</strong>. Pour des travaux soumis à une clé spéciale (ascenseur, chauffage, bâtiment), la base de tantièmes diffère.
         </div>
       </div>
 
-      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:0.8rem; color:var(--gray-500);">Calcul certifié proportionnel aux 97 478 tantièmes du Floréal</span>
-        <button type="button" class="btn btn-secondary" onclick="closeModal('simulateurFinancierModal')">Fermer</button>
+      <div class="sim-pro-footer">
+        <span>Synchronisé en direct avec l'Écran Salle</span>
+        <button type="button" class="topbar-btn topbar-btn-ghost" onclick="closeModal('simulateurFinancierModal')">Fermer</button>
       </div>
     </div>
   </div>

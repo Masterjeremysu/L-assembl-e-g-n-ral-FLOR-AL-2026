@@ -4313,14 +4313,15 @@ function calculerQuotePartTravauxModal() {
     grid.innerHTML = PALIERS_TANTIEMES_REELS.map(p => {
       const totalPart = (net * p.tant) / totalCopro;
       const parEcheance = totalPart / echeances;
+      const pctVoix = totalCopro > 0 ? ((p.tant / totalCopro) * 100).toFixed(2) : '0.00';
       return `
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.65rem; text-align:center;">
-          <div style="font-weight:800; font-size:0.88rem; color:#1e3a8a;">${p.tant} tantièmes</div>
-          <div style="font-size:0.72rem; color:#64748b; margin-bottom:3px;">${p.label}</div>
-          <div style="font-size:1.1rem; font-weight:900; color:#0f172a;">
+        <div class="sim-tier-card">
+          <div class="sim-tier-tant">${p.tant} tantièmes</div>
+          <div class="sim-tier-pct">${pctVoix} % des voix</div>
+          <div class="sim-tier-total">
             ${totalPart.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </div>
-          <div style="font-size:0.75rem; font-weight:700; color:#059669; margin-top:2px;">
+          <div class="sim-tier-call">
             ~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel
           </div>
         </div>
