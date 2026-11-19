@@ -14,7 +14,7 @@
   <title>Suivi AG & Votes - RÉSIDENCE LE FLORÉAL 2026</title>
   <link rel="stylesheet" href="css/style.css?v=4.0">
   <link rel="stylesheet" href="css/auth.css?v=4.0">
-  <link rel="stylesheet" href="css/app-ui.css?v=5.0">
+  <link rel="stylesheet" href="css/app-ui.css?v=6.0">
   <!-- Firebase SDK Compat (Temps réel Cloud sécurisé) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -162,81 +162,79 @@
     </div>
   </div>
 
-  <!-- Header -->
-  <header>
+  <!-- Header Ultra-Pro (Style Vercel / Linear Command Bar) -->
+  <header class="pro-topbar">
     <div class="header-container">
-      <div class="header-brand">
-        <div class="header-logo-icon" style="padding:0; overflow:hidden; border-radius:10px; border:1px solid rgba(251,191,36,0.4); box-shadow:0 2px 10px rgba(245,158,11,0.25);">
-          <img src="./assets/icon.svg" alt="Le Floréal AG 2026" style="width:100%; height:100%; object-fit:cover; display:block;">
+      <!-- Gauche : Identité + Statut Live compact -->
+      <div class="header-left-group">
+        <div class="header-brand">
+          <div class="header-logo-icon">
+            <img src="./assets/icon.svg" alt="Le Floréal AG 2026">
+          </div>
+          <div class="header-title">
+            <h1>Suivi AG & Pointage CS</h1>
+            <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL • AG DU 25/11/2026</p>
+          </div>
         </div>
-        <div class="header-title">
-          <h1>Suivi AG & Pointage CS</h1>
-          <p id="headerSubtitle">RÉSIDENCE LE FLORÉAL • AG DU 25/11/2026</p>
-        </div>
+
+        <span class="topbar-divider no-print"></span>
+
+        <!-- Statut Supabase discret & élégant -->
+        <button type="button" id="cloudStatusBadge" class="cloud-status-badge syncing no-print" onclick="forceSyncFromCloud()" title="Base Supabase en temps réel — Cliquer pour actualiser">
+          <span id="cloudStatusDot" class="cloud-dot syncing"></span>
+          <span id="cloudStatusText">En direct</span>
+        </button>
       </div>
 
-      <!-- Recherche universelle style Spotlight (Ctrl+K / /) -->
-      <div class="header-search-pill no-print" onclick="openSpotlightModal()" title="Recherche universelle (Copropriétaire, lot, mandat, résolution) - Raccourci '/' ou 'Ctrl+K'">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <!-- Centre : Barre de commande Spotlight (Ctrl+K / /) -->
+      <div class="header-search-pill no-print" onclick="openSpotlightModal()" title="Recherche rapide (Copropriétaire, lot, mandat, résolution) — Raccourci '/' ou 'Ctrl+K'">
+        <svg class="nav-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
         <span class="search-placeholder">Rechercher copro, lot, résolution...</span>
         <kbd class="search-kbd">/</kbd>
       </div>
 
+      <!-- Droite : Actions hiérarchisées (Zéro sapin de Noël) -->
       <div class="header-actions no-print">
-        <!-- Badge Statut Supabase PostgreSQL BDD Cloud -->
-        <div id="cloudStatusBadge" class="cloud-status-badge syncing" onclick="forceSyncFromCloud()" title="État BDD Supabase - Cliquer pour forcer l'actualisation">
-          <span id="cloudStatusDot" class="cloud-dot syncing"></span>
-          <span id="cloudStatusText">Supabase Direct</span>
-        </div>
-
-        <!-- 📽️ Écran Salle / Vidéoprojecteur XXL -->
-        <button class="btn btn-outline" style="border-color:#38bdf8; color:#ffffff; background:linear-gradient(135deg, rgba(2,132,199,0.35), rgba(14,165,233,0.2)); font-weight:800; box-shadow:0 0 10px rgba(56,189,248,0.25);" onclick="ouvrirEcranPublic()" title="Ouvrir l'Écran Rétroprojecteur public de la salle sur second écran (ou télé / Chromecast)">
-          <span>📽️ Écran Salle</span>
+        <!-- + Pouvoir (Ghost sobre) -->
+        <button type="button" class="topbar-btn topbar-btn-ghost" onclick="openNewPouvoirModal()" title="Enregistrer un nouveau pouvoir">
+          <svg class="nav-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8"></path><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path><path d="M19 16v6"></path><path d="M16 19h6"></path></svg>
+          <span>Pouvoir</span>
         </button>
 
-        <!-- ▶ Mode Séance -->
-        <button class="btn btn-header-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Mode plein écran / grand format pour suivre résolution par résolution en séance">
-          <span>▶ Séance</span>
-        </button>
-
-        <!-- + Pouvoir rapide -->
-        <button class="btn btn-header-gold" onclick="openNewPouvoirModal()" title="Enregistrer rapidement un pouvoir reçu au dernier moment">
-          <span>✉️ + Pouvoir</span>
-        </button>
-
-        <!-- Menu groupé déroulant : Documents, Outils & Multi-écrans -->
+        <!-- Menu Outils & PV (Ghost sobre) -->
         <div class="header-dropdown" id="dropdownDocs">
-          <button class="btn btn-header-subtle dropdown-trigger" onclick="toggleHeaderDropdown('dropdownDocsMenu')" title="Procès-verbaux, Attestation officielle, Multi-écrans et Simulateur">
-            <span>📑 Outils & PV</span>
-            <span class="dropdown-chevron">▾</span>
+          <button type="button" class="topbar-btn topbar-btn-ghost dropdown-trigger" onclick="toggleHeaderDropdown('dropdownDocsMenu')" title="Documents officiels, PV, Simulateur et Exports">
+            <svg class="nav-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>Outils & PV</span>
+            <svg class="dropdown-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
           </button>
           <div class="dropdown-menu-pro" id="dropdownDocsMenu">
-            <div class="dropdown-group-title">Outils AG</div>
-            <button class="dropdown-item-pro" onclick="ouvrirSimulateurFinancier(); closeHeaderDropdowns();">
-              <span class="item-icon">💰</span>
+            <div class="dropdown-group-title">Outils de Séance</div>
+            <button type="button" class="dropdown-item-pro" onclick="ouvrirSimulateurFinancier(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg></span>
               <div class="item-text">
                 <span class="item-title">Quote-Part Travaux & Devis</span>
                 <span class="item-desc">Simulateur financier instantané par tantièmes</span>
               </div>
             </button>
             <div class="dropdown-divider"></div>
-            <div class="dropdown-group-title">Documents de Séance</div>
-            <button class="dropdown-item-pro" onclick="openOuvertureModal(); closeHeaderDropdowns();">
-              <span class="item-icon">🎙️</span>
+            <div class="dropdown-group-title">Documents Officiels</div>
+            <button type="button" class="dropdown-item-pro" onclick="openOuvertureModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></span>
               <div class="item-text">
                 <span class="item-title">Ouverture AG & Quorum (18h)</span>
                 <span class="item-desc">Feuille de présence et discours officiel</span>
               </div>
             </button>
-            <button class="dropdown-item-pro" onclick="openPvMiroirModal(); closeHeaderDropdowns();">
-              <span class="item-icon">📄</span>
+            <button type="button" class="dropdown-item-pro" onclick="openPvMiroirModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="m9 15 2 2 4-4"></path></svg></span>
               <div class="item-text">
                 <span class="item-title">Relevé PV Contradictoire CS</span>
                 <span class="item-desc">Synthèse et pointage miroir des votes</span>
               </div>
             </button>
-            <button class="dropdown-item-pro" onclick="openClotureModal(); closeHeaderDropdowns();">
-              <span class="item-icon">📑</span>
+            <button type="button" class="dropdown-item-pro" onclick="openClotureModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
               <div class="item-text">
                 <span class="item-title">Attestation de Clôture & Signatures</span>
                 <span class="item-desc">Bilan officiel certifié par les scrutateurs</span>
@@ -244,22 +242,22 @@
             </button>
             <div class="dropdown-divider"></div>
             <div class="dropdown-group-title">Communication & Export</div>
-            <button class="dropdown-item-pro" onclick="openExportPouvoirsModal('MEMBRES'); closeHeaderDropdowns();">
-              <span class="item-icon">✉️</span>
+            <button type="button" class="dropdown-item-pro" onclick="openExportPouvoirsModal('MEMBRES'); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg></span>
               <div class="item-text">
                 <span class="item-title">Pouvoirs & Feuilles de Mandats CS</span>
                 <span class="item-desc">Vue éclatée ou par membre, PDF & CSV</span>
               </div>
             </button>
-            <button class="dropdown-item-pro" onclick="openFlashInfoModal(); closeHeaderDropdowns();">
-              <span class="item-icon">📢</span>
+            <button type="button" class="dropdown-item-pro" onclick="openFlashInfoModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></svg></span>
               <div class="item-text">
                 <span class="item-title">Flash-Info Résidents (4 halls)</span>
                 <span class="item-desc">Flyer imprimable & message WhatsApp</span>
               </div>
             </button>
-            <button class="dropdown-item-pro" onclick="openExportModal(); closeHeaderDropdowns();">
-              <span class="item-icon">💾</span>
+            <button type="button" class="dropdown-item-pro" onclick="openExportModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg></span>
               <div class="item-text">
                 <span class="item-title">Export ERP & Sauvegarde</span>
                 <span class="item-desc">Fichiers CSV UTF-8 & JSON</span>
@@ -268,53 +266,102 @@
           </div>
         </div>
 
-        <!-- Profil Utilisateur & PIN -->
-        <div class="auth-user-pill" id="authUserPill" onclick="openChangePinModal()" title="Connecté au CS - Cliquez pour modifier votre code PIN">
-          <span class="auth-user-avatar" id="authUserAvatar">CS</span>
-          <span id="authUserName">Membre CS</span>
-        </div>
+        <!-- Écran Salle (Accent glacé sobre) -->
+        <button type="button" class="topbar-btn topbar-btn-accent" onclick="ouvrirEcranPublic()" title="Ouvrir l'Écran Rétroprojecteur public sur second écran">
+          <svg class="nav-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line><polygon points="10 7 15 10 10 13 10 7" fill="currentColor" stroke="none"></polygon></svg>
+          <span>Écran Salle</span>
+        </button>
 
-        <!-- Groupe Utilitaires -->
-        <div class="header-util-group">
-          <button class="btn-icon-subtle" onclick="logoutUser()" title="Verrouiller l'application (Code PIN requis)">
-            🔒
+        <!-- Mode Séance (Unique CTA Principal style Vercel) -->
+        <button type="button" class="topbar-btn topbar-btn-primary" onclick="toggleModeSeance()" id="btnToggleSeance" title="Activer le Mode Séance plein écran résolution par résolution">
+          <svg class="nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+          <span>Séance</span>
+        </button>
+
+        <!-- Menu Profil Utilisateur Dark Glass (Regroupe PIN, Thème, Raccourcis, Verrouillage) -->
+        <div class="header-dropdown" id="dropdownUser">
+          <button type="button" class="topbar-user-pill dropdown-trigger" id="authUserPill" onclick="toggleHeaderDropdown('dropdownUserMenu')" title="Profil & Préférences">
+            <span class="auth-user-avatar" id="authUserAvatar">CS</span>
+            <span class="topbar-user-name" id="authUserName">Membre CS</span>
+            <svg class="dropdown-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
           </button>
-          <button class="btn-icon-subtle" onclick="openShortcutsModal()" title="Raccourcis Clavier (Touche ?)">
-            ⌨️
-          </button>
-          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Basculer Mode Sombre">
-            🌙
-          </button>
+          <div class="dropdown-menu-pro dropdown-menu-user" id="dropdownUserMenu">
+            <div class="dropdown-group-title">Mon Poste & Sécurité</div>
+            <button type="button" class="dropdown-item-pro" onclick="openChangePinModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg></span>
+              <div class="item-text">
+                <span class="item-title">Modifier mon code PIN</span>
+                <span class="item-desc">Changer votre code secret personnel</span>
+              </div>
+            </button>
+            <button type="button" class="dropdown-item-pro" onclick="forceSyncFromCloud(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg></span>
+              <div class="item-text">
+                <span class="item-title">Forcer la synchronisation</span>
+                <span class="item-desc">Recharger les données en direct depuis Supabase</span>
+              </div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-group-title">Préférences</div>
+            <button type="button" class="dropdown-item-pro" onclick="toggleDarkMode(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><span id="themeToggleBtn">🌙</span></span>
+              <div class="item-text">
+                <span class="item-title">Apparence Clair / Sombre</span>
+                <span class="item-desc">Adapter le contraste et économiser la batterie</span>
+              </div>
+            </button>
+            <button type="button" class="dropdown-item-pro" onclick="openShortcutsModal(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="M6 8h.001"></path><path d="M10 8h.001"></path><path d="M14 8h.001"></path><path d="M18 8h.001"></path><path d="M8 12h.001"></path><path d="M12 12h.001"></path><path d="M16 12h.001"></path><path d="M7 16h10"></path></svg></span>
+              <div class="item-text">
+                <span class="item-title">Raccourcis clavier (?)</span>
+                <span class="item-desc">Navigation rapide en mode séance</span>
+              </div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item-pro dropdown-item-danger" onclick="logoutUser(); closeHeaderDropdowns();">
+              <span class="item-icon-svg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+              <div class="item-text">
+                <span class="item-title">Verrouiller l'application</span>
+                <span class="item-desc">Retour à l'écran PIN sécurisé</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Navigation Tabs (App Pro - Zéro scrollbar) -->
+  <!-- Navigation Tabs (Style Vercel / Linear Underline + 100 % SVG Lucide) -->
   <nav class="tabs-nav no-print">
     <div class="tabs-container">
-      <button class="tab-btn active" onclick="switchTab('votes')">
-        📋 Ordre du jour & Votes
+      <button type="button" class="tab-btn active" onclick="switchTab('votes')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="m9 14 2 2 4-4"></path></svg>
+        <span>Ordre du jour & Votes</span>
         <span class="badge-count" id="badgeVotesCount">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('presence')">
-        🚪 Émargement
+      <button type="button" class="tab-btn" onclick="switchTab('presence')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+        <span>Émargement</span>
         <span class="badge-count" id="badgePresenceCount">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('pouvoirs')">
-        ✉️ Pouvoirs & Mandats
+      <button type="button" class="tab-btn" onclick="switchTab('pouvoirs')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10.5V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12.5"></path><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path><path d="m16 19 2 2 4-4"></path></svg>
+        <span>Pouvoirs & Mandats</span>
         <span class="badge-count" id="badgePouvoirsCount">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('members')">
-        👥 Conseil Syndical
+      <button type="button" class="tab-btn" onclick="switchTab('members')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Conseil Syndical</span>
         <span class="badge-count" id="badgeMembersCount">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('audit')">
-        📜 Journal d'Audit
+      <button type="button" class="tab-btn" onclick="switchTab('audit')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><path d="m9 12 2 2 4-4"></path></svg>
+        <span>Journal d'Audit</span>
         <span class="badge-count" id="badgeAuditCount">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('settings')">
-        ⚙️ Paramètres
+      <button type="button" class="tab-btn" onclick="switchTab('settings')">
+        <svg class="tab-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        <span>Paramètres</span>
       </button>
     </div>
   </nav>
