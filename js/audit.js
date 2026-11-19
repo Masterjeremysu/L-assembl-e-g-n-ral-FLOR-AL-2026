@@ -32,6 +32,16 @@ function logAuditAction(type, description, details = '') {
   // Ajout en tête de liste
   appData.auditLogs.unshift(logEntry);
 
+  // Synchro temps réel vers Supabase ag_audit_logs
+  if (typeof cloudPushAuditLog === 'function') {
+    cloudPushAuditLog({
+      user: logEntry.user,
+      category: logEntry.type,
+      title: logEntry.description,
+      details: logEntry.details
+    });
+  }
+
   // Limite de taille à 500 entrées pour éviter de surcharger la mémoire
   if (appData.auditLogs.length > 500) {
     appData.auditLogs = appData.auditLogs.slice(0, 500);

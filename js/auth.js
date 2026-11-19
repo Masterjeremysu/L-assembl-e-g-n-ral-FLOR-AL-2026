@@ -499,6 +499,10 @@ function saveNewPinForm(e) {
       logAuditAction("SECURITE", "Code PIN personnel modifié", `${u.name} a mis à jour son code PIN personnel`);
     }
 
+    if (typeof cloudSaveMemberPins === "function") {
+      cloudSaveMemberPins(appData.memberPins);
+    }
+
     if (typeof persistData === "function") {
       persistData();
     }
@@ -627,6 +631,10 @@ function saveOnboardingPinForm(e) {
 
     if (typeof logAuditAction === "function") {
       logAuditAction("SECURITE", "Code PIN personnel activé", `${u.name} a activé son code PIN personnel lors de sa 1ère connexion`);
+    }
+
+    if (typeof cloudSaveMemberPins === "function") {
+      cloudSaveMemberPins(appData.memberPins);
     }
 
     if (typeof persistData === "function") {

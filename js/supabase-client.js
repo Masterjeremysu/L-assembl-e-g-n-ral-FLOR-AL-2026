@@ -134,6 +134,8 @@ async function syncFromSupabase(isManual = false) {
           if (details.eluNom !== undefined) local.eluNom = details.eluNom;
           if (details.heureVote) local.heureVote = details.heureVote;
           if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
+          if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
+          if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
           local.votes = {
             pour: r.votes_pour || 0,
             contre: r.votes_contre || 0,
@@ -144,8 +146,53 @@ async function syncFromSupabase(isManual = false) {
       });
     }
 
+    // 4. Synchronisation des codes PIN personnalisés (memberPins)
+    if (stateData && stateData.config && stateData.config.memberPins && typeof appData !== 'undefined') {
+      appData.memberPins = { ...(appData.memberPins || {}), ...stateData.config.memberPins };
+      if (typeof updateAuthPinHint === 'function') updateAuthPinHint();
+    }
+
+    // 5. Récupérer les derniers journaux d'audit partagés (ag_audit_logs)
+    try {
+      const { data: auditRows } = await supabaseClient
+        .from('ag_audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(60);
+      if (auditRows && auditRows.length > 0 && typeof appData !== 'undefined') {
+        const mapped = auditRows.map(row => {
+          const parts = String(row.action || 'CONFIG : Action CS').split(':');
+          const typeStr = (parts[0] || 'CONFIG').trim();
+          const descStr = parts.slice(1).join(':').trim() || row.action || 'Action CS';
+          return {
+            id: 'sb_' + row.id,
+            timestamp: row.created_at || new Date().toISOString(),
+            heure: row.created_at ? new Date(row.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
+            date: row.created_at ? new Date(row.created_at).toLocaleDateString('fr-FR') : '',
+            user: row.auteur || 'Membre CS',
+            type: typeStr,
+            description: descStr,
+            details: (row.details && typeof row.details === 'object') ? (row.details.text || '') : String(row.details || '')
+          };
+        });
+        const existingKeys = new Set((appData.auditLogs || []).map(l => `${l.heure}|${l.description}|${l.user}`));
+        mapped.forEach(m => {
+          const key = `${m.heure}|${m.description}|${m.user}`;
+          if (!existingKeys.has(key)) {
+            appData.auditLogs = appData.auditLogs || [];
+            appData.auditLogs.push(m);
+            existingKeys.add(key);
+          }
+        });
+      }
+    } catch (eAudit) {
+      console.warn('Lecture ag_audit_logs ignorée :', eAudit);
+    }
+
     if (stateData && stateData.display_state) {
-      if (typeof window.broadcastDisplayState === 'function') {
+      if (typeof window.onRemoteDisplayStateUpdate === 'function') {
+        window.onRemoteDisplayStateUpdate(stateData.display_state);
+      } else if (typeof window.broadcastDisplayState === 'function') {
         window.broadcastDisplayState(stateData.display_state);
       }
     }
@@ -229,6 +276,7 @@ function setupSupabaseRealtime() {
           if (details.eluNom !== undefined) local.eluNom = details.eluNom;
           if (details.heureVote) local.heureVote = details.heureVote;
           if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
+          if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
           local.votes = {
             pour: row.votes_pour || 0,
             contre: row.votes_contre || 0,
@@ -489,6 +537,53 @@ async function cloudPushAllCoprosToSupabase(silent = false) {
   }
 }
 
+/**
+ * Synchronise les codes PIN personnalisés des membres CS dans ag_state.config
+ */
+async function cloudSaveMemberPins(memberPins) {
+  if (!supabaseClient || !isSupabaseOnline || !memberPins) return;
+  try {
+    const { data: stateRow } = await supabaseClient
+      .from('ag_state')
+      .select('config')
+      .eq('id', SUPABASE_CONFIG.stateId)
+      .maybeSingle();
+
+    const currentConfig = (stateRow && stateRow.config) ? stateRow.config : {};
+    const mergedPins = { ...(currentConfig.memberPins || {}), ...memberPins };
+
+    await supabaseClient
+      .from('ag_state')
+      .update({
+        config: { ...currentConfig, memberPins: mergedPins },
+        updated_at: new Date().toISOString(),
+        updated_by: typeof getCurrentUser === 'function' ? getCurrentUser().name : 'CS Sécurité'
+      })
+      .eq('id', SUPABASE_CONFIG.stateId);
+  } catch (e) {
+    console.warn('Erreur synchro memberPins Supabase :', e);
+  }
+}
+
+/**
+ * Enregistre une entrée du Journal d'Audit dans public.ag_audit_logs
+ */
+async function cloudPushAuditLog(entry) {
+  if (!supabaseClient || !isSupabaseOnline || !entry) return;
+  try {
+    await supabaseClient
+      .from('ag_audit_logs')
+      .insert({
+        auteur: entry.user || 'Membre CS',
+        action: `${entry.category || 'ACTION'} : ${entry.title || ''}`,
+        details: { text: entry.details || '' },
+        created_at: new Date().toISOString()
+      });
+  } catch (e) {
+    console.warn('Erreur push ag_audit_logs :', e);
+  }
+}
+
 // Export global pour compatibilité
 window.initSupabase = initSupabase;
 window.syncFromSupabase = syncFromSupabase;
@@ -496,6 +591,7 @@ window.cloudUpdateCopro = cloudUpdateCopro;
 window.cloudUpdateResolution = cloudUpdateResolution;
 window.cloudUpdateDisplayState = cloudUpdateDisplayState;
 window.cloudPushAllCoprosToSupabase = cloudPushAllCoprosToSupabase;
-window.cloudPushData = cloudPushData;
+window.cloudSaveMemberPins = cloudSaveMemberPins;
+window.cloudPushAuditLog = cloudPushAuditLog;
 window.cloudPushData = cloudPushData;
 window.forceSyncFromCloud = forceSyncFromCloud;

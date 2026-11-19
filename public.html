@@ -466,9 +466,18 @@
     </div>
   </footer>
 
+  <script src="js/data.js?v=4.2"></script>
   <script>
-    const STORAGE_KEY = 'AG_CS_VOTES_DATA_FLOREAL_2026_V2';
     const DISPLAY_KEY = 'AG_PUBLIC_DISPLAY_STATE';
+
+    // Initialisation autonome de window.appData (fonctionne même sur un 2e PC neuf via Supabase)
+    window.appData = (function() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return (typeof DEFAULT_AG_DATA !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_AG_DATA)) : null;
+    })();
 
     let channel = null;
     try {
@@ -513,10 +522,13 @@
     function getAppData() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        return null;
-      }
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          window.appData = parsed;
+          return parsed;
+        }
+      } catch (e) {}
+      return window.appData || null;
     }
 
     function getDisplayState() {
@@ -529,8 +541,24 @@
     }
 
     function handleStateUpdate(data) {
-      if (!data) return;
+      if (data && data.mode) {
+        try {
+          localStorage.setItem(DISPLAY_KEY, JSON.stringify(data));
+        } catch (e) {}
+      }
       refreshDisplay();
+    }
+
+    function computeLiveQuorum(appData) {
+      const copros = appData?.coproprietaires || [];
+      let tant = 0, nbPresents = 0, nbPouvoirs = 0, nbVpc = 0;
+      copros.forEach(c => {
+        const t = Number(c.tantiemes) || 0;
+        if (c.statut === 'PRESENT') { tant += t; nbPresents++; }
+        else if (c.statut === 'POUVOIR') { tant += t; nbPouvoirs++; }
+        else if (c.statut === 'VPC') { tant += t; nbVpc++; }
+      });
+      return { tant, nbPresents, nbPouvoirs, nbVpc, totalCopros: copros.length };
     }
 
     function refreshDisplay() {
@@ -540,14 +568,21 @@
         return;
       }
 
-      // Quorum en-tête
+      // Quorum calculé en direct (autonome via Supabase)
       const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
-      const presents = Number(appData.config?.presentTantiemes) || 0;
+      const q = computeLiveQuorum(appData);
+      const presents = q.tant || Number(appData.config?.presentTantiemes) || 0;
       const pct = totalCopro > 0 ? ((presents / totalCopro) * 100).toFixed(1) : '0';
       document.getElementById('headerQuorumTant').innerText = `${presents.toLocaleString('fr-FR')} / ${totalCopro.toLocaleString('fr-FR')} t.`;
       document.getElementById('headerQuorumPct').innerText = `(${pct}%)`;
 
       const displayState = getDisplayState();
+
+      // Mode Accueil & Quorum en direct (17h30 - 18h00)
+      if (displayState && displayState.mode === 'ACCUEIL') {
+        renderAccueilScreen(totalCopro, q);
+        return;
+      }
 
       // Mode Spécifique : Simulation Financière Travaux
       if (displayState && displayState.mode === 'FINANCE') {
@@ -560,7 +595,7 @@
       const res = (appData.resolutions || []).find(r => r.id === resId) || appData.resolutions[0];
 
       if (!res) {
-        renderWaitingScreen();
+        renderAccueilScreen(totalCopro, q);
         return;
       }
 
@@ -598,10 +633,11 @@
       let bannerHtml = '';
       const heureVoteStr = res.heureVote || res.voteTime || '';
       if (isAdopted) {
+        const label251 = res.adoptedVia251 ? ' (Passerelle Art. 25-1)' : '';
         bannerHtml = `
           <div class="proclamation-banner adoptee">
             <span>✅</span>
-            <span>RÉSOLUTION ADOPTÉE</span>
+            <span>RÉSOLUTION ADOPTÉE${label251}</span>
             <span style="font-size:1.6rem; font-weight:700;">(${pour.toLocaleString('fr-FR')} POUR / ${contre.toLocaleString('fr-FR')} CONTRE)</span>
             ${heureVoteStr ? `<span style="font-size:1.3rem; opacity:0.9;">• Votée à ${heureVoteStr}</span>` : ''}
           </div>
@@ -731,10 +767,11 @@
           ${paliers.map(tant => {
             const total = (netBudget * tant) / totalCopro;
             const parEcheance = total / echeances;
+            const pctVoix = totalCopro > 0 ? ((tant / totalCopro) * 100).toFixed(2) : '0.00';
             return `
               <div class="finance-card">
                 <div class="finance-type-title">${tant} tantièmes</div>
-                <div class="finance-type-sub">${tant <= 5 ? 'Place parking' : (tant <= 44 ? 'Box garage' : 'Appartement / Lots')}</div>
+                <div class="finance-type-sub">${pctVoix} % des voix</div>
                 <div class="finance-type-total">${total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
                 <div class="finance-type-echeance">~${parEcheance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / appel</div>
               </div>
@@ -744,15 +781,71 @@
       `;
     }
 
-    function renderWaitingScreen() {
+    function renderAccueilScreen(totalCopro, q) {
       const container = document.getElementById('projectorContentCard');
+      const tant = q?.tant || 0;
+      const pct = totalCopro > 0 ? ((tant / totalCopro) * 100).toFixed(1) : '0.0';
+      const nbTotal = (q?.nbPresents || 0) + (q?.nbPouvoirs || 0) + (q?.nbVpc || 0);
+      const seuil13 = Math.ceil(totalCopro / 3);
+      const seuil25 = Math.floor(totalCopro / 2) + 1;
+      const barWidth = Math.min(100, (tant / totalCopro) * 100).toFixed(1);
+
       container.innerHTML = `
-        <div style="text-align:center; padding:5rem 2rem;">
-          <div style="font-size:4rem; margin-bottom:1rem;">🏢</div>
-          <h1 style="font-size:3rem; font-weight:900; color:#ffffff; margin-bottom:1rem;">ASSEMBLÉE GÉNÉRALE 2026</h1>
-          <p style="font-size:1.6rem; color:#94a3b8;">La séance va bientôt débuter • En attente de délibération...</p>
+        <div style="text-align:center; padding:1.5rem 1rem;">
+          <div style="width:96px; height:96px; margin:0 auto 1.25rem; border-radius:22px; overflow:hidden; border:2px solid #f59e0b; box-shadow:0 12px 32px rgba(245,158,11,0.3);">
+            <img src="./assets/icon.svg" alt="Le Floréal" style="width:100%; height:100%; object-fit:cover;">
+          </div>
+          <div style="display:inline-block; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#7dd3fc; padding:0.35rem 1.1rem; border-radius:9999px; font-size:1rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:0.8rem;">
+            Bienvenue • Salle Jacques Prévert, Sassenage
+          </div>
+          <h1 style="font-size:2.9rem; font-weight:900; color:#ffffff; margin:0 0 0.5rem 0; letter-spacing:-0.02em;">
+            ASSEMBLÉE GÉNÉRALE 2026
+          </h1>
+          <p style="font-size:1.35rem; color:#94a3b8; margin:0 0 2rem 0;">
+            Résidence Le Floréal • Émargement en cours — La séance débute à 18h00
+          </p>
+
+          <!-- Jauge Quorum Live -->
+          <div style="background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:20px; padding:1.8rem 2.2rem; max-width:920px; margin:0 auto;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:1rem; margin-bottom:0.8rem;">
+              <div style="text-align:left;">
+                <div style="font-size:0.95rem; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; font-weight:700;">Quorum en temps réel</div>
+                <div style="font-size:2.6rem; font-weight:900; color:#ffffff; line-height:1.1;">
+                  ${tant.toLocaleString('fr-FR')} <span style="font-size:1.3rem; color:#64748b; font-weight:700;">/ ${totalCopro.toLocaleString('fr-FR')} tantièmes</span>
+                </div>
+              </div>
+              <div style="font-size:3rem; font-weight:900; color:${tant >= seuil25 ? '#34d399' : (tant >= seuil13 ? '#fbbf24' : '#38bdf8')};">
+                ${pct}%
+              </div>
+            </div>
+
+            <div style="height:26px; background:#090d16; border-radius:9999px; overflow:hidden; border:1px solid #334155; position:relative; margin-bottom:1.2rem;">
+              <div style="height:100%; width:${barWidth}%; background:linear-gradient(90deg, #2563eb 0%, #38bdf8 55%, #10b981 100%); border-radius:9999px; transition:width 0.5s ease;"></div>
+              <div style="position:absolute; left:33.33%; top:0; bottom:0; width:2px; background:rgba(251,191,36,0.8);" title="Seuil 1/3 Passerelle 25-1"></div>
+              <div style="position:absolute; left:50%; top:0; bottom:0; width:2px; background:rgba(52,211,153,0.9);" title="Seuil 50% Article 25"></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; text-align:center;">
+              <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:0.85rem;">
+                <div style="font-size:1.8rem; font-weight:900; color:#34d399;">${q?.nbPresents || 0}</div>
+                <div style="font-size:0.9rem; color:#94a3b8; font-weight:600;">Présents en salle</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:0.85rem;">
+                <div style="font-size:1.8rem; font-weight:900; color:#60a5fa;">${q?.nbPouvoirs || 0}</div>
+                <div style="font-size:0.9rem; color:#94a3b8; font-weight:600;">Pouvoirs enregistrés</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:0.85rem;">
+                <div style="font-size:1.8rem; font-weight:900; color:#c084fc;">${nbTotal} / ${q?.totalCopros || 259}</div>
+                <div style="font-size:0.9rem; color:#94a3b8; font-weight:600;">Copropriétaires représentés</div>
+              </div>
+            </div>
+          </div>
         </div>
       `;
+    }
+
+    function renderWaitingScreen() {
+      renderAccueilScreen(97478, { tant: 0, nbPresents: 0, nbPouvoirs: 0, nbVpc: 0, totalCopros: 259 });
     }
 
     function formatDescription(desc) {
@@ -772,8 +865,9 @@
         .replace(/"/g, '&quot;');
     }
 
-    // Chargement initial
+    // Chargement initial & pont Realtime Supabase autonome
     window.onRemoteDisplayStateUpdate = handleStateUpdate;
+    window.updateUI = refreshDisplay;
     refreshDisplay();
     // Boucle de rafraîchissement doux
     setInterval(refreshDisplay, 2000);

@@ -1704,3 +1704,96 @@ body:not(.dark-mode) .pin-input-secure:focus {
   background: #ffffff;
   border-color: #2563eb;
 }
+
+
+/* ==============================================================
+   7. RADAR INTELLIGENT DES MAJORITÉS EN DIRECT (LIGHT & DARK)
+   ============================================================== */
+.majority-radar-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.radar-chip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.radar-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.radar-chip strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.radar-chip.radar-ok {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.radar-chip.radar-ok strong {
+  color: #047857;
+}
+
+.radar-chip.radar-warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.radar-chip.radar-warn strong {
+  color: #b45309;
+}
+
+.radar-chip.radar-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.radar-chip.radar-danger strong {
+  color: #b91c1c;
+}
+
+/* Dark mode Radar */
+body.dark-mode .radar-chip {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.dark-mode .radar-label {
+  color: #94a3b8;
+}
+body.dark-mode .radar-chip strong {
+  color: #f8fafc;
+}
+body.dark-mode .radar-chip.radar-ok {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+body.dark-mode .radar-chip.radar-ok strong {
+  color: #34d399;
+}
+body.dark-mode .radar-chip.radar-warn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+body.dark-mode .radar-chip.radar-warn strong {
+  color: #fbbf24;
+}
+body.dark-mode .radar-chip.radar-danger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+body.dark-mode .radar-chip.radar-danger strong {
+  color: #f87171;
+}

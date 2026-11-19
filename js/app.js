@@ -161,7 +161,43 @@ function updateUI() {
   // Compteurs Émargement
   document.getElementById('statTantiemesEnSalle').innerText = `${totalExprimesEnSalle} / ${totalTant}`;
   document.getElementById('statEnSallePct').innerText = `${((totalExprimesEnSalle / totalTant) * 100).toFixed(1)}% des voix représentées`;
-  document.getElementById('statPresentsCount').innerText = `${presentsPhysiques} présents, ${representesPouvoir} pouvoirs, ${partisEnCours} parti(s)`;
+  document.getElementById('statPresentsCount').innerText = `${presentsPhysiques} présents, ${representesPouvoir} pouvoirs, ${votesCorresp} VPC, ${partisEnCours} parti(s)`;
+
+  // Radar Intelligent des Majorités en Direct (Art. 24 / 25 / 25-1)
+  const rEnSalle = document.getElementById('radarEnSalle');
+  if (rEnSalle) {
+    const pctSalle = totalTant > 0 ? ((totalExprimesEnSalle / totalTant) * 100).toFixed(1) : '0.0';
+    const seuil24 = Math.floor(totalExprimesEnSalle / 2) + 1;
+    const seuil25 = Math.floor(totalTant / 2) + 1;
+    const seuil13 = Math.ceil(totalTant / 3);
+    rEnSalle.innerText = `${totalExprimesEnSalle.toLocaleString('fr-FR')} t. (${pctSalle}%)`;
+    const r24 = document.getElementById('radarSeuil24');
+    if (r24) r24.innerText = `≥ ${seuil24.toLocaleString('fr-FR')} voix`;
+
+    const r25 = document.getElementById('radarArt25Status');
+    const r25Chip = document.getElementById('radarArt25Chip');
+    if (r25 && r25Chip) {
+      if (totalExprimesEnSalle >= seuil25) {
+        r25.innerText = '✅ Atteignable 1er tour';
+        r25Chip.className = 'radar-chip radar-ok';
+      } else {
+        r25.innerText = `⚠️ Manque ${(seuil25 - totalExprimesEnSalle).toLocaleString('fr-FR')} t.`;
+        r25Chip.className = 'radar-chip radar-warn';
+      }
+    }
+
+    const rPass = document.getElementById('radarPasserelleStatus');
+    const rPassChip = document.getElementById('radarPasserelleChip');
+    if (rPass && rPassChip) {
+      if (totalExprimesEnSalle >= seuil13) {
+        rPass.innerText = '✅ 1/3 atteint (2nd vote Art. 24 OK)';
+        rPassChip.className = 'radar-chip radar-ok';
+      } else {
+        rPass.innerText = `🔴 Manque ${(seuil13 - totalExprimesEnSalle).toLocaleString('fr-FR')} t.`;
+        rPassChip.className = 'radar-chip radar-danger';
+      }
+    }
+  }
 
   // Badges d'onglets
   document.getElementById('badgeVotesCount').innerText = `${voted}/${total}`;
@@ -560,6 +596,9 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
               <button class="table-action-btn btn-action-pouvoir" onclick="openPouvoirModalForCopro('${c.id}')" title="Administrer / Attribuer le pouvoir">
                 ✉️ Pouvoir
               </button>
+              <button class="table-action-btn" style="${c.statut === 'VPC' ? 'background:#f3e8ff; color:#7e22ce; border-color:#d8b4fe; font-weight:700;' : 'background:rgba(139,92,246,0.08); color:#7c3aed; border-color:rgba(139,92,246,0.25);'}" onclick="setCoproStatut('${c.id}', 'VPC')" title="Pointer en Vote par Correspondance (VPC)">
+                📬 VPC
+              </button>
               <button class="table-action-btn btn-action-icon" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
                 🚪
               </button>
@@ -593,6 +632,15 @@ function getHeureParis() {
   }
 }
 
+function clearCoproSearch() {
+  const inp = document.getElementById('searchCoproInput');
+  if (inp) {
+    inp.value = '';
+    inp.focus();
+  }
+  renderCoproprietaires(appData.config.presentTantiemes, appData.config.totalTantiemes);
+}
+
 // Pointage express à l'accueil
 function setCoproStatut(id, newStatut) {
   const c = appData.coproprietaires.find(x => x.id === id);
@@ -607,6 +655,12 @@ function setCoproStatut(id, newStatut) {
     }
     if (typeof cloudUpdateCopro === 'function') {
       cloudUpdateCopro(id, newStatut, c.mandataire);
+    }
+    // Mode Pointage Express : si une recherche était en cours, on la vide et on remet le focus pour le suivant
+    const searchEl = document.getElementById('searchCoproInput');
+    if (searchEl && searchEl.value.trim() && (newStatut === 'PRESENT' || newStatut === 'VPC')) {
+      searchEl.value = '';
+      searchEl.focus();
     }
     persistData();
     showToast(`${c.nom} pointé comme ${newStatut}`, "success");
@@ -773,6 +827,14 @@ function openScrutinModal(resId) {
   document.getElementById('scrutinOpponentsList').value = res.opponentsText || '';
   const eluInput = document.getElementById('scrutinEluNomInput');
   if (eluInput) eluInput.value = res.eluNom || '';
+
+  const passWrap = document.getElementById('scrutinPasserelle251Wrap');
+  const passCheck = document.getElementById('scrutinPasserelle251Check');
+  if (passWrap && passCheck) {
+    const isArt25 = (res.majorite || '').includes('Article 25');
+    passWrap.style.display = isArt25 ? 'block' : 'none';
+    passCheck.checked = !!res.adoptedVia251;
+  }
 
   const searchInput = document.getElementById('scrutinChecklistSearch');
   if (searchInput) searchInput.value = '';
@@ -1078,20 +1140,47 @@ function saveScrutin(e) {
   const eluVal = document.getElementById('scrutinEluNomInput')?.value.trim();
   if (eluVal !== undefined) res.eluNom = eluVal;
 
-  // Détermination automatique du statut
+  // Détermination automatique du statut (avec prise en charge officielle Passerelle Art. 25-1)
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const usePasserelle251 = !!document.getElementById('scrutinPasserelle251Check')?.checked;
+  res.adoptedVia251 = false;
+
   if (res.majorite === 'Article 24') {
     res.status = (res.tantiemesPour > res.tantiemesContre) ? 'ADOPTEE' : 'REJETEE';
   } else if (res.majorite.includes('Article 25')) {
     const seuil25 = Math.floor(totalCopro / 2) + 1;
-    res.status = (res.tantiemesPour >= seuil25) ? 'ADOPTEE' : 'REJETEE';
+    if (res.tantiemesPour >= seuil25) {
+      res.status = 'ADOPTEE';
+    } else if (usePasserelle251) {
+      res.status = (res.tantiemesPour > res.tantiemesContre) ? 'ADOPTEE' : 'REJETEE';
+      if (res.status === 'ADOPTEE') res.adoptedVia251 = true;
+    } else {
+      res.status = 'REJETEE';
+    }
   }
 
   // Horodatage officiel du vote (Heure de Paris)
   res.heureVote = getHeureParis();
 
+  if (typeof cloudUpdateResolution === 'function') {
+    cloudUpdateResolution(
+      res.id,
+      res.status,
+      res.tantiemesPour,
+      res.tantiemesContre,
+      res.tantiemesAbs,
+      {
+        eluNom: res.eluNom || '',
+        heureVote: res.heureVote,
+        opponentsText: res.opponentsText || '',
+        adoptedVia251: res.adoptedVia251
+      }
+    );
+  }
+
   if (typeof logAuditAction === 'function') {
-    logAuditAction('VOTE', `Scrutin Résolution n° ${res.number} : ${res.status}`, `Résultat : ${res.status} (${res.tantiemesPour} Pour, ${res.tantiemesContre} Contre, ${res.tantiemesAbs} Abs) | ${res.title.substring(0, 45)}...`);
+    const label251 = res.adoptedVia251 ? ' [Passerelle Art. 25-1]' : '';
+    logAuditAction('VOTE', `Scrutin Résolution n° ${res.number} : ${res.status}${label251}`, `Résultat : ${res.status}${label251} (${res.tantiemesPour} Pour, ${res.tantiemesContre} Contre, ${res.tantiemesAbs} Abs) | ${res.title.substring(0, 45)}...`);
   }
 
   closeModal('scrutinModal');
@@ -1509,12 +1598,12 @@ function importDataJson(event) {
       if (imported.resolutions && imported.config) {
         appData = imported;
         persistData();
-        alert("Données importées avec succès !");
+        showToast("✅ Données importées avec succès !", "success");
       } else {
-        alert("Format JSON non valide.");
+        showToast("⚠️ Format JSON non valide.", "error");
       }
     } catch (err) {
-      alert("Erreur lors de la lecture du fichier : " + err.message);
+      showToast("❌ Erreur lors de la lecture du fichier : " + err.message, "error");
     }
   };
   reader.readAsText(file);
@@ -2008,7 +2097,7 @@ function savePouvoirForm(e) {
   const coproId = document.getElementById('pouvoirMandantSelect').value;
   const c = appData.coproprietaires.find(x => x.id === coproId);
   if (!c) {
-    alert("Veuillez sélectionner un copropriétaire.");
+    showToast("⚠️ Veuillez sélectionner un copropriétaire.", "warning");
     return;
   }
 
@@ -2020,7 +2109,7 @@ function savePouvoirForm(e) {
     memberId = document.getElementById('pouvoirMemberSelect').value;
     const m = appData.members.find(x => x.id === memberId);
     if (!m) {
-      alert("Veuillez choisir un membre du Conseil Syndical.");
+      showToast("⚠️ Veuillez choisir un membre du Conseil Syndical.", "warning");
       return;
     }
     mandataireNom = m.name;
@@ -3575,12 +3664,12 @@ function validerMouvementSeance(e) {
   const c = appData.coproprietaires.find(x => x.id === coproId);
 
   if (!c) {
-    alert("Veuillez sélectionner un copropriétaire.");
+    showToast("⚠️ Veuillez sélectionner un copropriétaire.", "warning");
     return;
   }
 
   if (!heure) {
-    alert("Veuillez renseigner l'heure officielle.");
+    showToast("⚠️ Veuillez renseigner l'heure officielle.", "warning");
     return;
   }
 
@@ -4063,7 +4152,7 @@ function enregistrerReserveResolution() {
   const text = document.getElementById('reserveTexteGenere')?.value.trim();
 
   if (!res || !text) {
-    alert("Veuillez sélectionner une résolution et générer un texte de réserve.");
+    showToast("⚠️ Veuillez sélectionner une résolution et générer un texte de réserve.", "warning");
     return;
   }
 
@@ -4481,6 +4570,16 @@ function projeterSimulationFinanciere() {
 function revenirResolutionSurEcranPublic() {
   diffuserSurEcranPublic('RESOLUTION');
   showToast("📽️ Écran Rétroprojecteur rétabli sur la résolution en cours !", "info");
+}
+
+function projeterEcranAccueil() {
+  diffuserSurEcranPublic('ACCUEIL');
+  showToast("🏛️ Écran Accueil & Quorum en direct diffusé sur le vidéoprojecteur !", "success");
+}
+
+function recalculerScrutinDirect() {
+  if (typeof computeScrutinTotals === 'function') computeScrutinTotals();
+  if (typeof verifierDiscordanceScrutin === 'function') verifierDiscordanceScrutin();
 }
 
 let isCostSimOpen = false;
