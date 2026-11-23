@@ -12,7 +12,7 @@
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
   <link rel="apple-touch-icon" href="assets/icon.svg">
   <title>Suivi AG & Votes - RÉSIDENCE LE FLORÉAL 2026</title>
-  <link rel="stylesheet" href="css/style.css?v=4.0">
+  <link rel="stylesheet" href="css/style.css?v=4.1">
   <link rel="stylesheet" href="css/auth.css?v=4.0">
   <link rel="stylesheet" href="css/app-ui.css?v=9.0">
   <!-- Firebase SDK Compat (Temps réel Cloud sécurisé) -->
@@ -637,7 +637,10 @@
             <option value="ABSENT">❌ Absents non représentés</option>
           </select>
         </div>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" style="background:#7c3aed; color:white; font-weight:700;" onclick="openVpcBallotModal()" title="Saisir et consulter les bulletins de Vote par Correspondance (POUR / CONTRE / ABSTENTION)">
+            📬 Bulletins VPC <span id="btnVpcCountBadge" style="background:rgba(255,255,255,0.22); padding:1px 6px; border-radius:999px; font-size:0.75rem; margin-left:4px;">0</span>
+          </button>
           <span style="font-size:0.8rem; font-weight:700; color:var(--primary);" id="statPresentsCount">0 présents</span>
           <button class="btn btn-primary" onclick="openNewCoproModal()">+ Ajouter</button>
         </div>
@@ -1292,13 +1295,27 @@ M. LEROY Jacques	Lot 8	85"></textarea>
             </div>
           </div>
 
+          <!-- Bandeau récapitulatif VPC (Votes par correspondance pré-saisis) -->
+          <div id="scrutinVpcBanner" style="display:none;"></div>
+
+          <!-- Règle légale Art. 17-1 A : Amendement en séance -->
+          <div id="scrutinAmendedWrap" style="display:none; background:#fdf4ff; border:1.5px solid #c026d3; border-radius:8px; padding:0.55rem 0.85rem; margin:0.45rem 0;">
+            <label style="display:flex; align-items:flex-start; gap:0.55rem; cursor:pointer; margin:0; font-size:0.82rem; color:#701a75;">
+              <input type="checkbox" id="scrutinAmendedCheck" style="width:17px; height:17px; margin-top:2px; accent-color:#a21caf; flex-shrink:0;" onchange="onScrutinAmendedChange()">
+              <span>
+                <strong>⚖️ Résolution amendée en séance (Art. 17-1 A loi 1965)</strong><br>
+                <span style="font-size:0.76rem;">Cochez si le texte est modifié en AG : les VPC ayant voté <strong>POUR</strong> (<span id="scrutinAmendedTantCount">0</span> t.) deviennent légalement <strong>défaillants</strong> (exclus du POUR).</span>
+              </span>
+            </label>
+          </div>
+
           <!-- Règle d'or légale & Bouton Unanimité 1-clic -->
           <div style="display:flex; justify-content:space-between; align-items:center; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:0.5rem 0.8rem; margin:0.6rem 0; flex-wrap:wrap; gap:0.5rem;">
             <div style="font-size:0.82rem; color:#065f46; flex:1; min-width:240px; line-height:1.4;">
-              💡 <strong>Règle légale :</strong> Par défaut, tous les copropriétaires présents en salle votent <strong>POUR</strong>. Ne cochez ci-dessous <u>QUE</u> les mains levées pour <strong>CONTRE</strong> ou <strong>ABSTENTION</strong>.
+              💡 <strong>Règle légale :</strong> Par défaut, tous les copropriétaires présents en salle votent <strong>POUR</strong>. Les bulletins <strong>VPC</strong> sont pré-remplis automatiquement ; en salle, ne cochez <u>QUE</u> les mains levées <strong>CONTRE</strong> ou <strong>ABSTENTION</strong>.
             </div>
             <button type="button" class="btn btn-sm btn-success" onclick="scrutinValiderUnanimite()" style="white-space:nowrap; font-weight:700;">
-              ⚡ Unanimité (0 Contre, 0 Abs)
+              ⚡ Unanimité salle (0 Contre, 0 Abs)
             </button>
           </div>
 
@@ -1392,6 +1409,68 @@ M. LEROY Jacques	Lot 8	85"></textarea>
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL SAISIE DES BULLETINS VPC (VOTES PAR CORRESPONDANCE) -->
+  <div class="modal-overlay" id="vpcBallotModal">
+    <div class="modal-box" style="max-width:780px;">
+      <div class="modal-header" style="background:linear-gradient(135deg, #6d28d9, #7c3aed); color:white;">
+        <h3 class="modal-title" style="color:white;">📬 Saisie des Bulletins VPC (Vote par Correspondance)</h3>
+        <button class="modal-close" style="color:white;" onclick="closeModal('vpcBallotModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Sélecteur de copropriétaire VPC + Ajout rapide -->
+        <div class="form-row" style="align-items:flex-end; margin-bottom:0.65rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-weight:700; color:#5b21b6;">Copropriétaire VPC à saisir / modifier</label>
+            <select id="vpcCoproSelect" class="form-control" onchange="onSelectVpcCoproChange()">
+              <!-- Rempli dynamiquement -->
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-weight:600; color:var(--gray-600);">+ Ajouter un copropriétaire en VPC</label>
+            <div style="display:flex; gap:0.4rem;">
+              <select id="vpcQuickAddSelect" class="form-control">
+                <!-- Rempli dynamiquement -->
+              </select>
+              <button type="button" class="btn btn-sm" style="background:#7c3aed; color:white; white-space:nowrap; font-weight:700;" onclick="quickAddCoproToVpc()">
+                + Passer VPC
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Infos du copropriétaire sélectionné & actions rapides -->
+        <div id="vpcBallotHeaderInfo" style="display:none; background:#f5f3ff; border:1px solid #c4b5fd; border-radius:8px; padding:0.6rem 0.85rem; margin-bottom:0.65rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <strong id="vpcSelectedName" style="color:#4c1d95; font-size:0.95rem;">—</strong>
+              <span id="vpcSelectedMeta" style="font-size:0.8rem; color:#6d28d9; margin-left:0.4rem;"></span>
+            </div>
+            <div id="vpcSelectedProgress" class="vpc-summary-pills"></div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.55rem; align-items:center;">
+            <span style="font-size:0.76rem; font-weight:700; color:#5b21b6; margin-right:0.2rem;">Remplissage express :</span>
+            <button type="button" class="btn btn-sm" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-weight:700; font-size:0.75rem;" onclick="fillAllVpcBallot('POUR')">👍 Tout POUR</button>
+            <button type="button" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-weight:700; font-size:0.75rem;" onclick="fillAllVpcBallot('CONTRE')">👎 Tout CONTRE</button>
+            <button type="button" class="btn btn-sm" style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; font-weight:700; font-size:0.75rem;" onclick="fillAllVpcBallot('ABSTENTION')">⚠️ Tout ABST</button>
+            <button type="button" class="btn btn-sm btn-secondary" style="font-size:0.75rem;" onclick="fillAllVpcBallot('')">↺ Effacer</button>
+          </div>
+        </div>
+
+        <!-- Liste des résolutions à voter -->
+        <div id="vpcBallotListContainer">
+          <!-- Rendu dynamique par renderVpcBallotList() -->
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div id="vpcBallotFooterSummary" style="font-size:0.8rem; color:var(--gray-600); font-weight:600;"></div>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('vpcBallotModal')">Fermer</button>
+          <button type="button" class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="saveVpcBallot()">💾 Enregistrer le bulletin VPC</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2303,11 +2382,11 @@ M. LEROY Jacques	Lot 8	85"></textarea>
   <script src="js/ui-dialogs.js?v=5.0"></script>
   <script src="js/data.js?v=4.0"></script>
   <script src="js/auth.js?v=4.0"></script>
-  <script src="js/supabase-client.js?v=4.2"></script>
+  <script src="js/supabase-client.js?v=4.3"></script>
   <script src="js/audit.js?v=4.0"></script>
   <script src="js/sync.js?v=4.0"></script>
   <script src="js/pwa.js?v=4.0"></script>
-  <script src="js/app.js?v=4.0"></script>
+  <script src="js/app.js?v=4.1"></script>
 
   <!-- Enregistrement Service Worker PWA -->
   <script>

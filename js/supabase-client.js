@@ -135,7 +135,7 @@ async function syncFromSupabase(isManual = false) {
           if (details.heureVote) local.heureVote = details.heureVote;
           if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
           if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
-          if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
+          if (details.amendedInSession !== undefined) local.amendedInSession = !!details.amendedInSession;
           local.votes = {
             pour: r.votes_pour || 0,
             contre: r.votes_contre || 0,
@@ -155,6 +155,11 @@ async function syncFromSupabase(isManual = false) {
       if (Array.isArray(stateData.config.customMessages)) {
         if (!appData.config) appData.config = {};
         appData.config.customMessages = stateData.config.customMessages;
+      }
+      if (stateData.config.vpcVotes && typeof stateData.config.vpcVotes === 'object') {
+        appData.vpcVotes = { ...(appData.vpcVotes || {}), ...stateData.config.vpcVotes };
+        if (!appData.config) appData.config = {};
+        appData.config.vpcVotes = appData.vpcVotes;
       }
     }
 
@@ -283,6 +288,7 @@ function setupSupabaseRealtime() {
           if (details.heureVote) local.heureVote = details.heureVote;
           if (details.opponentsText !== undefined) local.opponentsText = details.opponentsText;
           if (details.adoptedVia251 !== undefined) local.adoptedVia251 = !!details.adoptedVia251;
+          if (details.amendedInSession !== undefined) local.amendedInSession = !!details.amendedInSession;
           local.votes = {
             pour: row.votes_pour || 0,
             contre: row.votes_contre || 0,
@@ -314,6 +320,15 @@ function setupSupabaseRealtime() {
         if (typeof window.onRemoteDisplayStateUpdate === 'function') {
           window.onRemoteDisplayStateUpdate(row.display_state);
         }
+      }
+      if (row && row.config && row.config.vpcVotes && typeof appData !== 'undefined') {
+        appData.vpcVotes = row.config.vpcVotes;
+        if (!appData.config) appData.config = {};
+        appData.config.vpcVotes = row.config.vpcVotes;
+        if (typeof STORAGE_KEY !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        }
+        if (typeof updateUI === 'function') updateUI();
       }
     })
     .subscribe((status) => {
@@ -514,12 +529,13 @@ async function cloudPushAllCoprosToSupabase(silent = false) {
     }
 
     // Pousser également l'état global et les résolutions
-    if (appData.config || appData.seance) {
+    if (appData.config || appData.seance || appData.vpcVotes) {
+      const mergedConfig = { ...(appData.config || {}), vpcVotes: appData.vpcVotes || {} };
       await supabaseClient
         .from('ag_state')
         .upsert({
           id: SUPABASE_CONFIG.stateId,
-          config: appData.config || {},
+          config: mergedConfig,
           seance: appData.seance || {},
           updated_at: new Date().toISOString(),
           updated_by: typeof getCurrentUser === 'function' ? getCurrentUser().name : 'CS Sync'
@@ -613,6 +629,29 @@ async function cloudSaveCustomMessages(customMessages) {
   }
 }
 
+async function cloudSaveVpcVotes(vpcVotes) {
+  if (!supabaseClient || !isSupabaseOnline || !vpcVotes || typeof vpcVotes !== 'object') return;
+  try {
+    const { data: stateRow } = await supabaseClient
+      .from('ag_state')
+      .select('config')
+      .eq('id', SUPABASE_CONFIG.stateId)
+      .maybeSingle();
+
+    const currentConfig = (stateRow && stateRow.config) ? stateRow.config : {};
+    await supabaseClient
+      .from('ag_state')
+      .update({
+        config: { ...currentConfig, vpcVotes: vpcVotes },
+        updated_at: new Date().toISOString(),
+        updated_by: typeof getCurrentUser === 'function' ? getCurrentUser().name : 'CS VPC'
+      })
+      .eq('id', SUPABASE_CONFIG.stateId);
+  } catch (e) {
+    console.warn('Erreur synchro vpcVotes Supabase :', e);
+  }
+}
+
 // Export global pour compatibilité
 window.initSupabase = initSupabase;
 window.syncFromSupabase = syncFromSupabase;
@@ -622,6 +661,7 @@ window.cloudUpdateDisplayState = cloudUpdateDisplayState;
 window.cloudPushAllCoprosToSupabase = cloudPushAllCoprosToSupabase;
 window.cloudSaveMemberPins = cloudSaveMemberPins;
 window.cloudSaveCustomMessages = cloudSaveCustomMessages;
+window.cloudSaveVpcVotes = cloudSaveVpcVotes;
 window.cloudPushAuditLog = cloudPushAuditLog;
 window.cloudPushData = cloudPushData;
 window.forceSyncFromCloud = forceSyncFromCloud;

@@ -346,6 +346,8 @@ function renderResolutions(totalEnSalle, totalCopro) {
           </div>
         ` : ''}
 
+        ${!isSansVote ? renderResolutionVpcPreview(r.id) : ''}
+
         ${!isSansVote ? renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) : ''}
 
         ${hasNumbers ? `
@@ -570,7 +572,9 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
       } else if (c.statut === 'POUVOIR') {
         statutBadge = `<span class="badge-pouvoir">✉️ Pouvoir : ${escapeHtml(c.mandataire || 'Inconnu')}</span>`;
       } else if (c.statut === 'VPC') {
-        statutBadge = `<span class="badge-vpc">📬 Vote Corresp.</span>`;
+        const comp = typeof getVpcCoproCompletion === 'function' ? getVpcCoproCompletion(c.id) : { filled: 0, total: 0 };
+        const compLabel = comp.total > 0 ? ` (${comp.filled}/${comp.total})` : '';
+        statutBadge = `<span class="badge-vpc" style="cursor:pointer;" onclick="openVpcBallotModal('${c.id}')" title="Cliquer pour saisir ou consulter son bulletin VPC">📬 VPC${compLabel}</span>`;
       } else if (c.statut === 'PARTI') {
         statutBadge = `<span class="badge-parti">🚪 Parti (${c.heureDepart || 'En cours'})</span>`;
       } else {
@@ -596,8 +600,8 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
               <button class="table-action-btn btn-action-pouvoir" onclick="openPouvoirModalForCopro('${c.id}')" title="Administrer / Attribuer le pouvoir">
                 ✉️ Pouvoir
               </button>
-              <button class="table-action-btn" style="${c.statut === 'VPC' ? 'background:#f3e8ff; color:#7e22ce; border-color:#d8b4fe; font-weight:700;' : 'background:rgba(139,92,246,0.08); color:#7c3aed; border-color:rgba(139,92,246,0.25);'}" onclick="setCoproStatut('${c.id}', 'VPC')" title="Pointer en Vote par Correspondance (VPC)">
-                📬 VPC
+              <button class="table-action-btn" style="${c.statut === 'VPC' ? 'background:#f3e8ff; color:#7e22ce; border-color:#d8b4fe; font-weight:700;' : 'background:rgba(139,92,246,0.08); color:#7c3aed; border-color:rgba(139,92,246,0.25);'}" onclick="${c.statut === 'VPC' ? `openVpcBallotModal('${c.id}')` : `setCoproStatut('${c.id}', 'VPC')`}" title="${c.statut === 'VPC' ? 'Saisir / Modifier son bulletin VPC (POUR / CONTRE / ABST)' : 'Pointer en Vote par Correspondance (VPC)'}">
+                ${c.statut === 'VPC' ? '📝 Bulletin VPC' : '📬 VPC'}
               </button>
               <button class="table-action-btn btn-action-icon" onclick="promptDepartCopro('${c.id}')" title="Enregistrer son départ en cours d'AG">
                 🚪
@@ -614,6 +618,12 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
 
   const effectiveTotal = totalTant || 97478;
   document.getElementById('footPresentTantiemes').innerText = `${totalEnSalle} / ${effectiveTotal} tantièmes en salle (${((totalEnSalle / effectiveTotal) * 100).toFixed(1)}%)`;
+
+  const vpcBadge = document.getElementById('btnVpcCountBadge');
+  if (vpcBadge) {
+    const vpcCount = (appData.coproprietaires || []).filter(c => c.statut === 'VPC').length;
+    vpcBadge.innerText = vpcCount;
+  }
 }
 
 // Horodatage officiel Garanti Heure de Paris (Europe/Paris)
@@ -801,6 +811,358 @@ function setQuickVote(id, newStatus) {
 }
 
 // ==========================================
+// MODULE BULLETINS VPC (VOTES PAR CORRESPONDANCE)
+// ==========================================
+let currentVpcCoproId = null;
+let vpcBallotDraft = {};
+let vpcBallotDirty = false;
+
+function ensureVpcVotesStore() {
+  if (!appData) return {};
+  if (!appData.vpcVotes || typeof appData.vpcVotes !== 'object') {
+    appData.vpcVotes = (appData.config && appData.config.vpcVotes && typeof appData.config.vpcVotes === 'object')
+      ? { ...appData.config.vpcVotes }
+      : {};
+  }
+  return appData.vpcVotes;
+}
+
+function getVotableResolutions() {
+  return (appData.resolutions || []).filter(r => r.majorite !== 'article sans vote');
+}
+
+function getCoproVpcVote(coproId, resId) {
+  const store = ensureVpcVotesStore();
+  return (store[coproId] && store[coproId][resId]) ? store[coproId][resId] : '';
+}
+
+function getVpcCoproCompletion(coproId) {
+  const votables = getVotableResolutions();
+  const store = ensureVpcVotesStore();
+  const map = store[coproId] || {};
+  let filled = 0, pour = 0, contre = 0, abs = 0;
+  votables.forEach(r => {
+    const v = map[r.id];
+    if (v === 'POUR') { filled++; pour++; }
+    else if (v === 'CONTRE') { filled++; contre++; }
+    else if (v === 'ABSTENTION') { filled++; abs++; }
+  });
+  return { filled, total: votables.length, pour, contre, abs };
+}
+
+function getResolutionVpcBreakdown(resId, isAmended = false) {
+  const vpcCopros = (appData.coproprietaires || []).filter(c => c.statut === 'VPC');
+  let pourTant = 0, pourCount = 0;
+  let contreTant = 0, contreCount = 0;
+  let absTant = 0, absCount = 0;
+  let defaillantTant = 0, defaillantCount = 0;
+  let unfilledTant = 0, unfilledCount = 0;
+  let rawPourTant = 0, rawPourCount = 0;
+  const contreIds = [];
+  const contreNoms = [];
+  const absIds = [];
+  const items = [];
+
+  vpcCopros.forEach(c => {
+    const tant = Number(c.tantiemes) || 0;
+    const rawChoice = getCoproVpcVote(c.id, resId); // 'POUR' | 'CONTRE' | 'ABSTENTION' | ''
+    let effectiveChoice = rawChoice;
+
+    if (rawChoice === 'POUR') {
+      rawPourTant += tant;
+      rawPourCount++;
+      if (isAmended) {
+        effectiveChoice = 'DEFAILLANT';
+        defaillantTant += tant;
+        defaillantCount++;
+      } else {
+        pourTant += tant;
+        pourCount++;
+      }
+    } else if (rawChoice === 'CONTRE') {
+      contreTant += tant;
+      contreCount++;
+      contreIds.push(c.id);
+      contreNoms.push(`${c.nom} (${tant} t. - VPC)`);
+    } else if (rawChoice === 'ABSTENTION') {
+      absTant += tant;
+      absCount++;
+      absIds.push(c.id);
+    } else {
+      unfilledTant += tant;
+      unfilledCount++;
+    }
+
+    items.push({ copro: c, rawChoice, effectiveChoice, tantiemes: tant });
+  });
+
+  return {
+    items,
+    totalVpcCount: vpcCopros.length,
+    totalVpcTant: vpcCopros.reduce((acc, c) => acc + (Number(c.tantiemes) || 0), 0),
+    pourTant, pourCount,
+    rawPourTant, rawPourCount,
+    contreTant, contreCount, contreIds, contreNoms,
+    absTant, absCount, absIds,
+    defaillantTant, defaillantCount,
+    unfilledTant, unfilledCount
+  };
+}
+
+function renderResolutionVpcPreview(resId) {
+  const b = getResolutionVpcBreakdown(resId, false);
+  if (b.totalVpcCount === 0) return '';
+  const hasAnyFilled = (b.pourCount + b.contreCount + b.absCount) > 0;
+  if (!hasAnyFilled) return '';
+
+  return `
+    <div class="vpc-summary-banner no-print">
+      <div style="font-weight:700; display:flex; align-items:center; gap:0.35rem;">
+        📬 Bulletins VPC (${b.totalVpcCount} · ${b.totalVpcTant.toLocaleString('fr-FR')} t.) :
+      </div>
+      <div class="vpc-summary-pills">
+        ${b.pourCount > 0 ? `<span class="vpc-pill vpc-pill-pour">👍 ${b.pourTant.toLocaleString('fr-FR')} t. (${b.pourCount})</span>` : ''}
+        ${b.contreCount > 0 ? `<span class="vpc-pill vpc-pill-contre">👎 ${b.contreTant.toLocaleString('fr-FR')} t. (${b.contreCount})</span>` : ''}
+        ${b.absCount > 0 ? `<span class="vpc-pill vpc-pill-abs">⚠️ ${b.absTant.toLocaleString('fr-FR')} t. (${b.absCount})</span>` : ''}
+        ${b.unfilledCount > 0 ? `<span class="vpc-pill vpc-pill-empty">❓ ${b.unfilledCount} non saisi(s)</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function openVpcBallotModal(coproId = null) {
+  ensureVpcVotesStore();
+  populateVpcModalSelectors(coproId);
+  openModal('vpcBallotModal');
+}
+
+function populateVpcModalSelectors(targetCoproId = null) {
+  const vpcSelect = document.getElementById('vpcCoproSelect');
+  const addSelect = document.getElementById('vpcQuickAddSelect');
+  if (!vpcSelect || !addSelect) return;
+
+  const allCopros = [...(appData.coproprietaires || [])].sort((a, b) =>
+    (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' })
+  );
+  const vpcCopros = allCopros.filter(c => c.statut === 'VPC');
+  const nonVpcCopros = allCopros.filter(c => c.statut !== 'VPC');
+
+  if (vpcCopros.length === 0) {
+    vpcSelect.innerHTML = `<option value="">— Aucun copropriétaire pointé en VPC —</option>`;
+    currentVpcCoproId = null;
+  } else {
+    vpcSelect.innerHTML = vpcCopros.map(c => {
+      const comp = getVpcCoproCompletion(c.id);
+      const icon = comp.filled === comp.total && comp.total > 0 ? '✅' : (comp.filled > 0 ? '📝' : '⚪');
+      return `<option value="${c.id}">${icon} ${escapeHtml(c.nom)} (${c.tantiemes || 0} t.) — ${comp.filled}/${comp.total}</option>`;
+    }).join('');
+
+    if (targetCoproId && vpcCopros.some(c => c.id === targetCoproId)) {
+      currentVpcCoproId = targetCoproId;
+    } else if (!currentVpcCoproId || !vpcCopros.some(c => c.id === currentVpcCoproId)) {
+      currentVpcCoproId = vpcCopros[0].id;
+    }
+    vpcSelect.value = currentVpcCoproId;
+  }
+
+  addSelect.innerHTML = `<option value="">Choisir un copropriétaire...</option>` +
+    nonVpcCopros.map(c => `<option value="${c.id}">${escapeHtml(c.nom)} (${c.tantiemes || 0} t.)</option>`).join('');
+
+  loadVpcBallotDraftForCurrent();
+}
+
+function loadVpcBallotDraftForCurrent() {
+  const store = ensureVpcVotesStore();
+  vpcBallotDraft = currentVpcCoproId ? { ...(store[currentVpcCoproId] || {}) } : {};
+  vpcBallotDirty = false;
+  renderVpcBallotList();
+}
+
+function onSelectVpcCoproChange() {
+  if (vpcBallotDirty && currentVpcCoproId) {
+    saveVpcBallot(false);
+  }
+  const vpcSelect = document.getElementById('vpcCoproSelect');
+  currentVpcCoproId = vpcSelect ? vpcSelect.value : null;
+  loadVpcBallotDraftForCurrent();
+}
+
+function quickAddCoproToVpc() {
+  const addSelect = document.getElementById('vpcQuickAddSelect');
+  const coproId = addSelect ? addSelect.value : '';
+  if (!coproId) {
+    showToast('Sélectionnez un copropriétaire à passer en VPC.', 'warning');
+    return;
+  }
+  if (vpcBallotDirty && currentVpcCoproId) {
+    saveVpcBallot(false);
+  }
+  const c = (appData.coproprietaires || []).find(x => x.id === coproId);
+  if (!c) return;
+  c.statut = 'VPC';
+  delete c.heureDepart;
+  if (typeof cloudUpdateCopro === 'function') {
+    cloudUpdateCopro(coproId, 'VPC', null);
+  }
+  if (typeof logAuditAction === 'function') {
+    logAuditAction('PRESENCE', `Passage en VPC : ${c.nom}`, `Statut défini à VPC (${c.tantiemes} tantièmes)`);
+  }
+  persistData();
+  populateVpcModalSelectors(coproId);
+  showToast(`📬 ${c.nom} ajouté aux Votes par Correspondance !`, 'success');
+}
+
+function setVpcBallotChoice(resId, choice) {
+  if (!currentVpcCoproId) return;
+  if (vpcBallotDraft[resId] === choice) {
+    delete vpcBallotDraft[resId];
+  } else {
+    vpcBallotDraft[resId] = choice;
+  }
+  vpcBallotDirty = true;
+  renderVpcBallotList();
+}
+
+function fillAllVpcBallot(choice) {
+  if (!currentVpcCoproId) return;
+  const votables = getVotableResolutions();
+  if (!choice) {
+    vpcBallotDraft = {};
+  } else {
+    votables.forEach(r => {
+      vpcBallotDraft[r.id] = choice;
+    });
+  }
+  vpcBallotDirty = true;
+  renderVpcBallotList();
+}
+
+function renderVpcBallotList() {
+  const headerInfo = document.getElementById('vpcBallotHeaderInfo');
+  const container = document.getElementById('vpcBallotListContainer');
+  const footerSummary = document.getElementById('vpcBallotFooterSummary');
+  if (!container) return;
+
+  if (!currentVpcCoproId) {
+    if (headerInfo) headerInfo.style.display = 'none';
+    if (footerSummary) footerSummary.innerText = '';
+    container.innerHTML = `
+      <div style="text-align:center; padding:2rem 1rem; color:var(--gray-500); border:1px dashed var(--gray-300); border-radius:8px;">
+        <div style="font-size:1.8rem; margin-bottom:0.4rem;">📬</div>
+        <strong>Aucun copropriétaire n'est encore pointé en VPC.</strong><br>
+        <span style="font-size:0.84rem;">Sélectionnez un nom dans <em>« + Ajouter un copropriétaire en VPC »</em> ci-dessus, ou cliquez sur <strong>📬 VPC</strong> dans la liste des copropriétaires.</span>
+      </div>
+    `;
+    return;
+  }
+
+  const copro = (appData.coproprietaires || []).find(c => c.id === currentVpcCoproId);
+  if (!copro) return;
+
+  const votables = getVotableResolutions();
+  let cPour = 0, cContre = 0, cAbs = 0, cEmpty = 0;
+  votables.forEach(r => {
+    const v = vpcBallotDraft[r.id] || '';
+    if (v === 'POUR') cPour++;
+    else if (v === 'CONTRE') cContre++;
+    else if (v === 'ABSTENTION') cAbs++;
+    else cEmpty++;
+  });
+
+  if (headerInfo) {
+    headerInfo.style.display = 'block';
+    const nameEl = document.getElementById('vpcSelectedName');
+    const metaEl = document.getElementById('vpcSelectedMeta');
+    const progEl = document.getElementById('vpcSelectedProgress');
+    if (nameEl) nameEl.innerText = copro.nom;
+    if (metaEl) metaEl.innerText = `Lots : ${copro.lots || '-'} · ${copro.tantiemes || 0} tantièmes`;
+    if (progEl) {
+      progEl.innerHTML = `
+        <span class="vpc-pill vpc-pill-pour">👍 ${cPour}</span>
+        <span class="vpc-pill vpc-pill-contre">👎 ${cContre}</span>
+        <span class="vpc-pill vpc-pill-abs">⚠️ ${cAbs}</span>
+        ${cEmpty > 0 ? `<span class="vpc-pill vpc-pill-empty">⚪ ${cEmpty} vide(s)</span>` : '<span class="vpc-pill vpc-pill-pour">✅ Complet</span>'}
+      `;
+    }
+  }
+
+  if (footerSummary) {
+    footerSummary.innerText = `${cPour + cContre + cAbs} / ${votables.length} résolutions saisies (${cPour} POUR · ${cContre} CONTRE · ${cAbs} ABST)`;
+  }
+
+  container.innerHTML = `
+    <div class="vpc-ballot-list">
+      ${votables.map(r => {
+        const val = vpcBallotDraft[r.id] || '';
+        return `
+          <div class="vpc-ballot-row">
+            <div class="vpc-ballot-res-info">
+              <div class="vpc-ballot-res-title">
+                <span style="color:#6d28d9; font-weight:800;">Rés. ${escapeHtml(r.number)}</span> — ${escapeHtml(r.title)}
+              </div>
+              <div class="vpc-ballot-res-meta">
+                <span>${escapeHtml(r.majorite)}</span>
+                ${r.csConsigne ? `<span>· Consigne CS : <strong>${escapeHtml(r.csConsigne)}</strong></span>` : ''}
+              </div>
+            </div>
+            <div class="vpc-choice-group">
+              <button type="button" class="vpc-choice-btn ${val === 'POUR' ? 'active-pour' : ''}" onclick="setVpcBallotChoice('${r.id}', 'POUR')">👍 POUR</button>
+              <button type="button" class="vpc-choice-btn ${val === 'CONTRE' ? 'active-contre' : ''}" onclick="setVpcBallotChoice('${r.id}', 'CONTRE')">👎 CONTRE</button>
+              <button type="button" class="vpc-choice-btn ${val === 'ABSTENTION' ? 'active-abs' : ''}" onclick="setVpcBallotChoice('${r.id}', 'ABSTENTION')">⚠️ ABST</button>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function saveVpcBallot(closeAfter = true) {
+  if (!currentVpcCoproId) {
+    if (closeAfter) closeModal('vpcBallotModal');
+    return;
+  }
+  const store = ensureVpcVotesStore();
+  // Nettoyer les clés vides
+  const cleaned = {};
+  Object.keys(vpcBallotDraft).forEach(resId => {
+    if (vpcBallotDraft[resId]) cleaned[resId] = vpcBallotDraft[resId];
+  });
+  store[currentVpcCoproId] = cleaned;
+  appData.vpcVotes = store;
+  if (!appData.config) appData.config = {};
+  appData.config.vpcVotes = store;
+  vpcBallotDirty = false;
+
+  const copro = (appData.coproprietaires || []).find(c => c.id === currentVpcCoproId);
+  const comp = getVpcCoproCompletion(currentVpcCoproId);
+
+  if (typeof logAuditAction === 'function' && copro) {
+    logAuditAction(
+      'VOTE',
+      `Bulletin VPC enregistré : ${copro.nom}`,
+      `${comp.filled}/${comp.total} résolutions (${comp.pour} POUR, ${comp.contre} CONTRE, ${comp.abs} ABST) — ${copro.tantiemes} t.`
+    );
+  }
+
+  if (typeof cloudSaveVpcVotes === 'function') {
+    cloudSaveVpcVotes(appData.vpcVotes);
+  }
+
+  persistData();
+  populateVpcModalSelectors(currentVpcCoproId);
+
+  if (closeAfter) {
+    closeModal('vpcBallotModal');
+    // Si le scrutin était ouvert en arrière-plan, le rafraîchir
+    if (document.getElementById('scrutinModal')?.classList.contains('active') && currentScrutinResId) {
+      openScrutinModal(currentScrutinResId);
+    }
+    showToast(`📬 Bulletin VPC de ${copro ? copro.nom : 'copropriétaire'} enregistré (${comp.pour}P / ${comp.contre}C / ${comp.abs}A) !`, 'success');
+  }
+}
+
+// ==========================================
 // MODULE DÉPOUILLEMENT MIROIR & SCRUTIN
 // ==========================================
 let currentScrutinResId = null;
@@ -814,7 +1176,7 @@ function openScrutinModal(resId) {
   document.getElementById('scrutinResTitle').innerText = res.title;
   document.getElementById('scrutinResMaj').innerText = `Majorité légale requise : ${res.majorite}`;
 
-  // Tantièmes présents en salle actuellement
+  // Tantièmes présents en salle actuellement (Présents + Pouvoirs + VPC)
   const totalEnSalle = appData.config.presentTantiemes || 0;
   document.getElementById('scrutinTotalSalle').innerText = totalEnSalle;
 
@@ -836,14 +1198,72 @@ function openScrutinModal(resId) {
     passCheck.checked = !!res.adoptedVia251;
   }
 
+  const amendCheck = document.getElementById('scrutinAmendedCheck');
+  if (amendCheck) amendCheck.checked = !!res.amendedInSession;
+
   const searchInput = document.getElementById('scrutinChecklistSearch');
   if (searchInput) searchInput.value = '';
 
-  // Calcul instantané des opposants cochés
+  renderScrutinVpcBanner();
   renderScrutinChecklist();
-  computeScrutinTotals();
-  verifierDiscordanceScrutin();
+
+  // Si des bulletins VPC sont pré-saisis pour cette résolution, synchroniser immédiatement le décompte
+  const vpcBreakdown = getResolutionVpcBreakdown(resId, !!res.amendedInSession);
+  const hasExplicitVpc = (vpcBreakdown.rawPourCount + vpcBreakdown.contreCount + vpcBreakdown.absCount) > 0;
+  if (hasExplicitVpc) {
+    onScrutinCheckboxChange(null, null);
+  } else {
+    computeScrutinTotals();
+    verifierDiscordanceScrutin();
+  }
+
   openModal('scrutinModal');
+}
+
+function renderScrutinVpcBanner() {
+  const banner = document.getElementById('scrutinVpcBanner');
+  const amendWrap = document.getElementById('scrutinAmendedWrap');
+  const amendTantEl = document.getElementById('scrutinAmendedTantCount');
+  if (!banner || !currentScrutinResId) return;
+
+  const isAmended = !!document.getElementById('scrutinAmendedCheck')?.checked;
+  const b = getResolutionVpcBreakdown(currentScrutinResId, isAmended);
+
+  if (b.totalVpcCount === 0) {
+    banner.style.display = 'none';
+    if (amendWrap) amendWrap.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'block';
+  banner.innerHTML = `
+    <div class="vpc-summary-banner" style="margin:0.45rem 0;">
+      <div>
+        <strong>📬 Bulletins VPC intégrés (${b.totalVpcCount} · ${b.totalVpcTant.toLocaleString('fr-FR')} t.) :</strong>
+        <div class="vpc-summary-pills" style="margin-top:0.3rem;">
+          ${b.pourCount > 0 ? `<span class="vpc-pill vpc-pill-pour">👍 POUR : ${b.pourTant.toLocaleString('fr-FR')} t. (${b.pourCount})</span>` : ''}
+          ${b.defaillantCount > 0 ? `<span class="vpc-pill vpc-pill-defaillant">🚫 Défaillant (amendé) : ${b.defaillantTant.toLocaleString('fr-FR')} t. (${b.defaillantCount})</span>` : ''}
+          ${b.contreCount > 0 ? `<span class="vpc-pill vpc-pill-contre">👎 CONTRE : ${b.contreTant.toLocaleString('fr-FR')} t. (${b.contreCount})</span>` : ''}
+          ${b.absCount > 0 ? `<span class="vpc-pill vpc-pill-abs">⚠️ ABST : ${b.absTant.toLocaleString('fr-FR')} t. (${b.absCount})</span>` : ''}
+          ${b.unfilledCount > 0 ? `<span class="vpc-pill vpc-pill-empty">⚠️ ${b.unfilledCount} bulletin(s) non saisi(s)</span>` : ''}
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm" style="background:#7c3aed; color:white; font-size:0.75rem; font-weight:700;" onclick="openVpcBallotModal()">
+        📝 Saisir / Modifier VPC
+      </button>
+    </div>
+  `;
+
+  if (amendWrap) {
+    amendWrap.style.display = b.rawPourCount > 0 ? 'block' : 'none';
+    if (amendTantEl) amendTantEl.innerText = b.rawPourTant.toLocaleString('fr-FR');
+  }
+}
+
+function onScrutinAmendedChange() {
+  renderScrutinVpcBanner();
+  renderScrutinChecklist();
+  onScrutinCheckboxChange(null, null);
 }
 
 function renderScrutinChecklist() {
@@ -851,41 +1271,90 @@ function renderScrutinChecklist() {
   if (!container) return;
 
   const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+  if (!res) return;
+
   const activeOpponents = res.opponentsIds || [];
   const activeAbs = res.absenteeIds || [];
+  const isAmended = !!document.getElementById('scrutinAmendedCheck')?.checked;
 
-  // Filtrer uniquement les copropriétaires présents ou représentés en salle
-  const presents = (appData.coproprietaires || []).filter(c => c.statut === 'PRESENT' || c.statut === 'POUVOIR' || c.statut === 'VPC');
+  // Séparer VPC (pré-remplis) et présents/pouvoirs en salle (mains levées)
+  const inRoom = (appData.coproprietaires || []).filter(c => c.statut === 'PRESENT' || c.statut === 'POUVOIR');
+  const vpcBreakdown = getResolutionVpcBreakdown(currentScrutinResId, isAmended);
 
-  if (presents.length === 0) {
+  if (inRoom.length === 0 && vpcBreakdown.totalVpcCount === 0) {
     container.innerHTML = `<div style="font-size:0.82rem; color:var(--gray-500); padding:0.5rem;">
       Astuce : Pointez d'abord les présents dans l'onglet « Copropriétaires & Pouvoirs », ou saisissez directement les chiffres ci-dessous.
     </div>`;
     return;
   }
 
-  container.innerHTML = `
-    <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:0.4rem;">
-      Mains levées en salle (Cochez uniquement CONTRE ou ABSTENTION — Le reste vote POUR automatiquement) :
-    </div>
-    <div class="scrutin-checklist-box">
-      ${presents.map(c => `
-        <div class="scrutin-item-row" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes}" style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.4rem; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
-          <label style="display:flex; align-items:center; gap:0.45rem; cursor:pointer; flex:1; min-width:0; margin-right:0.5rem;">
-            <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeOpponents.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'CONTRE')">
-            <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.nom)}</span>
-            <span class="tantieme-pill" style="font-size:0.75rem;">${c.tantiemes} t.</span>
-            ${c.statut === 'POUVOIR' ? `<span style="font-size:0.72rem; color:#2563eb;">(➔ ${escapeHtml(c.mandataire || 'CS')})</span>` : ''}
-            ${c.statut === 'VPC' ? `<span style="font-size:0.72rem; color:#7c3aed;">(VPC)</span>` : ''}
-          </label>
-          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:#d97706; cursor:pointer; white-space:nowrap;">
-            <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeAbs.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'ABS')">
-            Abstention
-          </label>
+  let html = '';
+
+  // 1. Bloc VPC (pré-rempli automatiquement depuis les bulletins)
+  if (vpcBreakdown.items.length > 0) {
+    html += `
+      <div class="vpc-scrutin-section">
+        <div style="font-size:0.78rem; font-weight:800; color:#5b21b6; margin-bottom:0.35rem;">
+          📬 Votes par Correspondance (${vpcBreakdown.items.length}) — pré-remplis automatiquement :
         </div>
-      `).join('')}
-    </div>
-  `;
+        ${vpcBreakdown.items.map(item => {
+          const c = item.copro;
+          const hasExplicit = item.rawChoice !== '';
+          const isContre = hasExplicit ? (item.effectiveChoice === 'CONTRE') : activeOpponents.includes(c.id);
+          const isAbs = hasExplicit ? (item.effectiveChoice === 'ABSTENTION') : activeAbs.includes(c.id);
+
+          let choiceBadge = '';
+          if (item.effectiveChoice === 'POUR') choiceBadge = `<span class="vpc-pill vpc-pill-pour">👍 POUR</span>`;
+          else if (item.effectiveChoice === 'CONTRE') choiceBadge = `<span class="vpc-pill vpc-pill-contre">👎 CONTRE</span>`;
+          else if (item.effectiveChoice === 'ABSTENTION') choiceBadge = `<span class="vpc-pill vpc-pill-abs">⚠️ ABST</span>`;
+          else if (item.effectiveChoice === 'DEFAILLANT') choiceBadge = `<span class="vpc-pill vpc-pill-defaillant">🚫 Défaillant (amendé)</span>`;
+          else choiceBadge = `<span class="vpc-pill vpc-pill-empty">⚠️ Bulletin non saisi</span>`;
+
+          return `
+            <div class="scrutin-item-row vpc-scrutin-row" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes} vpc">
+              <label style="display:flex; align-items:center; gap:0.4rem; flex:1; min-width:0; cursor:${hasExplicit ? 'default' : 'pointer'};">
+                <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" data-vpc="1" data-vpc-locked="${hasExplicit ? '1' : '0'}" ${isContre ? 'checked' : ''} ${hasExplicit ? 'disabled' : ''} onchange="onScrutinCheckboxChange(this, 'CONTRE')">
+                <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.nom)}</span>
+                <span class="tantieme-pill" style="font-size:0.72rem;">${c.tantiemes} t.</span>
+                ${choiceBadge}
+              </label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.74rem; color:#d97706; white-space:nowrap; cursor:${hasExplicit ? 'default' : 'pointer'};">
+                <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" data-vpc="1" data-vpc-locked="${hasExplicit ? '1' : '0'}" ${isAbs ? 'checked' : ''} ${hasExplicit ? 'disabled' : ''} onchange="onScrutinCheckboxChange(this, 'ABS')">
+                Abst.
+              </label>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // 2. Bloc Mains levées en salle (Présents & Pouvoirs uniquement)
+  if (inRoom.length > 0) {
+    html += `
+      <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:0.4rem;">
+        🙋 Mains levées en salle (${inRoom.length} présents/pouvoirs — cochez uniquement CONTRE ou ABSTENTION) :
+      </div>
+      <div class="scrutin-checklist-box">
+        ${inRoom.map(c => `
+          <div class="scrutin-item-row" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes}" style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.4rem; border-bottom:1px solid #f1f5f9; font-size:0.82rem;">
+            <label style="display:flex; align-items:center; gap:0.45rem; cursor:pointer; flex:1; min-width:0; margin-right:0.5rem;">
+              <input type="checkbox" class="chk-contre" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeOpponents.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'CONTRE')">
+              <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.nom)}</span>
+              <span class="tantieme-pill" style="font-size:0.75rem;">${c.tantiemes} t.</span>
+              ${c.statut === 'POUVOIR' ? `<span style="font-size:0.72rem; color:#2563eb;">(➔ ${escapeHtml(c.mandataire || 'CS')})</span>` : ''}
+            </label>
+            <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:#d97706; cursor:pointer; white-space:nowrap;">
+              <input type="checkbox" class="chk-abs" data-id="${c.id}" data-tant="${c.tantiemes}" ${activeAbs.includes(c.id) ? 'checked' : ''} onchange="onScrutinCheckboxChange(this, 'ABS')">
+              Abstention
+            </label>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
 }
 
 function filtrerScrutinChecklist() {
@@ -902,44 +1371,38 @@ function filtrerScrutinChecklist() {
 }
 
 function scrutinValiderUnanimite() {
-  const totalSalle = Number(document.getElementById('scrutinTotalSalle').innerText) || appData.config.presentTantiemes || 0;
+  // Décocher UNIQUEMENT les cases en salle (préserve les bulletins VPC verrouillés)
+  document.querySelectorAll('.chk-contre:not([data-vpc-locked="1"])').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.chk-abs:not([data-vpc-locked="1"])').forEach(cb => cb.checked = false);
 
-  // Décocher toutes les cases de la checklist
-  document.querySelectorAll('.chk-contre').forEach(cb => cb.checked = false);
-  document.querySelectorAll('.chk-abs').forEach(cb => cb.checked = false);
+  // Recalculer automatiquement avec les éventuels VPC CONTRE/ABST conservés
+  onScrutinCheckboxChange(null, null);
 
-  document.getElementById('scrutinContreInput').value = 0;
-  document.getElementById('scrutinAbsInput').value = 0;
-  document.getElementById('scrutinPourInput').value = totalSalle;
-  document.getElementById('scrutinOpponentsList').value = "Aucun opposant (Unanimité)";
-  document.getElementById('scrutinSyndicClaim').value = 'ADOPTEE';
-  document.getElementById('scrutinSyndicVoixInput').value = totalSalle;
+  const contreTotal = Number(document.getElementById('scrutinContreInput').value) || 0;
+  const absTotal = Number(document.getElementById('scrutinAbsInput').value) || 0;
+  const pourTotal = Number(document.getElementById('scrutinPourInput').value) || 0;
 
-  const res = appData.resolutions.find(r => r.id === currentScrutinResId);
-  if (res) {
-    res.opponentsIds = [];
-    res.absenteeIds = [];
-    res.opponentsList = [];
-    res.opponentsText = "Adoptée à l'unanimité (0 contre, 0 abstention)";
-    res.tantiemesPour = totalSalle;
-    res.tantiemesContre = 0;
-    res.tantiemesAbs = 0;
+  if (contreTotal === 0 && absTotal === 0) {
+    document.getElementById('scrutinOpponentsList').value = "Aucun opposant (Unanimité)";
+    const res = appData.resolutions.find(r => r.id === currentScrutinResId);
+    if (res) res.opponentsText = "Adoptée à l'unanimité (0 contre, 0 abstention)";
+    showToast("⚡ Scrutin pré-rempli à l'UNANIMITÉ (100% POUR) !", "success");
+  } else {
+    showToast("⚡ Unanimité EN SALLE appliquée (les bulletins VPC Contre/Abstention ont été conservés) !", "success");
   }
 
-  computeScrutinTotals();
+  document.getElementById('scrutinSyndicClaim').value = 'ADOPTEE';
+  document.getElementById('scrutinSyndicVoixInput').value = pourTotal;
   verifierDiscordanceScrutin();
-  showToast("⚡ Scrutin pré-rempli à l'UNANIMITÉ (100% POUR) !", "success");
 }
 
 function onScrutinCheckboxChange(el, type) {
   if (el) {
     const id = el.getAttribute('data-id');
     if (type === 'CONTRE' && el.checked) {
-      // Exclusivité mutuelle : si on coche Contre, on décoche Abstention
       const absCb = document.querySelector(`.chk-abs[data-id="${id}"]`);
       if (absCb) absCb.checked = false;
     } else if (type === 'ABS' && el.checked) {
-      // Exclusivité mutuelle : si on coche Abstention, on décoche Contre
       const contreCb = document.querySelector(`.chk-contre[data-id="${id}"]`);
       if (contreCb) contreCb.checked = false;
     }
@@ -954,10 +1417,11 @@ function onScrutinCheckboxChange(el, type) {
   document.querySelectorAll('.chk-contre:checked').forEach(cb => {
     const tant = Number(cb.getAttribute('data-tant')) || 0;
     const id = cb.getAttribute('data-id');
+    const isVpc = cb.getAttribute('data-vpc') === '1';
     contreTotal += tant;
     contreIds.push(id);
     const copro = appData.coproprietaires.find(c => c.id === id);
-    if (copro) contreNoms.push(`${copro.nom} (${tant})`);
+    if (copro) contreNoms.push(`${copro.nom} (${tant}${isVpc ? ' - VPC' : ''})`);
   });
 
   document.querySelectorAll('.chk-abs:checked').forEach(cb => {
@@ -986,8 +1450,13 @@ function computeScrutinTotals() {
   const contre = Number(document.getElementById('scrutinContreInput').value) || 0;
   const abs = Number(document.getElementById('scrutinAbsInput').value) || 0;
 
-  // En droit, Voix Pour = Total Présents - Contre - Abstention
-  const pourCalcule = Math.max(0, totalSalle - contre - abs);
+  // Art. 17-1 A : si amendée en séance, les VPC ayant voté POUR sont assimilés à des défaillants (exclus du POUR)
+  const isAmended = !!document.getElementById('scrutinAmendedCheck')?.checked;
+  const vpcBreakdown = currentScrutinResId ? getResolutionVpcBreakdown(currentScrutinResId, isAmended) : { defaillantTant: 0, defaillantCount: 0 };
+  const defaillantTant = isAmended ? vpcBreakdown.defaillantTant : 0;
+
+  // En droit, Voix Pour = Total Présents - Défaillants (VPC amendés) - Contre - Abstention
+  const pourCalcule = Math.max(0, totalSalle - defaillantTant - contre - abs);
   document.getElementById('scrutinPourInput').value = pourCalcule;
 
   // Calcul du résultat légal
@@ -1000,22 +1469,26 @@ function computeScrutinTotals() {
     return;
   }
 
+  const defNote = defaillantTant > 0
+    ? ` <span style="color:#86198f; font-weight:600;">(Art. 17-1 A : ${defaillantTant} t. VPC POUR exclus car résolution amendée)</span>`
+    : '';
+
   if (res.majorite === 'Article 24') {
     if (pourCalcule > contre) {
-      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 24</span> (${pourCalcule} Pour contre ${contre} Contre). Les ${abs} abstentions sont légales et non comptabilisées.`;
+      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 24</span> (${pourCalcule} Pour contre ${contre} Contre). Les ${abs} abstentions sont légales et non comptabilisées.${defNote}`;
     } else {
-      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE à l'Article 24</span> (${contre} Contre >= ${pourCalcule} Pour).`;
+      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE à l'Article 24</span> (${contre} Contre >= ${pourCalcule} Pour).${defNote}`;
     }
   } else if (res.majorite.includes('Article 25')) {
     const seuil25 = Math.floor(totalCopro / 2) + 1;
     const seuil13 = Math.ceil(totalCopro / 3);
 
     if (pourCalcule >= seuil25) {
-      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 25</span> (${pourCalcule} Pour >= ${seuil25} requis).`;
+      resultBox.innerHTML = `<span style="color:var(--success); font-weight:700;">✅ ADOPTÉE à l'Article 25</span> (${pourCalcule} Pour >= ${seuil25} requis).${defNote}`;
     } else if (pourCalcule >= seuil13) {
-      resultBox.innerHTML = `<span style="color:#b45309; font-weight:700;">⚠️ PASSERELLE ART. 25-1 DISPONIBLE</span> (${pourCalcule} Pour >= ${seuil13} soit 1/3 des voix). Le syndic n'a PAS le droit de rejeter définitivement : un 2nd vote à l'Art. 24 est obligatoire en séance !`;
+      resultBox.innerHTML = `<span style="color:#b45309; font-weight:700;">⚠️ PASSERELLE ART. 25-1 DISPONIBLE</span> (${pourCalcule} Pour >= ${seuil13} soit 1/3 des voix). Le syndic n'a PAS le droit de rejeter définitivement : un 2nd vote à l'Art. 24 est obligatoire en séance !${defNote}`;
     } else {
-      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE Définitivement</span> (${pourCalcule} Pour < ${seuil13} requis pour la passerelle).`;
+      resultBox.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ REJETÉE Définitivement</span> (${pourCalcule} Pour < ${seuil13} requis pour la passerelle).${defNote}`;
     }
   }
 
@@ -1143,6 +1616,7 @@ function saveScrutin(e) {
   // Détermination automatique du statut (avec prise en charge officielle Passerelle Art. 25-1)
   const totalCopro = Number(appData.config.totalTantiemes) || 97478;
   const usePasserelle251 = !!document.getElementById('scrutinPasserelle251Check')?.checked;
+  res.amendedInSession = !!document.getElementById('scrutinAmendedCheck')?.checked;
   res.adoptedVia251 = false;
 
   if (res.majorite === 'Article 24') {
@@ -1173,7 +1647,8 @@ function saveScrutin(e) {
         eluNom: res.eluNom || '',
         heureVote: res.heureVote,
         opponentsText: res.opponentsText || '',
-        adoptedVia251: res.adoptedVia251
+        adoptedVia251: res.adoptedVia251,
+        amendedInSession: !!res.amendedInSession
       }
     );
   }
