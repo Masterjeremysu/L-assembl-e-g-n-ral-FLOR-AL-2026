@@ -774,30 +774,53 @@ function renderMembers(csPerso, csMandats, csTotal, totalTant) {
   document.getElementById('footTotalCsTantiemes').innerText = `${csTotal} / ${totalTant} (${totalTant > 0 ? ((csTotal / totalTant) * 100).toFixed(1) : 0}%)`;
 }
 
-// Quick Vote Action
+// Quick Vote Action (intègre automatiquement les bulletins VPC pré-saisis)
 function setQuickVote(id, newStatus) {
   const res = appData.resolutions.find(r => r.id === id);
   if (res) {
     res.status = newStatus;
     const totalEnSalle = appData.config.presentTantiemes || 0;
+    const vpc = typeof getResolutionVpcBreakdown === 'function'
+      ? getResolutionVpcBreakdown(id, !!res.amendedInSession)
+      : { pourTant: 0, contreTant: 0, absTant: 0, defaillantTant: 0, contreNoms: [], contreIds: [], absIds: [] };
+
     if (newStatus !== 'EN_ATTENTE') {
       res.heureVote = getHeureParis();
-      if (newStatus === 'ADOPTEE' && (!res.tantiemesPour || res.tantiemesPour === 0)) {
-        res.tantiemesPour = totalEnSalle;
-        res.tantiemesContre = res.tantiemesContre || 0;
-        res.tantiemesAbs = res.tantiemesAbs || 0;
+      const hasExistingNumbers = (Number(res.tantiemesPour) > 0 || Number(res.tantiemesContre) > 0 || Number(res.tantiemesAbs) > 0);
+      if (newStatus === 'ADOPTEE' && !hasExistingNumbers) {
+        const contre = vpc.contreTant || 0;
+        const abs = vpc.absTant || 0;
+        const def = res.amendedInSession ? (vpc.defaillantTant || 0) : 0;
+        res.tantiemesContre = contre;
+        res.tantiemesAbs = abs;
+        res.tantiemesPour = Math.max(0, totalEnSalle - def - contre - abs);
+        if (vpc.contreNoms && vpc.contreNoms.length > 0) {
+          res.opponentsText = vpc.contreNoms.join(', ');
+          res.opponentsList = [...vpc.contreNoms];
+          res.opponentsIds = [...vpc.contreIds];
+        }
+        if (vpc.absIds && vpc.absIds.length > 0) res.absenteeIds = [...vpc.absIds];
         res.syndicClaimStatus = res.syndicClaimStatus || 'ADOPTEE';
-      } else if (newStatus === 'REJETEE' && (!res.tantiemesContre || res.tantiemesContre === 0)) {
-        res.tantiemesContre = totalEnSalle;
-        res.tantiemesPour = res.tantiemesPour || 0;
-        res.tantiemesAbs = res.tantiemesAbs || 0;
+      } else if (newStatus === 'REJETEE' && !hasExistingNumbers) {
+        const pour = vpc.pourTant || 0;
+        const abs = vpc.absTant || 0;
+        const def = res.amendedInSession ? (vpc.defaillantTant || 0) : 0;
+        res.tantiemesPour = pour;
+        res.tantiemesAbs = abs;
+        res.tantiemesContre = Math.max(0, totalEnSalle - def - pour - abs);
         res.syndicClaimStatus = res.syndicClaimStatus || 'REJETEE';
       }
     } else {
       delete res.heureVote;
     }
     if (typeof cloudUpdateResolution === 'function') {
-      cloudUpdateResolution(id, newStatus, res.tantiemesPour, res.tantiemesContre, res.tantiemesAbs);
+      cloudUpdateResolution(id, newStatus, res.tantiemesPour, res.tantiemesContre, res.tantiemesAbs, {
+        eluNom: res.eluNom || '',
+        heureVote: res.heureVote || '',
+        opponentsText: res.opponentsText || '',
+        adoptedVia251: !!res.adoptedVia251,
+        amendedInSession: !!res.amendedInSession
+      });
     }
     persistData();
     diffuserSurEcranPublic('RESOLUTION');
