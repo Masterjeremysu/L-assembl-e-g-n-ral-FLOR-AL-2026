@@ -100,18 +100,40 @@ async function syncFromSupabase(isManual = false) {
         const local = appData.coproprietaires.find(item => item.id === c.id);
         if (local) {
           const remotePresence = (c.presence || 'ABSENT').toUpperCase();
+          // Toujours synchroniser nom, lots et tantièmes corrigés depuis la BDD maître
+          if (c.nom) local.nom = c.nom;
+          if (c.lots !== undefined && c.lots !== null) local.lots = c.lots;
+          local.tantiemes = c.tantiemes;
           // Protection : Si l'utilisateur a enregistré un pouvoir sur son PC et que Supabase l'a encore en absent
           if (local.statut === 'POUVOIR' && remotePresence === 'ABSENT' && local.mandataire) {
             localPouvoirsToPush.push(local);
           } else {
             local.statut = remotePresence;
             local.mandataire = c.mandataire_id || '';
-            local.tantiemes = c.tantiemes;
             if (c.heure_emargement) local.heure_emargement = c.heure_emargement;
             if (c.signature) local.signature = c.signature;
           }
+        } else {
+          // Nouveau copropriétaire présent dans Supabase mais absent du cache localStorage
+          appData.coproprietaires.push({
+            id: c.id,
+            nom: c.nom || 'Copropriétaire',
+            lots: c.lots || '',
+            tantiemes: Number(c.tantiemes) || 0,
+            categorie: '',
+            statut: (c.presence || 'ABSENT').toUpperCase(),
+            mandataire: c.mandataire_id || '',
+            notes: '',
+            heure_emargement: c.heure_emargement || undefined,
+            signature: c.signature || undefined
+          });
         }
       });
+
+      // Mise à niveau automatique du total légal 97 478 -> 100 000
+      if (appData.config && (!appData.config.totalTantiemes || Number(appData.config.totalTantiemes) === 97478)) {
+        appData.config.totalTantiemes = 100000;
+      }
 
       // Auto-push des pouvoirs locaux vers Supabase s'il y avait un décalage
       if (localPouvoirsToPush.length > 0) {

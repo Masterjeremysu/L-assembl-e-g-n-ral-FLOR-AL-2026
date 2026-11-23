@@ -98,7 +98,7 @@ function switchTab(tabId) {
 
 // UI Updates
 function updateUI() {
-  const totalTant = Number(appData.config.totalTantiemes) || 97478;
+  const totalTant = Number(appData.config.totalTantiemes) || 100000;
 
   // Synchronisation stricte des mandats et des pouvoirs avec le Conseil Syndical
   syncMembersAndPouvoirs();
@@ -219,7 +219,7 @@ function updateUI() {
   // Settings
   document.getElementById('cfgCoproname').value = appData.config.coproName || '';
   document.getElementById('cfgAgDate').value = appData.config.agDate || '';
-  document.getElementById('cfgTotalTantiemes').value = appData.config.totalTantiemes || 97478;
+  document.getElementById('cfgTotalTantiemes').value = appData.config.totalTantiemes || 100000;
   document.getElementById('cfgPresentTantiemes').value = appData.config.presentTantiemes || totalExprimesEnSalle;
 }
 
@@ -616,7 +616,7 @@ function renderCoproprietaires(totalEnSalle, totalTant) {
     }).join('');
   }
 
-  const effectiveTotal = totalTant || 97478;
+  const effectiveTotal = totalTant || 100000;
   document.getElementById('footPresentTantiemes').innerText = `${totalEnSalle} / ${effectiveTotal} tantièmes en salle (${((totalEnSalle / effectiveTotal) * 100).toFixed(1)}%)`;
 
   const vpcBadge = document.getElementById('btnVpcCountBadge');
@@ -1461,7 +1461,7 @@ function computeScrutinTotals() {
 
   // Calcul du résultat légal
   const res = appData.resolutions.find(r => r.id === currentScrutinResId);
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const resultBox = document.getElementById('scrutinLegalVerdict');
 
   if (!res || res.majorite === 'article sans vote') {
@@ -1510,7 +1510,7 @@ function verifierDiscordanceScrutin() {
   const syndicVoix = Number(document.getElementById('scrutinSyndicVoixInput')?.value) || 0;
   const pourCalcule = Number(document.getElementById('scrutinPourInput')?.value) || 0;
   const contre = Number(document.getElementById('scrutinContreInput')?.value) || 0;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
 
   let legalVerdict = 'REJETEE';
   let isPasserelle = false;
@@ -1614,7 +1614,7 @@ function saveScrutin(e) {
   if (eluVal !== undefined) res.eluNom = eluVal;
 
   // Détermination automatique du statut (avec prise en charge officielle Passerelle Art. 25-1)
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const usePasserelle251 = !!document.getElementById('scrutinPasserelle251Check')?.checked;
   res.amendedInSession = !!document.getElementById('scrutinAmendedCheck')?.checked;
   res.adoptedVia251 = false;
@@ -1971,7 +1971,7 @@ function deleteCopro(id) {
 function saveConfig() {
   appData.config.coproName = document.getElementById('cfgCoproname').value.trim();
   appData.config.agDate = document.getElementById('cfgAgDate').value;
-  appData.config.totalTantiemes = Number(document.getElementById('cfgTotalTantiemes').value) || 97478;
+  appData.config.totalTantiemes = Number(document.getElementById('cfgTotalTantiemes').value) || 100000;
   appData.config.presentTantiemes = Number(document.getElementById('cfgPresentTantiemes').value) || 0;
   persistData();
 }
@@ -2110,7 +2110,7 @@ function syncMembersAndPouvoirs() {
   if (!appData.coproprietaires) appData.coproprietaires = [];
   if (!appData.members) appData.members = [];
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const maxVoix10Pct = totalCopro * 0.10;
 
   // Lier les mandataires existants s'ils n'ont pas encore mandataireMemberId
@@ -2177,7 +2177,7 @@ function renderPouvoirsTab() {
   const tableBody = document.getElementById('pouvoirsTableBody');
   if (!pouvoirsGrid || !tableBody) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const copros = appData.coproprietaires || [];
   const allPouvoirs = copros.filter(c => c.statut === 'POUVOIR');
 
@@ -2441,7 +2441,7 @@ function populateCsMemberSelect(targetMemberId = null) {
   const select = document.getElementById('pouvoirMemberSelect');
   if (!select) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const max10Pct = totalCopro * 0.10;
 
   // Uniquement les membres actifs du CS
@@ -2527,7 +2527,7 @@ function onPouvoirMemberChanged() {
   const currentMandats = m._nbMandats || 0;
   const nextMandats = (c && c.mandataireMemberId === m.id) ? currentMandats : currentMandats + 1;
   const nextVoix = (m._totalVoix || 0) + addTant;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const max10Pct = totalCopro * 0.10;
 
   if (nextMandats <= 3) {
@@ -2543,7 +2543,7 @@ function suggererMeilleurMembreCS() {
   const coproId = document.getElementById('pouvoirMandantSelect')?.value;
   const c = appData.coproprietaires.find(x => x.id === coproId);
   const tantToAdd = c ? (Number(c.tantiemes) || 0) : 0;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const max10Pct = totalCopro * 0.10;
 
   const activeMembers = appData.members.filter(m => m.statut !== 'DEMISSIONNAIRE');
@@ -2697,7 +2697,7 @@ function suggererTransfertCS() {
   const coproId = currentTransfertCoproId;
   const c = appData.coproprietaires.find(x => x.id === coproId);
   const tantToAdd = c ? (Number(c.tantiemes) || 0) : 0;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const max10Pct = totalCopro * 0.10;
 
   const candidates = appData.members.filter(m => m.id !== c?.mandataireMemberId && m.statut !== 'DEMISSIONNAIRE');
@@ -2772,7 +2772,7 @@ async function repartirPouvoirsBlancsAuto() {
 
   if (!conf) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const max10Pct = totalCopro * 0.10;
 
   blancs.forEach(c => {
@@ -2873,7 +2873,7 @@ function renderPouvoirsExportPreview(viewType) {
   if (btnEclate) btnEclate.className = `btn-tab-export ${viewType === 'ECLATE' ? 'active' : ''}`;
   if (btnFiches) btnFiches.className = `btn-tab-export ${viewType === 'FICHES' ? 'active' : ''}`;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const maxVoix10Pct = totalCopro * 0.10;
   const copros = appData.coproprietaires || [];
   const allPouvoirs = copros.filter(c => c.statut === 'POUVOIR');
@@ -3353,7 +3353,7 @@ function exportPouvoirsEclateCsv() {
 
 function exportPouvoirsParMembreCsv() {
   syncMembersAndPouvoirs();
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const activeMembers = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE' || (m._assignedCopros && m._assignedCopros.length > 0));
   
   let csv = "Membre_CS;Role_Lots;Tantiemes_Perso;Nb_Mandats;Tantiemes_Mandats;Total_Voix_En_AG;Pourcentage_Syndicat;Conformite_Art22;Mandants_Detailles\n";
@@ -3457,7 +3457,7 @@ function imprimerPouvoirsDoc() {
 
 function copierPouvoirsResume() {
   syncMembersAndPouvoirs();
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const copros = (appData.coproprietaires || []).filter(c => c.statut === 'POUVOIR');
   const totalPouvoirsCount = copros.length;
   const totalPouvoirsTant = copros.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
@@ -3581,8 +3581,8 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
     }
   } else if (isArt25) {
     // Art 25 : Majorité de tous les copropriétaires
-    targetSeuil = Math.floor(totalCopro / 2) + 1; // 48 740
-    passerelleSeuil = Math.ceil(totalCopro / 3); // 32 493
+    targetSeuil = Math.floor(totalCopro / 2) + 1; // 50 001
+    passerelleSeuil = Math.ceil(totalCopro / 3); // 33 334
     seuilPct = 50;
     ruleTag = 'Article 25 • Majorité absolue';
     ruleSubtext = `Seuil : ${targetSeuil.toLocaleString('fr-FR')} voix (> 50% de l'immeuble)`;
@@ -3906,7 +3906,7 @@ function renderModeSeance() {
   const activeMembersSeance = (appData.members || []).filter(m => m.statut !== 'DEMISSIONNAIRE');
   const csTotalVoix = activeMembersSeance.reduce((acc, m) => acc + (Number(m.tantiemes) || 0) + (Number(m.mandatTantiemes) || 0), 0);
   const totalEnSalle = appData.config.presentTantiemes || 0;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
 
   const zone = document.getElementById('seanceTactiqueZone');
   if (zone) {
@@ -3924,8 +3924,8 @@ function renderModeSeance() {
   if (alertBanner) {
     const isArt25 = res.majorite && res.majorite.includes('Article 25');
     const isArt26 = res.majorite && res.majorite.includes('Article 26');
-    const seuil25 = Math.floor(totalCopro / 2) + 1; // 48 740
-    const seuilPasserelle = Math.ceil(totalCopro / 3); // 32 493
+    const seuil25 = Math.floor(totalCopro / 2) + 1; // 50 001
+    const seuilPasserelle = Math.ceil(totalCopro / 3); // 33 334
 
     if (isArt25 && totalEnSalle < seuil25) {
       alertBanner.style.display = 'block';
@@ -3934,8 +3934,8 @@ function renderModeSeance() {
       alertBanner.style.color = '#991b1b';
       alertBanner.innerHTML = `
         <strong>⚠️ ALERTE QUORUM CRITIQUE (DÉPARTS CONSTATÉS) :</strong><br>
-        Il ne reste plus que <strong>${totalEnSalle.toLocaleString('fr-FR')} voix en salle</strong> (sur 97 478). Le seuil de majorité absolue de 48 740 voix est désormais <u>physiquement impossible à atteindre</u> au 1er vote !<br>
-        👉 <strong>Consigne impérative :</strong> Exigez de plein droit le second vote immédiat à la majorité simple via la <strong>passerelle Article 25-1</strong> (seuil de 32 493 voix dépassé) !
+        Il ne reste plus que <strong>${totalEnSalle.toLocaleString('fr-FR')} voix en salle</strong> (sur 100 000). Le seuil de majorité absolue de 50 001 voix est désormais <u>physiquement impossible à atteindre</u> au 1er vote !<br>
+        👉 <strong>Consigne impérative :</strong> Exigez de plein droit le second vote immédiat à la majorité simple via la <strong>passerelle Article 25-1</strong> (seuil de 33 334 voix dépassé) !
       `;
     } else if (totalEnSalle < seuilPasserelle && (isArt25 || isArt26)) {
       alertBanner.style.display = 'block';
@@ -3943,7 +3943,7 @@ function renderModeSeance() {
       alertBanner.style.border = '2px solid #b91c1c';
       alertBanner.style.color = '#991b1b';
       alertBanner.innerHTML = `
-        <strong>🚨 ALERTE QUORUM MINIMUM FRANCHI :</strong> Le nombre de voix en salle (${totalEnSalle.toLocaleString('fr-FR')}) est inférieur au tiers de la copropriété (32 493). La passerelle de vote 25-1 n'est plus accessible !
+        <strong>🚨 ALERTE QUORUM MINIMUM FRANCHI :</strong> Le nombre de voix en salle (${totalEnSalle.toLocaleString('fr-FR')}) est inférieur au tiers de la copropriété (33 334). La passerelle de vote 25-1 n'est plus accessible !
       `;
     } else {
       alertBanner.style.display = 'none';
@@ -4267,7 +4267,7 @@ function openPvMiroirModal() {
   const container = document.getElementById('pvMiroirPrintContent');
   if (!container) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const copros = appData.coproprietaires || [];
   const presents = copros.filter(c => c.statut === 'PRESENT');
   const pouvoirs = copros.filter(c => c.statut === 'POUVOIR');
@@ -4401,7 +4401,7 @@ function renderFicheOuverture() {
   const container = document.getElementById('ouverturePrintZone');
   if (!container) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const copros = appData.coproprietaires || [];
   const nbTotal = copros.length || 259;
 
@@ -4424,8 +4424,8 @@ function renderFicheOuverture() {
   const totalRepresentes = tantPresents + tantPouvoirs + tantVpc;
   const nbRepresentes = presents.length + pouvoirs.length + vpc.length;
   const pctRepresentes = totalCopro > 0 ? ((totalRepresentes / totalCopro) * 100).toFixed(1) : 0;
-  const seuil25 = Math.floor(totalCopro / 2) + 1; // 48 740
-  const seuilPasserelle = Math.ceil(totalCopro / 3); // 32 493
+  const seuil25 = Math.floor(totalCopro / 2) + 1; // 50 001
+  const seuilPasserelle = Math.ceil(totalCopro / 3); // 33 334
 
   const isQuorum25 = totalRepresentes >= seuil25;
   const isQuorumPasserelle = totalRepresentes >= seuilPasserelle;
@@ -4486,8 +4486,8 @@ function renderFicheOuverture() {
           ${isQuorum25
             ? `<span style="color:#15803d; font-weight:700; margin-left:0.3rem;">✅ Majorité absolue Art. 25 atteignable en 1er vote (${totalRepresentes.toLocaleString('fr-FR')} >= ${seuil25.toLocaleString('fr-FR')})</span>`
             : (isQuorumPasserelle
-                ? `<span style="color:#b45309; font-weight:700; margin-left:0.3rem;">⚠️ Art. 25 strict impossible sans 100% de Pour — Passerelle Art. 25-1 immédiatement disponible (${totalRepresentes.toLocaleString('fr-FR')} >= 32 493 voix)</span>`
-                : `<span style="color:#dc2626; font-weight:700; margin-left:0.3rem;">❌ Représentation < 1/3 (${totalRepresentes.toLocaleString('fr-FR')} < 32 493). Mobilisation obligatoire !</span>`
+                ? `<span style="color:#b45309; font-weight:700; margin-left:0.3rem;">⚠️ Art. 25 strict impossible sans 100% de Pour — Passerelle Art. 25-1 immédiatement disponible (${totalRepresentes.toLocaleString('fr-FR')} >= 33 334 voix)</span>`
+                : `<span style="color:#dc2626; font-weight:700; margin-left:0.3rem;">❌ Représentation < 1/3 (${totalRepresentes.toLocaleString('fr-FR')} < 33 334). Mobilisation obligatoire !</span>`
               )
           }
         </div>
@@ -4510,7 +4510,7 @@ Le Conseil Syndical détient à lui seul un mandat de confiance de <strong>${tot
 
 Nous rappelons au cabinet Citya et au futur bureau de séance nos exigences démocratiques fondamentales pour cette soirée :<br>
 1. La tenue scrupuleuse de la feuille de présence et l'enregistrement officiel de chaque vote nominatif contre et abstention au procès-verbal, conformément à l'article 17 du décret de 1967 ;<br>
-2. Le respect absolu de la passerelle de l'article 25-1 : dès qu'une résolution recueille au moins un tiers des voix de la copropriété (32 493 tantièmes), le second vote immédiat à la majorité simple de l'article 24 est obligatoire de plein droit ;<br>
+2. Le respect absolu de la passerelle de l'article 25-1 : dès qu'une résolution recueille au moins un tiers des voix de la copropriété (33 334 tantièmes), le second vote immédiat à la majorité simple de l'article 24 est obligatoire de plein droit ;<br>
 3. Des débats loyaux, transparents et respectueux du temps de parole de chaque copropriétaire.<br><br>
 
 Nous vous invitons à suivre attentivement les consignes de vote affichées et argumentées par le Conseil Syndical. Déclarons maintenant la séance ouverte ! »
@@ -4596,7 +4596,7 @@ function genererTexteReserve() {
   const prefix = `[RÉSERVE FORMELLE AU PROCÈS-VERBAL — Art. 17 Décret n° 67-223 du 17 mars 1967]\n\nSur la Résolution n° ${res.number} (« ${res.title} ») :\n`;
 
   if (type === 'PASSERELLE') {
-    text = `${prefix}Le Conseil Syndical et les copropriétaires soussignés constatent que cette décision relève de l'Article 25 de la Loi du 10 juillet 1965 et a recueilli au moins le tiers des voix de tous les copropriétaires (seuil légal de 32 493 tantièmes).\n\nEn conséquence, nous exigeons expressément et de plein droit l'application immédiate de la passerelle de vote prévue à l'Article 25-1 de la Loi du 10 juillet 1965 (mise aux voix immédiate à la majorité simple de l'Article 24 au cours de la même séance).\n\nTout refus, clôture unilatérale ou passage à la résolution suivante sans ce second vote entache la décision d'un vice de forme substantiel entraînant sa nullité absolue au titre de l'Article 42 de la Loi de 1965.${details ? `\n\nPrécisions constatées : ${details}` : ''}`;
+    text = `${prefix}Le Conseil Syndical et les copropriétaires soussignés constatent que cette décision relève de l'Article 25 de la Loi du 10 juillet 1965 et a recueilli au moins le tiers des voix de tous les copropriétaires (seuil légal de 33 334 tantièmes).\n\nEn conséquence, nous exigeons expressément et de plein droit l'application immédiate de la passerelle de vote prévue à l'Article 25-1 de la Loi du 10 juillet 1965 (mise aux voix immédiate à la majorité simple de l'Article 24 au cours de la même séance).\n\nTout refus, clôture unilatérale ou passage à la résolution suivante sans ce second vote entache la décision d'un vice de forme substantiel entraînant sa nullité absolue au titre de l'Article 42 de la Loi de 1965.${details ? `\n\nPrécisions constatées : ${details}` : ''}`;
   } else if (type === 'COMPTE_VOIX') {
     text = `${prefix}Le Conseil Syndical et les copropriétaires soussignés contestent formellement le décompte et le résultat proclamé par le syndic / le président de séance.\n\nLe pointage contradictoire contradictoirement établi en salle démontre une discordance flagrante entre les votes exprimés à main levée et l'annonce verbale faite à la tribune.\n\nNous exigeons la consignation nominative intégrale au présent procès-verbal de chaque copropriétaire opposant et abstentionniste avec mention exacte de ses tantièmes, ainsi que le recompte formel avant toute adoption.${details ? `\n\nConstat d'écart : ${details}` : ''}`;
   } else if (type === 'POUVOIR_REJET') {
@@ -4864,7 +4864,7 @@ function calculerQuotePartTravauxModal() {
   const netLabel = document.getElementById('simModalNetLabel');
   if (netLabel) netLabel.innerText = `${net.toLocaleString('fr-FR')} €`;
 
-  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config?.totalTantiemes) || 100000;
   const valeurUnitaire = totalCopro > 0 ? (net / totalCopro) : 0;
   const echeanceUnitaire = valeurUnitaire / echeances;
 
@@ -4914,7 +4914,7 @@ function calculerParTantiemesDirectsModal() {
   const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
   const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
   const net = Math.max(0, budget - deduction);
-  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config?.totalTantiemes) || 100000;
 
   const totalPart = (net * tant) / totalCopro;
   const parEcheance = totalPart / echeances;
@@ -4964,7 +4964,7 @@ function rechercherCoproSimModal() {
   const deduction = Number(document.getElementById('simModalDeductionInput')?.value) || 0;
   const echeances = Number(document.getElementById('simModalEcheanceSelect')?.value) || 4;
   const net = Math.max(0, budget - deduction);
-  const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config?.totalTantiemes) || 100000;
 
   const found = (appData.coproprietaires || []).find(c =>
     fuzzyMatch(query, `${c.nom} ${c.lots || ''}`)
@@ -5172,7 +5172,7 @@ function calculerImpactCharges() {
 
   if (totalBudget <= 0) totalBudget = 85000;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
 
   grid.innerHTML = PALIERS_TANTIEMES_REELS.slice(0, 6).map(p => {
     const part = (totalBudget * p.tant / totalCopro);
@@ -5206,7 +5206,7 @@ function calculerQuotePartVoisin() {
   }
 
   const budget = Number(budgetInput?.value) || 85000;
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
 
   // Si l'utilisateur tape un nombre direct de tantièmes
   if (/^\d+$/.test(query)) {
@@ -5374,7 +5374,7 @@ function renderFicheCloture() {
   const container = document.getElementById('cloturePrintZone');
   if (!container) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const resolutions = appData.resolutions || [];
   const voteRes = resolutions.filter(r => r.majorite !== 'article sans vote');
   const adopted = voteRes.filter(r => r.status === 'ADOPTEE');
@@ -5592,7 +5592,7 @@ function renderFlashInfo() {
   const container = document.getElementById('flashInfoPrintZone');
   if (!container) return;
 
-  const totalCopro = Number(appData.config.totalTantiemes) || 97478;
+  const totalCopro = Number(appData.config.totalTantiemes) || 100000;
   const resolutions = appData.resolutions || [];
   const voteRes = resolutions.filter(r => r.majorite !== 'article sans vote');
   const adopted = voteRes.filter(r => r.status === 'ADOPTEE');

@@ -569,7 +569,7 @@
       }
 
       // Quorum calculé en direct (autonome via Supabase)
-      const totalCopro = Number(appData.config?.totalTantiemes) || 97478;
+      const totalCopro = Number(appData.config?.totalTantiemes) || 100000;
       const q = computeLiveQuorum(appData);
       const presents = q.tant || Number(appData.config?.presentTantiemes) || 0;
       const pct = totalCopro > 0 ? ((presents / totalCopro) * 100).toFixed(1) : '0';
@@ -875,7 +875,7 @@
     }
 
     function renderWaitingScreen() {
-      renderAccueilScreen(97478, { tant: 0, nbPresents: 0, nbPouvoirs: 0, nbVpc: 0, totalCopros: 259 });
+      renderAccueilScreen(100000, { tant: 0, nbPresents: 0, nbPouvoirs: 0, nbVpc: 0, totalCopros: 282 });
     }
 
     function formatDescription(desc) {
