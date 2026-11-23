@@ -424,6 +424,9 @@
           <strong>Avis du CS :</strong> <span id="seanceCsArgumentsText">-</span>
         </div>
 
+        <!-- Bandeau VPC en direct en Mode Séance -->
+        <div id="seanceVpcBanner" style="display:none; margin-bottom:0.9rem;"></div>
+
         <!-- Candidat / Élu(e) désigné(e) en séance -->
         <div id="seanceElectionZone" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); border-radius:8px; padding:0.65rem 0.9rem; margin-bottom:0.9rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
           <div style="font-size:0.85rem; font-weight:800; color:#fde047; display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
@@ -1466,7 +1469,8 @@ M. LEROY Jacques	Lot 8	85"></textarea>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
         <div id="vpcBallotFooterSummary" style="font-size:0.8rem; color:var(--gray-600); font-weight:600;"></div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" onclick="ouvrirRecapVpcImprimable()" title="Ouvrir le tableau complet des VPC (totaux par résolution) prêt à imprimer pour contrôler Citya">🖨️ Récap imprimable</button>
           <button type="button" class="btn btn-secondary" onclick="closeModal('vpcBallotModal')">Fermer</button>
           <button type="button" class="btn btn-primary" style="background:#7c3aed; border-color:#6d28d9;" onclick="saveVpcBallot()">💾 Enregistrer le bulletin VPC</button>
         </div>

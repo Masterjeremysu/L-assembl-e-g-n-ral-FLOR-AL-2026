@@ -655,6 +655,7 @@ function clearCoproSearch() {
 function setCoproStatut(id, newStatut) {
   const c = appData.coproprietaires.find(x => x.id === id);
   if (c) {
+    const prevStatut = c.statut;
     c.statut = newStatut;
     if (newStatut === 'PRESENT') {
       c.heureArrivee = getHeureParis();
@@ -673,7 +674,11 @@ function setCoproStatut(id, newStatut) {
       searchEl.focus();
     }
     persistData();
-    showToast(`${c.nom} pointé comme ${newStatut}`, "success");
+    if (prevStatut === 'VPC' && (newStatut === 'PRESENT' || newStatut === 'POUVOIR')) {
+      notifyVpcCancelledArt141(c, newStatut);
+    } else {
+      showToast(`${c.nom} pointé comme ${newStatut}`, "success");
+    }
   }
 }
 
@@ -1181,7 +1186,428 @@ function saveVpcBallot(closeAfter = true) {
     if (document.getElementById('scrutinModal')?.classList.contains('active') && currentScrutinResId) {
       openScrutinModal(currentScrutinResId);
     }
+    if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive) {
+      renderModeSeance();
+    }
     showToast(`📬 Bulletin VPC de ${copro ? copro.nom : 'copropriétaire'} enregistré (${comp.pour}P / ${comp.contre}C / ${comp.abs}A) !`, 'success');
+  }
+}
+
+// Bandeau VPC en direct dans le Mode Séance grand format
+function renderSeanceVpcBanner(res) {
+  const container = document.getElementById('seanceVpcBanner');
+  if (!container) return;
+
+  if (!res || res.majorite === 'article sans vote') {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  const b = getResolutionVpcBreakdown(res.id, !!res.amendedInSession);
+  if (b.totalVpcCount === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  const pillsHtml = [
+    `<span class="seance-vpc-pill pour" title="VPC ayant voté POUR">👍 ${b.pourTant.toLocaleString('fr-FR')} t. (${b.pourCount})</span>`,
+    `<span class="seance-vpc-pill contre" title="VPC ayant voté CONTRE">👎 ${b.contreTant.toLocaleString('fr-FR')} t. (${b.contreCount})</span>`,
+    `<span class="seance-vpc-pill abs" title="VPC ayant voté ABSTENTION">⚠️ ${b.absTant.toLocaleString('fr-FR')} t. (${b.absCount})</span>`,
+    b.defaillantCount > 0
+      ? `<span class="seance-vpc-pill defaillant" title="VPC POUR devenus défaillants suite à amendement (Art. 17-1 A)">🚫 ${b.defaillantTant.toLocaleString('fr-FR')} t. défaillants (${b.defaillantCount})</span>`
+      : '',
+    b.unfilledCount > 0
+      ? `<span class="seance-vpc-pill empty" title="Bulletins VPC non encore saisis pour cette résolution">❓ ${b.unfilledCount} non saisi(s)</span>`
+      : ''
+  ].filter(Boolean).join('');
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="seance-vpc-banner">
+      <div class="seance-vpc-banner-left">
+        <strong style="color:#ddd6fe; white-space:nowrap;">📬 VPC sur cette résolution (${b.totalVpcCount} · ${b.totalVpcTant.toLocaleString('fr-FR')} t.) :</strong>
+        <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+          ${pillsHtml}
+        </div>
+      </div>
+      <div style="display:flex; gap:0.4rem; align-items:center;">
+        <button type="button" class="btn btn-sm" style="background:rgba(139,92,246,0.35); color:#f5f3ff; border:1px solid rgba(196,181,253,0.45); font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem;" onclick="openVpcBallotModal()" title="Consulter ou modifier les bulletins VPC">
+          📝 VPC
+        </button>
+        <button type="button" class="btn btn-sm" style="background:rgba(255,255,255,0.12); color:#e2e8f0; border:1px solid rgba(255,255,255,0.25); font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem;" onclick="ouvrirRecapVpcImprimable()" title="Imprimer le tableau récapitulatif des VPC (contrôle Citya)">
+          🖨️ Récap
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Tableau récapitulatif imprimable des VPC (contrôle anti-erreur Citya)
+function ouvrirRecapVpcImprimable() {
+  if (vpcBallotDirty && currentVpcCoproId) {
+    saveVpcBallot(false);
+  }
+
+  const vpcCopros = [...(appData.coproprietaires || [])]
+    .filter(c => c.statut === 'VPC')
+    .sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' }));
+
+  if (vpcCopros.length === 0) {
+    showToast("Aucun copropriétaire n'est actuellement pointé en VPC.", "warning");
+    return;
+  }
+
+  const votables = getVotableResolutions();
+  const totalVpcTant = vpcCopros.reduce((sum, c) => sum + (Number(c.tantiemes) || 0), 0);
+  const totalCoproTant = Number(appData.config?.totalTantiemes) || 100000;
+  const vpcPct = totalCoproTant > 0 ? ((totalVpcTant / totalCoproTant) * 100).toFixed(2) : '0.00';
+  const coproName = escapeHtml(appData.config?.coproName || 'Le Floréal');
+  const agDate = escapeHtml(appData.config?.agDate || '2026');
+  const nowStr = new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const resRowsHtml = votables.map(r => {
+    const b = getResolutionVpcBreakdown(r.id, false);
+    const hasOpposition = b.contreCount > 0 || b.absCount > 0;
+    const rowClass = hasOpposition ? 'row-alert' : '';
+    const majShort = escapeHtml((r.majorite || '').replace('Majorité simple ', '').replace('Majorité absolue ', '').replace('Double majorité ', ''));
+
+    return `
+      <tr class="${rowClass}">
+        <td class="col-num"><strong>${escapeHtml(r.number)}</strong></td>
+        <td class="col-title">
+          <div class="res-title">${escapeHtml(r.title)}</div>
+          ${r.csConsigne ? `<div class="res-consigne">Consigne CS : <strong>${escapeHtml(r.csConsigne)}</strong></div>` : ''}
+        </td>
+        <td class="col-maj">${majShort}</td>
+        <td class="col-vote col-pour">
+          <div class="vote-tant">${b.pourTant.toLocaleString('fr-FR')} t.</div>
+          <div class="vote-nb">${b.pourCount} bul.</div>
+        </td>
+        <td class="col-vote col-contre">
+          <div class="vote-tant">${b.contreTant.toLocaleString('fr-FR')} t.</div>
+          <div class="vote-nb">${b.contreCount} bul.</div>
+        </td>
+        <td class="col-vote col-abs">
+          <div class="vote-tant">${b.absTant.toLocaleString('fr-FR')} t.</div>
+          <div class="vote-nb">${b.absCount} bul.</div>
+        </td>
+        <td class="col-vote col-empty">
+          ${b.unfilledCount > 0 ? `<div class="vote-tant">${b.unfilledTant.toLocaleString('fr-FR')} t.</div><div class="vote-nb">${b.unfilledCount} vide(s)</div>` : '<span class="ok-check">✓ 100%</span>'}
+        </td>
+        <td class="col-check">
+          <span class="check-box"></span> OK &nbsp; / &nbsp; Écart : ________
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const coproRowsHtml = vpcCopros.map(c => {
+    const comp = getVpcCoproCompletion(c.id);
+    const store = ensureVpcVotesStore();
+    const votesMap = store[c.id] || {};
+    const exceptions = votables
+      .filter(r => votesMap[r.id] === 'CONTRE' || votesMap[r.id] === 'ABSTENTION')
+      .map(r => `${votesMap[r.id] === 'CONTRE' ? '👎' : '⚠️'} Rés. ${escapeHtml(r.number)}`)
+      .join(', ');
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(c.nom)}</strong></td>
+        <td>${escapeHtml(c.lots || '-')}</td>
+        <td style="text-align:right; font-weight:700;">${(Number(c.tantiemes) || 0).toLocaleString('fr-FR')} t.</td>
+        <td style="text-align:center;">${comp.filled} / ${comp.total}</td>
+        <td style="font-size:8.5pt;">${exceptions || '<span style="color:#15803d;">Tout POUR (aucun CONTRE / ABST)</span>'}</td>
+        <td style="text-align:center; width:75px;"><span class="check-box"></span> Annulé</td>
+      </tr>
+    `;
+  }).join('');
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showToast("⚠️ Fenêtre bloquée par le navigateur. Autorisez les pop-ups pour imprimer le récapitulatif VPC.", "warning");
+    return;
+  }
+
+  printWindow.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Tableau Récapitulatif VPC — AG ${coproName}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 18px 22px;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: #f5f3ff;
+      border: 1px solid #c4b5fd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+    }
+    .toolbar-btn {
+      background: #7c3aed;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 700;
+      font-size: 9.5pt;
+      cursor: pointer;
+    }
+    .toolbar-btn.secondary {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #4c1d95;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+      gap: 16px;
+    }
+    .doc-title {
+      margin: 0 0 4px 0;
+      font-size: 15pt;
+      color: #4c1d95;
+    }
+    .doc-subtitle {
+      font-size: 9pt;
+      color: #475569;
+    }
+    .kpi-box {
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .kpi-card {
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    .kpi-val {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #5b21b6;
+    }
+    .kpi-lbl {
+      font-size: 7.5pt;
+      color: #6d28d9;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    h2 {
+      font-size: 11pt;
+      color: #1e293b;
+      margin: 14px 0 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 8.8pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 5px 7px;
+      vertical-align: middle;
+    }
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      text-align: left;
+    }
+    tr { page-break-inside: avoid; }
+    tr.row-alert { background: #fffbeb; }
+    .col-num { width: 42px; text-align: center; color: #5b21b6; }
+    .col-title { width: 34%; }
+    .res-title { font-weight: 600; color: #0f172a; }
+    .res-consigne { font-size: 7.8pt; color: #64748b; margin-top: 2px; }
+    .col-maj { width: 11%; font-size: 8pt; color: #475569; }
+    .col-vote { text-align: right; white-space: nowrap; width: 10%; }
+    .vote-tant { font-weight: 800; font-size: 9pt; }
+    .vote-nb { font-size: 7.5pt; opacity: 0.8; }
+    .col-pour { background: #f0fdf4; color: #15803d; }
+    .col-contre { background: #fef2f2; color: #b91c1c; }
+    .col-abs { background: #fffbeb; color: #b45309; }
+    .col-empty { text-align: center; color: #64748b; width: 9%; }
+    .ok-check { color: #15803d; font-weight: 700; font-size: 8pt; }
+    .col-check { width: 14%; font-size: 8pt; color: #475569; white-space: nowrap; }
+    .check-box {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border: 1.5px solid #475569;
+      border-radius: 2px;
+      vertical-align: -1px;
+      margin-right: 3px;
+    }
+    .legal-note {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-left: 4px solid #d97706;
+      border-radius: 6px;
+      padding: 8px 11px;
+      font-size: 8.4pt;
+      color: #78350f;
+      margin-top: 8px;
+      page-break-inside: avoid;
+    }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { padding: 0; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <div>
+      <strong>🖨️ Fiche de contrôle contradictoire des VPC</strong> — Format paysage recommandé (prêt pour impression ou PDF).
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="toolbar-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+      <button class="toolbar-btn secondary" onclick="window.close()">✕ Fermer</button>
+    </div>
+  </div>
+
+  <div class="doc-header">
+    <div>
+      <h1 class="doc-title">📬 Récapitulatif Officiel des Votes par Correspondance (VPC)</h1>
+      <div class="doc-subtitle">
+        Copropriété <strong>${coproName}</strong> — AG ${agDate} · Édité le ${nowStr} · Grille de vérification anti-erreur face au Syndic
+      </div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-card">
+        <div class="kpi-val">${vpcCopros.length}</div>
+        <div class="kpi-lbl">Bulletins VPC</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${totalVpcTant.toLocaleString('fr-FR')} t.</div>
+        <div class="kpi-lbl">${vpcPct}% des voix</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>1. Totaux VPC par résolution (contrôle en séance)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:center;">N°</th>
+        <th>Résolution</th>
+        <th>Majorité</th>
+        <th style="text-align:right; background:#dcfce7; color:#15803d;">👍 POUR</th>
+        <th style="text-align:right; background:#fee2e2; color:#b91c1c;">👎 CONTRE</th>
+        <th style="text-align:right; background:#fef3c7; color:#b45309;">⚠️ ABST</th>
+        <th style="text-align:center;">Saisie</th>
+        <th>Contrôle Citya</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${resRowsHtml}
+    </tbody>
+  </table>
+
+  <h2>2. Liste nominative des bulletins VPC retenus (${vpcCopros.length} copropriétaires · ${totalVpcTant.toLocaleString('fr-FR')} tantièmes)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Copropriétaire</th>
+        <th>Lots</th>
+        <th style="text-align:right;">Tantièmes</th>
+        <th style="text-align:center;">Résolutions saisies</th>
+        <th>Votes CONTRE / ABSTENTION</th>
+        <th style="text-align:center;">Art. 14-1</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${coproRowsHtml}
+    </tbody>
+  </table>
+
+  <div class="legal-note">
+    <strong>⚖️ Rappel légal important (Art. 14-1 du décret du 17 mars 1967 & Art. 17-1 A loi du 10 juillet 1965) :</strong><br>
+    • <strong>Présence ou pouvoir ultérieur :</strong> Si un copropriétaire figurant ci-dessus se présente physiquement en salle ou donne pouvoir à un mandataire présent, son bulletin VPC est <u>automatiquement annulé</u> — cochez « Annulé » ci-dessus et vérifiez que le syndic (Citya) le retire de ses VPC.<br>
+    • <strong>Résolution amendée en séance :</strong> Si le texte d'une résolution est modifié en séance, les VPC ayant voté <strong>POUR</strong> deviennent légalement <strong>défaillants</strong> (exclus du POUR).
+  </div>
+</body>
+</html>`);
+  printWindow.document.close();
+}
+
+// Alerte légale automatique Art. 14-1 quand un VPC vient en salle ou donne pouvoir
+function notifyVpcCancelledArt141(copro, newStatut, extraDetail = '') {
+  if (!copro) return;
+  const comp = getVpcCoproCompletion(copro.id);
+  const statutLabel = newStatut === 'POUVOIR'
+    ? `Représenté par pouvoir${extraDetail ? ` (${escapeHtml(extraDetail)})` : ''}`
+    : 'Présent physiquement en salle';
+
+  if (typeof logAuditAction === 'function') {
+    logAuditAction(
+      'PRESENCE',
+      `Annulation VPC (Art. 14-1) : ${copro.nom}`,
+      `Passage de VPC à ${newStatut}${extraDetail ? ' — ' + extraDetail : ''} (${copro.tantiemes} t.) — vérifier retrait chez Citya`
+    );
+  }
+
+  if (typeof isModeSeanceActive !== 'undefined' && isModeSeanceActive) {
+    renderModeSeance();
+  }
+
+  const ballotInfo = comp.filled > 0
+    ? ` (<strong>${comp.filled}/${comp.total}</strong> résolutions saisies : ${comp.pour} POUR, ${comp.contre} CONTRE, ${comp.abs} ABST)`
+    : '';
+
+  const htmlMsg = `
+    <div style="margin-bottom:0.65rem;">
+      <strong>${escapeHtml(copro.nom)}</strong> (${(Number(copro.tantiemes) || 0).toLocaleString('fr-FR')} tantièmes) avait un bulletin <strong>VPC</strong>${ballotInfo}.
+    </div>
+    <div style="margin-bottom:0.75rem;">
+      En passant en <strong>${statutLabel}</strong>, son vote par correspondance est <strong>légalement annulé</strong> (Art. 14-1 du décret du 17 mars 1967) et a déjà été <strong>retiré automatiquement</strong> des totaux VPC de l'application.
+    </div>
+    <div style="background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.45); border-left:4px solid #f59e0b; border-radius:6px; padding:0.65rem 0.8rem; font-size:0.86rem;">
+      <strong>👉 Contrôle impératif en séance :</strong><br>
+      Vérifiez que le syndic (<strong>Citya</strong>) a bien <strong>retiré son bulletin VPC</strong> de son propre décompte pour éviter tout double comptage !
+    </div>
+    <div style="margin-top:0.55rem; font-size:0.78rem; color:var(--gray-500);">
+      ℹ️ Astuce : en cas d'erreur de pointage, son bulletin reste conservé en mémoire si vous le repassez en VPC.
+    </div>
+  `;
+
+  if (typeof appAlert === 'function') {
+    appAlert({
+      title: '⚖️ Bulletin VPC annulé (Art. 14-1)',
+      meta: 'Rappel légal — Décret du 17 mars 1967',
+      message: htmlMsg,
+      buttonText: "C'est noté, je vérifie avec Citya",
+      type: 'warning'
+    });
+  } else {
+    showToast(`⚖️ Art. 14-1 : VPC de ${copro.nom} annulé — vérifiez que Citya l'a bien retiré !`, 'warning');
   }
 }
 
@@ -1965,9 +2391,16 @@ function saveCopro(e) {
 
   if (!appData.coproprietaires) appData.coproprietaires = [];
 
+  let prevStatut = null;
+  let updatedCopro = null;
+
   if (id) {
     const index = appData.coproprietaires.findIndex(c => c.id === id);
-    if (index !== -1) appData.coproprietaires[index] = { ...appData.coproprietaires[index], ...coproData };
+    if (index !== -1) {
+      prevStatut = appData.coproprietaires[index].statut;
+      appData.coproprietaires[index] = { ...appData.coproprietaires[index], ...coproData };
+      updatedCopro = appData.coproprietaires[index];
+    }
   } else {
     appData.coproprietaires.push({ id: 'copro_' + Date.now(), ...coproData });
   }
@@ -1979,6 +2412,10 @@ function saveCopro(e) {
 
   closeModal('coproModal');
   persistData();
+
+  if (prevStatut === 'VPC' && updatedCopro && (coproData.statut === 'PRESENT' || coproData.statut === 'POUVOIR')) {
+    notifyVpcCancelledArt141(updatedCopro, coproData.statut, coproData.mandataire);
+  }
 }
 
 function deleteCopro(id) {
@@ -2622,6 +3059,7 @@ function savePouvoirForm(e) {
   const consignes = document.getElementById('pouvoirConsignes').value.trim();
   const source = document.getElementById('pouvoirSource').value.trim();
 
+  const prevStatut = c.statut;
   c.statut = 'POUVOIR';
   c.mandataire = mandataireNom;
   c.mandataireMemberId = memberId;
@@ -2641,7 +3079,11 @@ function savePouvoirForm(e) {
 
   closeModal('pouvoirModal');
   persistData();
-  showToast(`✉️ Pouvoir de ${c.nom} (${c.tantiemes} tant.) confié à ${mandataireNom} !`, "success");
+  if (prevStatut === 'VPC') {
+    notifyVpcCancelledArt141(c, 'POUVOIR', mandataireNom);
+  } else {
+    showToast(`✉️ Pouvoir de ${c.nom} (${c.tantiemes} tant.) confié à ${mandataireNom} !`, "success");
+  }
 }
 
 function revoquerPouvoirModal() {
@@ -3892,6 +4334,9 @@ function renderModeSeance() {
 
   document.getElementById('seanceCsArgumentsText').innerText = res.csNotes || 'Aucun argument particulier spécifié par le CS.';
 
+  // Bandeau VPC en direct sur cette résolution
+  renderSeanceVpcBanner(res);
+
   // Zone Candidat / Élu(e) de la séance
   const eluZone = document.getElementById('seanceElectionZone');
   const eluInput = document.getElementById('seanceEluInput');
@@ -4123,13 +4568,13 @@ function peuplerMouvementOptions(mode) {
     // Uniquement ceux actuellement en salle (Présents ou Pouvoirs)
     list = copros.filter(c => c.statut === 'PRESENT' || c.statut === 'POUVOIR');
   } else {
-    // Uniquement ceux absents ou déjà partis
-    list = copros.filter(c => c.statut === 'ABSENT' || c.statut === 'PARTI' || !c.statut);
+    // Absents, déjà partis, ou VPC arrivant finalement en salle (Art. 14-1)
+    list = copros.filter(c => c.statut === 'ABSENT' || c.statut === 'PARTI' || c.statut === 'VPC' || !c.statut);
   }
 
   select.innerHTML = list.map(c => `
-    <option value="${c.id}" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes}">
-      ${escapeHtml(c.nom)} — ${c.tantiemes} tant. [${escapeHtml(c.lots || 'Sans lot')}] (${c.statut})
+    <option value="${c.id}" data-search="${escapeHtml(c.nom)} ${escapeHtml(c.lots || '')} ${c.tantiemes} ${c.statut || ''}">
+      ${escapeHtml(c.nom)} — ${c.tantiemes} tant. [${escapeHtml(c.lots || 'Sans lot')}] (${c.statut === 'VPC' ? '📬 VPC — annule VPC Art. 14-1' : (c.statut || 'ABSENT')})
     </option>
   `).join('');
 
@@ -4181,14 +4626,22 @@ function validerMouvementSeance(e) {
     if (isModeSeanceActive) renderModeSeance();
     showToast(`🚪 Départ de ${c.nom} (${c.tantiemes} voix) consigné à ${heure}. Nouveau quorum : ${appData.config.presentTantiemes} voix.`, "warning");
   } else {
+    const prevStatut = c.statut;
     c.statut = 'PRESENT';
     c.heureArrivee = heure;
     delete c.heureDepart;
     c.notes = (c.notes ? c.notes + ' | ' : '') + `Arrivé en séance à ${heure}`;
+    if (typeof cloudUpdateCopro === 'function') {
+      cloudUpdateCopro(c.id, 'PRESENT', c.mandataire);
+    }
     closeModal('mouvementSeanceModal');
     persistData();
     if (isModeSeanceActive) renderModeSeance();
-    showToast(`👋 Arrivée de ${c.nom} (${c.tantiemes} voix) consignée à ${heure}. Nouveau quorum : ${appData.config.presentTantiemes} voix.`, "success");
+    if (prevStatut === 'VPC') {
+      notifyVpcCancelledArt141(c, 'PRESENT');
+    } else {
+      showToast(`👋 Arrivée de ${c.nom} (${c.tantiemes} voix) consignée à ${heure}. Nouveau quorum : ${appData.config.presentTantiemes} voix.`, "success");
+    }
   }
 }
 
