@@ -4016,20 +4016,40 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
   const abs = Number(r.tantiemesAbs) || 0;
   const hasNumbers = (pour > 0 || contre > 0 || abs > 0);
 
+  // Intégration des bulletins VPC alignés avant dépouillement
+  const vpcBreakdown = (!hasNumbers && typeof getResolutionVpcBreakdown === 'function')
+    ? getResolutionVpcBreakdown(r.id, !!r.amendedInSession)
+    : null;
+  const isConsigneContre = (r.csConsigne === 'CONTRE');
+  const vpcAlignedTant = vpcBreakdown ? (isConsigneContre ? vpcBreakdown.contreTant : vpcBreakdown.pourTant) : 0;
+  const vpcAlignedCount = vpcBreakdown ? (isConsigneContre ? vpcBreakdown.contreCount : vpcBreakdown.pourCount) : 0;
+  const vpcAlignedLabel = isConsigneContre ? 'VPC CONTRE' : 'VPC POUR';
+
   let targetSeuil = 0;
   let ruleTag = '';
   let ruleSubtext = '';
   let seuilPct = 50;
   let passerelleSeuil = 0;
-  let currentVal = hasNumbers ? pour : csTotalVoix;
+  const currentVal = hasNumbers ? pour : (csTotalVoix + vpcAlignedTant);
+  let denom = totalCopro || 1;
   let percent = 0;
+  let csPercent = 0;
+  let vpcPercent = 0;
   let isAdoptable = false;
   let messageTactiquePro = '';
   let alertPasserelleHtml = '';
 
+  const forceLabel = hasNumbers
+    ? 'Scrutin'
+    : (vpcAlignedTant > 0 ? `CS + ${vpcAlignedLabel}` : 'Force CS');
+  const forceDetailText = (!hasNumbers && vpcAlignedTant > 0)
+    ? `Force CS (${csTotalVoix.toLocaleString('fr-FR')}) + ${vpcAlignedLabel} (${vpcAlignedTant.toLocaleString('fr-FR')}) = <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix`
+    : `Force CS : <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix`;
+
   if (isArt24) {
     // Art 24 : Majorité simple des voix exprimées en salle
     const exprimesActuels = hasNumbers ? (pour + contre) : (totalEnSalle || 1);
+    denom = exprimesActuels;
     targetSeuil = Math.floor(exprimesActuels / 2) + 1;
     seuilPct = 50;
     ruleTag = 'Article 24 • Majorité simple';
@@ -4039,13 +4059,14 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
 
     if (isAdoptable) {
       const surplus = currentVal - targetSeuil;
-      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix, soit <strong>+${surplus.toLocaleString('fr-FR')} voix d'avance</strong> sur les ${targetSeuil.toLocaleString('fr-FR')} nécessaires pour l'adopter.`;
+      messageTactiquePro = `${forceDetailText}, soit <strong>+${surplus.toLocaleString('fr-FR')} voix d'avance</strong> sur les ${targetSeuil.toLocaleString('fr-FR')} nécessaires${isConsigneContre ? ' pour bloquer' : ' pour l\'adopter'}.`;
     } else {
       const besoin = Math.max(0, targetSeuil - currentVal);
-      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin.toLocaleString('fr-FR')} voix</strong> parmi les présents en séance pour emporter la décision.`;
+      messageTactiquePro = `${forceDetailText}. Il manque <strong>${besoin.toLocaleString('fr-FR')} voix</strong> parmi les présents en séance pour emporter la décision.`;
     }
   } else if (isArt25) {
     // Art 25 : Majorité de tous les copropriétaires
+    denom = totalCopro || 1;
     targetSeuil = Math.floor(totalCopro / 2) + 1; // 50 001
     passerelleSeuil = Math.ceil(totalCopro / 3); // 33 334
     seuilPct = 50;
@@ -4065,14 +4086,15 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
     }
 
     if (isAdoptable) {
-      messageTactiquePro = `Majorité absolue atteinte avec <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix ! L'adoption directe à l'Article 25 est acquise.`;
+      messageTactiquePro = `Majorité absolue atteinte avec ${forceDetailText} ! L'adoption directe à l'Article 25 est acquise.`;
     } else if (currentVal >= passerelleSeuil) {
-      messageTactiquePro = `Le CS détient <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix : seuil de passerelle 25-1 franchi ! Un second vote immédiat à l'Art. 24 peut être déclenché.`;
+      messageTactiquePro = `${forceDetailText} : seuil de passerelle 25-1 franchi ! Un second vote immédiat à l'Art. 24 peut être déclenché.`;
     } else {
-      messageTactiquePro = `Force CS : <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin25.toLocaleString('fr-FR')}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle.toLocaleString('fr-FR')}</strong> voix pour la passerelle 25-1).`;
+      messageTactiquePro = `${forceDetailText}. Il manque <strong>${besoin25.toLocaleString('fr-FR')}</strong> voix pour l'Art. 25 (ou <strong>${besoinPasserelle.toLocaleString('fr-FR')}</strong> voix pour la passerelle 25-1).`;
     }
   } else if (isArt26) {
     // Art 26 : Double majorité (2/3 de l'immeuble)
+    denom = totalCopro || 1;
     targetSeuil = Math.ceil((totalCopro * 2) / 3);
     seuilPct = 67;
     ruleTag = 'Article 26 • Double majorité';
@@ -4082,10 +4104,18 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
     const besoin26 = Math.max(0, targetSeuil - currentVal);
 
     if (isAdoptable) {
-      messageTactiquePro = `Double majorité acquise avec <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix ! Seuil des 2/3 franchi.`;
+      messageTactiquePro = `Double majorité acquise avec ${forceDetailText} ! Seuil des 2/3 franchi.`;
     } else {
-      messageTactiquePro = `Force CS : <strong>${currentVal.toLocaleString('fr-FR')}</strong> voix. Il manque <strong>${besoin26.toLocaleString('fr-FR')}</strong> voix pour atteindre les 2/3 de l'immeuble.`;
+      messageTactiquePro = `${forceDetailText}. Il manque <strong>${besoin26.toLocaleString('fr-FR')}</strong> voix pour atteindre les 2/3 de l'immeuble.`;
     }
+  }
+
+  if (!hasNumbers && vpcAlignedTant > 0 && denom > 0) {
+    csPercent = Math.min(100, (csTotalVoix / denom) * 100);
+    vpcPercent = Math.max(0, Math.min(100 - csPercent, (vpcAlignedTant / denom) * 100));
+  } else {
+    csPercent = percent;
+    vpcPercent = 0;
   }
 
   const fillClass = isAdoptable ? 'success' : (percent >= 33 ? 'warning' : 'primary');
@@ -4097,8 +4127,8 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
           <span class="gauge-rule-tag">${escapeHtml(ruleTag)}</span>
           <span class="gauge-rule-desc">${escapeHtml(ruleSubtext)}</span>
         </div>
-        <div class="gauge-score-pill ${isAdoptable ? 'score-adopted' : ''}">
-          <span class="score-label">${hasNumbers ? 'Scrutin' : 'Force CS'} :</span>
+        <div class="gauge-score-pill ${isAdoptable ? 'score-adopted' : ''}" title="${!hasNumbers && vpcAlignedTant > 0 ? `Force CS : ${csTotalVoix.toLocaleString('fr-FR')} t. + ${vpcAlignedLabel} (${vpcAlignedCount}) : ${vpcAlignedTant.toLocaleString('fr-FR')} t.` : ''}">
+          <span class="score-label">${forceLabel} :</span>
           <span class="score-val"><strong>${currentVal.toLocaleString('fr-FR')}</strong> voix</span>
           <span class="score-percent">(${percent}%)</span>
         </div>
@@ -4106,7 +4136,10 @@ function renderTacticalMajorityGauge(r, totalEnSalle, totalCopro, csTotalVoix) {
 
       <div class="gauge-bar-wrapper">
         <div class="gauge-track">
-          <div class="gauge-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
+          <div class="gauge-bar-fill ${fillClass} ${vpcPercent > 0 ? 'has-vpc-segment' : ''}" style="width: ${csPercent.toFixed(2)}%;"></div>
+          ${vpcPercent > 0 ? `
+            <div class="gauge-bar-fill-vpc ${csPercent <= 0 ? 'vpc-only' : ''}" style="left: ${csPercent.toFixed(2)}%; width: ${vpcPercent.toFixed(2)}%;" title="+ ${vpcAlignedTant.toLocaleString('fr-FR')} voix ${vpcAlignedLabel} (${vpcAlignedCount} bulletins)"></div>
+          ` : ''}
           ${isArt25 ? `
             <div class="gauge-marker-pin pin-passerelle" style="left: 33.33%;" title="Passerelle Art. 25-1 (33.3% - ${passerelleSeuil.toLocaleString('fr-FR')} voix)">
               <span class="marker-flag">⚡ Passerelle 1/3</span>
@@ -6064,6 +6097,260 @@ function openFlashInfoModal() {
   openModal('flashInfoModal');
 }
 
+function buildFlashInfoStyles(format = 'SCREEN') {
+  const isA3 = format === 'A3';
+  const isA4 = format === 'A4';
+  const baseFont = isA3 ? '13.5pt' : (isA4 ? '9.6pt' : '14px');
+  const titleSize = isA3 ? '26pt' : (isA4 ? '17.5pt' : '1.45rem');
+  const padMain = isA3 ? '24px 28px' : (isA4 ? '14px 18px' : '1.5rem 1.75rem');
+  const gapSection = isA3 ? '18px' : (isA4 ? '11px' : '1.1rem');
+
+  return `
+    .flyer-poster {
+      background: #ffffff;
+      color: #0f172a;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: ${baseFont};
+      line-height: 1.45;
+      border-radius: ${isA3 || isA4 ? '0' : '12px'};
+      overflow: hidden;
+      border: ${isA3 || isA4 ? 'none' : '1px solid #cbd5e1'};
+      box-shadow: ${isA3 || isA4 ? 'none' : '0 10px 30px rgba(15, 23, 42, 0.12)'};
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .flyer-header {
+      background: linear-gradient(135deg, #0f2454 0%, #1e3a8a 65%, #1d4ed8 100%);
+      color: #ffffff;
+      padding: ${isA3 ? '28px 34px 24px' : (isA4 ? '16px 22px 14px' : '1.6rem 1.75rem 1.35rem')};
+      border-bottom: 5px solid #f59e0b;
+      text-align: center;
+    }
+    .flyer-eyebrow {
+      font-size: 0.75em;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #bfdbfe;
+      margin-bottom: 0.45em;
+    }
+    .flyer-title {
+      margin: 0;
+      font-size: ${titleSize};
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      line-height: 1.18;
+      color: #ffffff;
+    }
+    .flyer-subtitle {
+      margin-top: 0.55em;
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 0.25em 0.9em;
+      border-radius: 9999px;
+      font-size: 0.82em;
+      font-weight: 600;
+      color: #e0f2fe;
+    }
+    .flyer-kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .flyer-kpi-item {
+      padding: ${isA3 ? '14px 16px' : (isA4 ? '8px 12px' : '0.75rem 1rem')};
+      text-align: center;
+      border-right: 1px solid #e2e8f0;
+    }
+    .flyer-kpi-item:last-child { border-right: none; }
+    .flyer-kpi-val {
+      font-size: 1.35em;
+      font-weight: 900;
+      color: #1e3a8a;
+      line-height: 1.15;
+    }
+    .flyer-kpi-val.emerald { color: #059669; }
+    .flyer-kpi-val.rose { color: #dc2626; }
+    .flyer-kpi-lbl {
+      font-size: 0.72em;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 700;
+      color: #64748b;
+      margin-top: 0.2em;
+    }
+    .flyer-body {
+      padding: ${padMain};
+      display: flex;
+      flex-direction: column;
+      gap: ${gapSection};
+    }
+    .flyer-intro {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 5px solid #10b981;
+      border-radius: 8px;
+      padding: ${isA3 ? '16px 20px' : (isA4 ? '10px 14px' : '0.9rem 1.1rem')};
+      color: #064e3b;
+      font-size: 0.92em;
+    }
+    .flyer-intro strong { color: #065f46; }
+    .flyer-syndic-box {
+      border-radius: 10px;
+      padding: ${isA3 ? '18px 22px' : (isA4 ? '11px 15px' : '1rem 1.15rem')};
+      border: 1.5px solid #cbd5e1;
+      background: #f8fafc;
+    }
+    .flyer-syndic-box.nouveau {
+      background: #ecfdf5;
+      border-color: #6ee7b7;
+    }
+    .flyer-syndic-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.45em;
+    }
+    .flyer-syndic-title {
+      margin: 0;
+      font-size: 1.05em;
+      font-weight: 800;
+      color: #1e3a8a;
+    }
+    .flyer-syndic-box.nouveau .flyer-syndic-title { color: #065f46; }
+    .flyer-syndic-desc {
+      font-size: 0.9em;
+      color: #334155;
+      line-height: 1.45;
+    }
+    .flyer-decisions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: ${gapSection};
+    }
+    .flyer-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+    .flyer-card-head {
+      padding: ${isA3 ? '11px 16px' : (isA4 ? '7px 11px' : '0.6rem 0.9rem')};
+      font-weight: 800;
+      font-size: 0.92em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .flyer-card-head.adopted { background: #ecfdf5; color: #065f46; border-bottom-color: #a7f3d0; }
+    .flyer-card-head.rejected { background: #fef2f2; color: #991b1b; border-bottom-color: #fecaca; }
+    .flyer-count-pill {
+      background: #ffffff;
+      padding: 0.12em 0.55em;
+      border-radius: 9999px;
+      font-size: 0.85em;
+      font-weight: 800;
+      border: 1px solid currentColor;
+    }
+    .flyer-card-body {
+      padding: ${isA3 ? '14px 16px' : (isA4 ? '9px 11px' : '0.75rem 0.9rem')};
+      flex: 1;
+    }
+    .flyer-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45em;
+    }
+    .flyer-list li {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5em;
+      font-size: 0.86em;
+      color: #1e293b;
+      line-height: 1.38;
+    }
+    .flyer-res-num {
+      flex-shrink: 0;
+      font-size: 0.78em;
+      font-weight: 800;
+      padding: 0.1em 0.45em;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+    .flyer-res-num.adopted { background: #dcfce7; color: #166534; }
+    .flyer-res-num.rejected { background: #fee2e2; color: #991b1b; }
+    .flyer-empty-note {
+      font-size: 0.86em;
+      color: #64748b;
+      font-style: italic;
+    }
+    .flyer-cs-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: ${isA3 ? '16px 20px' : (isA4 ? '10px 14px' : '0.9rem 1.1rem')};
+    }
+    .flyer-cs-title {
+      margin: 0 0 0.25em 0;
+      font-size: 0.96em;
+      font-weight: 800;
+      color: #1e3a8a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .flyer-cs-sub {
+      font-size: 0.85em;
+      color: #475569;
+      margin-bottom: 0.7em;
+    }
+    .flyer-cs-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: ${isA3 ? '10px' : '7px'};
+    }
+    .flyer-cs-member {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-left: 3.5px solid #1e3a8a;
+      border-radius: 6px;
+      padding: ${isA3 ? '8px 12px' : (isA4 ? '5px 8px' : '0.4rem 0.65rem')};
+      font-weight: 700;
+      font-size: 0.83em;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .flyer-footer {
+      border-top: 2px solid #e2e8f0;
+      padding-top: ${isA3 ? '14px' : '9px'};
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.78em;
+      color: #475569;
+    }
+    .flyer-footer-sign {
+      font-weight: 800;
+      color: #1e3a8a;
+      white-space: nowrap;
+    }
+  `;
+}
+
 function renderFlashInfo() {
   const container = document.getElementById('flashInfoPrintZone');
   if (!container) return;
@@ -6075,83 +6362,113 @@ function renderFlashInfo() {
   const rejected = voteRes.filter(r => r.status === 'REJETEE');
 
   const totalEnSalle = appData.config.presentTantiemes || 0;
-  const pctRepresente = totalCopro > 0 ? ((totalEnSalle / totalCopro) * 100).toFixed(1) : 0;
+  const pctRepresente = totalCopro > 0 ? ((totalEnSalle / totalCopro) * 100).toFixed(1) : '0.0';
+  const coproName = escapeHtml(appData.config?.coproName || 'Résidence Le Floréal');
 
   const syndicInfo = getSyndicEluInfo(resolutions);
   const conseillersElus = getConseillersElusInfo(resolutions);
 
+  // Nettoyer les éventuels emojis en début de titreBloc pour un rendu affiche ultra-propre
+  const cleanSyndicTitle = (syndicInfo.titreBloc || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+
   container.innerHTML = `
-    <div class="flash-info-card" id="flashInfoFlyerContent">
-      <div style="background:#1e3a8a; color:white; border-radius:8px; padding:1.25rem; text-align:center; margin-bottom:1.25rem;">
-        <div style="font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; font-weight:700; color:#93c5fd;">
-          Conseil Syndical • Résidence Le Floréal
+    <style>${buildFlashInfoStyles('SCREEN')}</style>
+    <div class="flyer-poster" id="flashInfoFlyerContent">
+      <div class="flyer-header">
+        <div class="flyer-eyebrow">Conseil Syndical • ${coproName} • Sassenage</div>
+        <h1 class="flyer-title">FLASH-INFO : RÉSULTATS DE L'ASSEMBLÉE GÉNÉRALE 2026</h1>
+        <div class="flyer-subtitle">Séance du 25 novembre 2026 • Salle Jacques Prévert, Sassenage</div>
+      </div>
+
+      <div class="flyer-kpi-strip">
+        <div class="flyer-kpi-item">
+          <div class="flyer-kpi-val">${pctRepresente}%</div>
+          <div class="flyer-kpi-lbl">Tantièmes représentés (${totalEnSalle.toLocaleString('fr-FR')} t.)</div>
         </div>
-        <h1 style="margin:0.4rem 0 0.2rem; font-size:1.4rem; font-weight:800; color:white;">
-          📢 FLASH-INFO : RÉSULTATS DE L'ASSEMBLÉE GÉNÉRALE 2026
-        </h1>
-        <div style="font-size:0.85rem; color:#bfdbfe;">
-          Séance du 25 novembre 2026 • Salle Jacques Prévert, Sassenage
+        <div class="flyer-kpi-item">
+          <div class="flyer-kpi-val emerald">${adopted.length}</div>
+          <div class="flyer-kpi-lbl">Décisions adoptées</div>
+        </div>
+        <div class="flyer-kpi-item">
+          <div class="flyer-kpi-val rose">${rejected.length}</div>
+          <div class="flyer-kpi-lbl">Projets rejetés / ajournés</div>
         </div>
       </div>
 
-      <div style="background:#ecfdf5; border-left:4px solid #10b981; padding:0.85rem 1rem; border-radius:4px; font-size:0.92rem; color:#065f46; margin-bottom:1.2rem; line-height:1.5;">
-        <strong>Chers voisins, chers copropriétaires,</strong><br>
-        Le Conseil Syndical vous remercie très chaleureusement pour votre mobilisation record lors de notre Assemblée Générale annuelle. Avec plus de <strong>${pctRepresente}% des tantièmes de la résidence représentés</strong>, notre communauté a fait entendre sa voix pour la défense de notre cadre de vie et la maîtrise stricte de nos charges !
-      </div>
-
-      <!-- BLOC INTELLIGENT DE DÉSIGNATION DU SYNDIC -->
-      <div style="background:${syndicInfo.status === 'NOUVEAU' ? '#ecfdf5' : '#f8fafc'}; border:1px solid ${syndicInfo.status === 'NOUVEAU' ? '#a7f3d0' : '#cbd5e1'}; border-radius:6px; padding:0.85rem 1rem; margin-bottom:1.25rem;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
-          <h3 style="margin:0; font-size:0.95rem; color:${syndicInfo.status === 'NOUVEAU' ? '#065f46' : '#1e3a8a'}; font-weight:800; display:flex; align-items:center; gap:0.4rem;">
-            ${syndicInfo.titreBloc}
-          </h3>
-          ${syndicInfo.badgeHtml}
-        </div>
-        <div style="font-size:0.84rem; color:#334155; line-height:1.5;">
-          ${syndicInfo.descBloc}
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:1rem; margin-bottom:1.25rem;">
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.85rem;">
-          <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#15803d; display:flex; align-items:center; gap:0.4rem;">
-            ✅ Les Décisions Majeures Adoptées (${adopted.length})
-          </h3>
-          <ul style="margin:0; padding-left:1.1rem; font-size:0.83rem; color:#334155; line-height:1.5;">
-            ${adopted.slice(0, 6).map(r => `<li><strong>N° ${r.number}</strong> : ${escapeHtml(r.title)}</li>`).join('')}
-            ${adopted.length > 6 ? `<li style="color:#64748b; font-style:italic;">... et ${adopted.length - 6} autres résolutions approuvées.</li>` : ''}
-          </ul>
+      <div class="flyer-body">
+        <div class="flyer-intro">
+          <strong>Chers voisins, chers copropriétaires,</strong><br>
+          Le Conseil Syndical vous remercie chaleureusement pour votre forte mobilisation lors de notre Assemblée Générale annuelle. Avec <strong>${pctRepresente}% des tantièmes de la résidence représentés</strong>, la copropriété a fait entendre sa voix pour la défense de notre cadre de vie et la maîtrise rigoureuse de nos charges.
         </div>
 
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:0.85rem;">
-          <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#dc2626; display:flex; align-items:center; gap:0.4rem;">
-            ❌ Projets Rejetés ou Ajournés (${rejected.length})
-          </h3>
-          ${rejected.length > 0 ? `
-            <ul style="margin:0; padding-left:1.1rem; font-size:0.83rem; color:#334155; line-height:1.5;">
-              ${rejected.map(r => `<li><strong>N° ${r.number}</strong> : ${escapeHtml(r.title)}</li>`).join('')}
-            </ul>
-          ` : `
-            <div style="font-size:0.83rem; color:#64748b;">Aucun rejet bloquant constaté lors de cette séance.</div>
-          `}
+        <div class="flyer-syndic-box ${syndicInfo.status === 'NOUVEAU' ? 'nouveau' : ''}">
+          <div class="flyer-syndic-top">
+            <h3 class="flyer-syndic-title">${cleanSyndicTitle}</h3>
+            ${syndicInfo.badgeHtml}
+          </div>
+          <div class="flyer-syndic-desc">${syndicInfo.descBloc}</div>
         </div>
-      </div>
 
-      <div style="background:#f1f5f9; border-radius:6px; padding:0.85rem; margin-bottom:1.25rem; font-size:0.86rem; color:#1e293b;">
-        <strong style="color:#1e3a8a;">👥 Votre Conseil Syndical pour l'année 2026-2027 :</strong><br>
-        ${syndicInfo.phraseCS}<br>
-        <div style="margin-top:0.4rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
-          ${conseillersElus.map(m => `
-            <span style="background:white; border:1px solid #cbd5e1; padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.8rem; color:#1e3a8a;">
-              👤 ${escapeHtml(m.name)}
-            </span>
-          `).join('')}
+        <div class="flyer-decisions-grid">
+          <div class="flyer-card">
+            <div class="flyer-card-head adopted">
+              <span>Décisions Majeures Adoptées</span>
+              <span class="flyer-count-pill">${adopted.length}</span>
+            </div>
+            <div class="flyer-card-body">
+              ${adopted.length > 0 ? `
+                <ul class="flyer-list">
+                  ${adopted.slice(0, 8).map(r => `
+                    <li>
+                      <span class="flyer-res-num adopted">N° ${escapeHtml(r.number)}</span>
+                      <span>${escapeHtml(r.title)}</span>
+                    </li>
+                  `).join('')}
+                  ${adopted.length > 8 ? `<li class="flyer-empty-note">… et ${adopted.length - 8} autres résolutions approuvées.</li>` : ''}
+                </ul>
+              ` : `
+                <div class="flyer-empty-note">Les résultats détaillés s'afficheront ici automatiquement au fil des votes de l'Assemblée Générale.</div>
+              `}
+            </div>
+          </div>
+
+          <div class="flyer-card">
+            <div class="flyer-card-head rejected">
+              <span>Projets Rejetés ou Ajournés</span>
+              <span class="flyer-count-pill">${rejected.length}</span>
+            </div>
+            <div class="flyer-card-body">
+              ${rejected.length > 0 ? `
+                <ul class="flyer-list">
+                  ${rejected.slice(0, 8).map(r => `
+                    <li>
+                      <span class="flyer-res-num rejected">N° ${escapeHtml(r.number)}</span>
+                      <span>${escapeHtml(r.title)}</span>
+                    </li>
+                  `).join('')}
+                  ${rejected.length > 8 ? `<li class="flyer-empty-note">… et ${rejected.length - 8} autres résolutions rejetées.</li>` : ''}
+                </ul>
+              ` : `
+                <div class="flyer-empty-note">Aucun rejet bloquant constaté lors de cette séance.</div>
+              `}
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div style="border-top:1px solid #e2e8f0; padding-top:0.75rem; text-align:center; font-size:0.78rem; color:#64748b; line-height:1.5;">
-        ${syndicInfo.footerPV}<br>
-        <strong>Bien cordialement, Votre Conseil Syndical • Résidence Le Floréal</strong>
+        <div class="flyer-cs-box">
+          <div class="flyer-cs-title">Votre Conseil Syndical pour l'exercice 2026-2027</div>
+          <div class="flyer-cs-sub">${syndicInfo.phraseCS}</div>
+          <div class="flyer-cs-grid">
+            ${conseillersElus.map(m => `
+              <div class="flyer-cs-member">${escapeHtml(m.name)}</div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="flyer-footer">
+          <div>${syndicInfo.footerPV}</div>
+          <div class="flyer-footer-sign">Votre Conseil Syndical • ${coproName}</div>
+        </div>
       </div>
     </div>
   `;
@@ -6168,28 +6485,93 @@ function copierFlashInfoTexte() {
   });
 }
 
-function imprimerFlashInfoFlyer() {
-  const content = document.getElementById('flashInfoPrintZone')?.innerHTML;
-  if (!content) return;
+function imprimerFlashInfoFlyer(format = 'A4') {
+  const posterEl = document.getElementById('flashInfoFlyerContent');
+  if (!posterEl) return;
+
+  const isA3 = (format === 'A3');
+  const pageSize = isA3 ? 'A3 portrait' : 'A4 portrait';
+  const pageMargin = isA3 ? '12mm' : '10mm';
 
   const printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Flash-Info AG 2026 - Conseil Syndical Le Floréal</title>
-      <style>
-        body { font-family: system-ui, -apple-system, sans-serif; padding: 25px; color: #0f172a; line-height: 1.5; font-size: 11pt; }
-        .flash-info-card { border: none !important; box-shadow: none !important; }
-        @media print { button { display: none !important; } }
-      </style>
-    </head>
-    <body>
-      ${content}
-      <script>window.onload = function() { window.print(); };</script>
-    </body>
-    </html>
-  `);
+  if (!printWindow) {
+    showToast("⚠️ Fenêtre bloquée par le navigateur. Autorisez les pop-ups pour imprimer le flyer.", "warning");
+    return;
+  }
+
+  printWindow.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Flash-Info AG 2026 (${isA3 ? 'Affiche A3' : 'Flyer A4'}) — Conseil Syndical Le Floréal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #e2e8f0;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .print-toolbar {
+      max-width: ${isA3 ? '1050px' : '794px'};
+      margin: 0 auto 14px auto;
+      background: #0f2454;
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .print-toolbar-btn {
+      background: #f59e0b;
+      color: #0f172a;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .print-toolbar-btn.secondary {
+      background: rgba(255,255,255,0.16);
+      color: #ffffff;
+    }
+    .sheet-preview {
+      max-width: ${isA3 ? '1050px' : '794px'};
+      margin: 0 auto;
+      background: #ffffff;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    }
+    ${buildFlashInfoStyles(isA3 ? 'A3' : 'A4')}
+    @media print {
+      @page { size: ${pageSize}; margin: ${pageMargin}; }
+      body { background: #ffffff; padding: 0; margin: 0; }
+      .print-toolbar { display: none !important; }
+      .sheet-preview { max-width: none; box-shadow: none; margin: 0; }
+      .flyer-poster { border: none !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-toolbar">
+    <div>
+      <strong>${isA3 ? '🖼️ Affiche Grand Format A3 (Halls d\'immeubles)' : '🖨️ Flyer Format A4'}</strong> — Pensez à sélectionner <em>${isA3 ? 'A3' : 'A4'}</em> et cocher <em>Graphiques d'arrière-plan</em>.
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="print-toolbar-btn" onclick="window.print()">🖨️ Imprimer / PDF (${isA3 ? 'A3' : 'A4'})</button>
+      <button class="print-toolbar-btn secondary" onclick="window.close()">✕ Fermer</button>
+    </div>
+  </div>
+  <div class="sheet-preview">
+    ${posterEl.outerHTML}
+  </div>
+</body>
+</html>`);
   printWindow.document.close();
 }
 

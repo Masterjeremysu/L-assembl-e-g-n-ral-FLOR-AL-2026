@@ -2121,21 +2121,26 @@ M. LEROY Jacques	Lot 8	85"></textarea>
 
   <!-- MODAL FLASH-INFO RÉSIDENTS POUR HALLS D'IMMEUBLES -->
   <div class="modal-overlay" id="flashInfoModal">
-    <div class="modal-box" style="max-width: 800px;">
+    <div class="modal-box" style="max-width: 860px;">
       <div class="modal-header">
-        <h3 class="modal-title">📢 Flash-Info Résidents (Compte-rendu du Conseil Syndical)</h3>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <button class="btn btn-sm btn-outline-primary" onclick="copierFlashInfoTexte()">📋 Copier (Email / WhatsApp)</button>
-          <button class="btn btn-sm btn-primary" onclick="imprimerFlashInfoFlyer()">🖨️ Imprimer Flyer A4 (Halls)</button>
+        <h3 class="modal-title">📢 Flash-Info Résidents (Affiche Halls A4 / A3)</h3>
+        <div style="display:flex; gap:0.45rem; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline-primary" onclick="copierFlashInfoTexte()">📋 Copier texte</button>
+          <button class="btn btn-sm btn-secondary" onclick="imprimerFlashInfoFlyer('A4')" title="Imprimer au format A4 (1 page)">🖨️ Imprimer A4</button>
+          <button class="btn btn-sm btn-primary" onclick="imprimerFlashInfoFlyer('A3')" title="Imprimer en grand format A3 pour les halls d'immeubles">🖼️ Affiche A3 (Halls)</button>
           <button class="modal-close" onclick="closeModal('flashInfoModal')">&times;</button>
         </div>
       </div>
-      <div class="modal-body" style="background:#f8fafc; padding:1.25rem;" id="flashInfoPrintZone">
+      <div class="modal-body" style="background:#e2e8f0; padding:1.25rem;" id="flashInfoPrintZone">
         <!-- Rendu dynamique par renderFlashInfo() -->
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('flashInfoModal')">Fermer</button>
-        <button type="button" class="btn btn-primary" onclick="copierFlashInfoTexte()">📋 Copier pour diffusion immédiate</button>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <span style="font-size:0.78rem; color:var(--gray-500);">💡 Astuce impression : cochez <strong>« Graphiques d'arrière-plan »</strong> dans la boîte d'impression.</span>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('flashInfoModal')">Fermer</button>
+          <button type="button" class="btn btn-secondary" onclick="imprimerFlashInfoFlyer('A4')">🖨️ Format A4</button>
+          <button type="button" class="btn btn-primary" onclick="imprimerFlashInfoFlyer('A3')">🖼️ Format A3 (Halls)</button>
+        </div>
       </div>
     </div>
   </div>
